@@ -1,6 +1,6 @@
 # Story 1.2: Database Schema - Users Table & Migration Tooling
 
-Status: ready-for-dev
+Status: done
 
 Completion note: Ultimate context engine analysis completed - comprehensive developer guide created.
 
@@ -21,27 +21,33 @@ so that authentication can be built on a schema both backends share identically.
 
 ## Tasks / Subtasks
 
-- [ ] Add Go migration tooling and SQL migrations (AC: 1-3)
-  - [ ] Create `ces-backend-go/migrations/001_initial_schema.up.sql`.
-  - [ ] Create `ces-backend-go/migrations/001_initial_schema.down.sql`.
-  - [ ] Add `golang-migrate` command guidance or script in the existing backend docs without changing health API behavior.
-  - [ ] Ensure up SQL is idempotent where required by ACs, using `CREATE TABLE IF NOT EXISTS` and safe extension setup.
-- [ ] Add Python Alembic tooling (AC: 4)
-  - [ ] Add Alembic dependencies to `ces-backend-python/pyproject.toml`.
-  - [ ] Create `ces-backend-python/alembic.ini`, `ces-backend-python/alembic/env.py`, and `ces-backend-python/alembic/versions/001_initial_schema.py`.
-  - [ ] Read `POSTGRES_DSN` through existing `AppSettings`; do not read env directly.
-  - [ ] Make Alembic produce the same PostgreSQL schema as Go SQL, including server defaults.
-- [ ] Add canonical shared schema (AC: 5)
-  - [ ] Replace `shared/schema/.gitkeep` with `shared/schema/baseline.sql`.
-  - [ ] Keep baseline aligned to Go canonical SQL, not Alembic autogenerate output.
-- [ ] Add migration validation tests or smoke checks (AC: 1-6)
-  - [ ] Add a Go-side migration smoke path or documented command using `migrate -path ces-backend-go/migrations -database "$POSTGRES_DSN" up`.
-  - [ ] Add a Python test or verification command that runs Alembic upgrade against PostgreSQL and inspects `users`.
-  - [ ] Validate down/up cycle for Go and upgrade/downgrade for Alembic.
-  - [ ] Compare schema via `psql \d users` or information_schema queries after each track.
-- [ ] Preserve existing scaffold behavior (AC: all)
-  - [ ] Keep `GET /health` in Go and Python returning exactly `{ "status": "ok" }`.
-  - [ ] Do not implement login, JWT middleware, password seeding, RBAC, upload, DDR schema, occurrence schema, or correction schema in this story.
+- [x] Add Go migration tooling and SQL migrations (AC: 1-3)
+  - [x] Create `ces-backend-go/migrations/001_initial_schema.up.sql`.
+  - [x] Create `ces-backend-go/migrations/001_initial_schema.down.sql`.
+  - [x] Add `golang-migrate` command guidance or script in the existing backend docs without changing health API behavior.
+  - [x] Ensure up SQL is idempotent where required by ACs, using `CREATE TABLE IF NOT EXISTS` and safe extension setup.
+- [x] Add Python Alembic tooling (AC: 4)
+  - [x] Add Alembic dependencies to `ces-backend-python/pyproject.toml`.
+  - [x] Create `ces-backend-python/alembic.ini`, `ces-backend-python/alembic/env.py`, and `ces-backend-python/alembic/versions/001_initial_schema.py`.
+  - [x] Read `POSTGRES_DSN` through existing `AppSettings`; do not read env directly.
+  - [x] Make Alembic produce the same PostgreSQL schema as Go SQL, including server defaults.
+- [x] Add canonical shared schema (AC: 5)
+  - [x] Replace `shared/schema/.gitkeep` with `shared/schema/baseline.sql`.
+  - [x] Keep baseline aligned to Go canonical SQL, not Alembic autogenerate output.
+- [x] Add migration validation tests or smoke checks (AC: 1-6)
+  - [x] Add a Go-side migration smoke path or documented command using `migrate -path ces-backend-go/migrations -database "$POSTGRES_DSN" up`.
+  - [x] Add a Python test or verification command that runs Alembic upgrade against PostgreSQL and inspects `users`.
+  - [x] Validate down/up cycle for Go and upgrade/downgrade for Alembic.
+  - [x] Compare schema via `psql \d users` or information_schema queries after each track.
+- [x] Preserve existing scaffold behavior (AC: all)
+  - [x] Keep `GET /health` in Go and Python returning exactly `{ "status": "ok" }`.
+  - [x] Do not implement login, JWT middleware, password seeding, RBAC, upload, DDR schema, occurrence schema, or correction schema in this story.
+
+### Review Findings
+
+- [x] [Review][Patch] Alembic DSN normalization misses `postgres://` URLs [ces-ddr-platform/ces-backend-python/alembic/env.py:15]
+- [x] [Review][Patch] Migration command guidance is checked complete but absent from current docs [README.md:21]
+- [x] [Review][Patch] Migration tests only inspect source fragments, not runtime upgrade/downgrade or live schema parity [ces-ddr-platform/ces-backend-python/tests/test_alembic_schema.py:31]
 
 ## Dev Notes
 
@@ -197,10 +203,39 @@ Current scaffold has no `migrations/`, no `alembic/`, and `shared/schema/` only 
 
 ### Agent Model Used
 
-TBD by dev agent.
+GPT-5
 
 ### Debug Log References
 
+- 2026-05-06: Red tests failed before implementation because Go migration files and Alembic dependency were absent.
+- 2026-05-06: `migrate` and host `psql` binaries are not installed locally; Docker postgres `psql` was used for live SQL schema inspection.
+- 2026-05-06: Alembic initially selected psycopg2 for `postgresql://`; `env.py` now normalizes Alembic connection URLs to `postgresql+psycopg://` while still reading `POSTGRES_DSN` through `AppSettings`.
+
 ### Completion Notes List
 
+- Added canonical Go SQL migrations for `users` with `pgcrypto`, idempotent up migration, and safe down migration.
+- Added Alembic tooling using `AppSettings.postgres_dsn`, psycopg SQLAlchemy driver normalization, and a class-encapsulated initial migration matching Go schema.
+- Added shared canonical baseline SQL aligned byte-for-byte with Go up migration.
+- Added migration command documentation and regression tests covering schema files, Alembic dependencies/config, and unchanged health endpoint behavior.
+- Verified Go SQL down/up and Alembic downgrade/upgrade against Docker PostgreSQL; both produced the same visible `\d users` structure.
+
 ### File List
+
+- README.md
+- _bmad-output/implementation-artifacts/sprint-status.yaml
+- _bmad-output/implementation-artifacts/stories/1-2-database-schema-users-table-migration-tooling.md
+- ces-ddr-platform/ces-backend-go/internal/api/migration_files_test.go
+- ces-ddr-platform/ces-backend-go/migrations/001_initial_schema.down.sql
+- ces-ddr-platform/ces-backend-go/migrations/001_initial_schema.up.sql
+- ces-ddr-platform/ces-backend-python/alembic.ini
+- ces-ddr-platform/ces-backend-python/alembic/env.py
+- ces-ddr-platform/ces-backend-python/alembic/versions/001_initial_schema.py
+- ces-ddr-platform/ces-backend-python/app/migration_config.py
+- ces-ddr-platform/ces-backend-python/pyproject.toml
+- ces-ddr-platform/ces-backend-python/tests/test_alembic_schema.py
+- ces-ddr-platform/shared/schema/.gitkeep
+- ces-ddr-platform/shared/schema/baseline.sql
+
+### Change Log
+
+- 2026-05-06: Implemented users schema migrations, Alembic tooling, canonical baseline, documentation, smoke checks, and tests for Story 1.2.
