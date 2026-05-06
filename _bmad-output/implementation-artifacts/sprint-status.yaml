@@ -1,0 +1,103 @@
+# generated: 2026-05-06
+# last_updated: 2026-05-06
+# project: Canadian Energy Service Internal Tool
+# project_key: NOKEY
+# tracking_system: file-system
+# story_location: _bmad-output/implementation-artifacts/stories
+
+# STATUS DEFINITIONS:
+# ==================
+# Epic Status:
+#   - backlog: Epic not yet started
+#   - in-progress: Epic actively being worked on
+#   - done: All stories in epic completed
+#
+# Epic Status Transitions:
+#   - backlog → in-progress: Automatically when first story is created (via create-story)
+#   - in-progress → done: Manually when all stories reach 'done' status
+#
+# Story Status:
+#   - backlog: Story only exists in epic file
+#   - ready-for-dev: Story file created in stories folder
+#   - in-progress: Developer actively working on implementation
+#   - review: Ready for code review (via Dev's code-review workflow)
+#   - done: Story completed
+#
+# Retrospective Status:
+#   - optional: Can be completed but not required
+#   - done: Retrospective has been completed
+#
+# WORKFLOW NOTES:
+# ===============
+# - Epic transitions to 'in-progress' automatically when first story is created
+# - Stories can be worked in parallel if team capacity allows
+# - Developer typically creates next story after previous one is 'done' to incorporate learnings
+# - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
+
+generated: 2026-05-06
+last_updated: 2026-05-06
+project: Canadian Energy Service Internal Tool
+project_key: NOKEY
+tracking_system: file-system
+story_location: _bmad-output/implementation-artifacts/stories
+
+development_status:
+  # ── Epic 1: Platform Foundation & Authenticated Access ──
+  epic-1: in-progress
+  1-1-project-scaffold-development-infrastructure: done
+  1-2-database-schema-users-table-migration-tooling: ready-for-dev
+  1-3-authentication-api-login-jwt-middleware: backlog
+  1-4-frontend-authentication-shell-protected-routing: backlog
+  epic-1-retrospective: optional
+
+  # ── Epic 2: DDR Upload & AI Extraction Pipeline ──
+  epic-2: backlog
+  2-1-ddr-pipeline-database-schema: backlog
+  2-2-pdf-upload-endpoint-processing-queue: backlog
+  2-3-pdf-pre-splitter-date-boundary-detection: backlog
+  2-4-per-date-gemini-extraction-pydantic-validation: backlog
+  2-5-sse-processing-status-stream-frontend-status-hook: backlog
+  2-6-extraction-cost-tracking-time-log-embedding: backlog
+  epic-2-retrospective: optional
+
+  # ── Epic 3: Occurrence Table & Generation ──
+  epic-3: backlog
+  3-1-occurrences-database-schema: backlog
+  3-2-keyword-classification-engine-type-section: backlog
+  3-3-mmd-inference-density-join-dedup-engine: backlog
+  3-4-occurrence-generation-api-pipeline-integration: backlog
+  3-5-occurrencetable-ui-full-frontend-component: backlog
+  epic-3-retrospective: optional
+
+  # ── Epic 4: Inline Editing & Correction Store ──
+  epic-4: backlog
+  4-1-corrections-database-schema: backlog
+  4-2-occurrence-edit-api-correction-store-write: backlog
+  4-3-correction-context-builder-pipeline-injection: backlog
+  4-4-correction-store-review-api: backlog
+  4-5-inline-edit-ui-reasoncapturemodal: backlog
+  epic-4-retrospective: optional
+
+  # ── Epic 5: Data Export ──
+  epic-5: backlog
+  5-1-per-ddr-excel-export-backend: backlog
+  5-2-master-excel-export-backend: backlog
+  5-3-time-log-csv-export-backend: backlog
+  5-4-export-ui-one-click-download-flow: backlog
+  epic-5-retrospective: optional
+
+  # ── Epic 6: Query & Well History ──
+  epic-6: backlog
+  6-1-bm25-keyword-search-backend: backlog
+  6-2-qdrant-vector-search-nl-query-api: backlog
+  6-3-cross-ddr-filter-well-history-api: backlog
+  6-4-query-history-ui: backlog
+  epic-6-retrospective: optional
+
+  # ── Epic 7: Pipeline Monitoring & System Administration ──
+  epic-7: backlog
+  7-1-pipeline-queue-per-date-status-api: backlog
+  7-2-error-log-per-date-re-run-api: backlog
+  7-3-keyword-management-api: backlog
+  7-4-monitor-dashboard-keyword-editor-ui: backlog
+  epic-7-retrospective: optional

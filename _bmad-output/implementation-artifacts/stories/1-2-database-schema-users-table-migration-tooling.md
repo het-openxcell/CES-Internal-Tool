@@ -1,0 +1,206 @@
+# Story 1.2: Database Schema - Users Table & Migration Tooling
+
+Status: ready-for-dev
+
+Completion note: Ultimate context engine analysis completed - comprehensive developer guide created.
+
+## Story
+
+As a platform developer,
+I want the users table created via versioned migrations on both backends,
+so that authentication can be built on a schema both backends share identically.
+
+## Acceptance Criteria
+
+1. Given Go backend migrations directory `ces-ddr-platform/ces-backend-go/migrations/` exists, when `golang-migrate` runs `001_initial_schema.up.sql`, then `users` table is created with `id UUID PRIMARY KEY DEFAULT gen_random_uuid()`, `username VARCHAR(255) UNIQUE NOT NULL`, `password_hash TEXT NOT NULL`, `created_at TIMESTAMPTZ NOT NULL DEFAULT now()`, and `updated_at TIMESTAMPTZ NOT NULL DEFAULT now()`.
+2. Given Go migration has already run once, when `golang-migrate` runs again, then the second run produces no schema error and no duplicate objects.
+3. Given Go migration has run, when `golang-migrate` runs `001_initial_schema.down.sql`, then `users` table is dropped cleanly and rerunning the up migration recreates the same schema.
+4. Given Python Alembic is configured in `ces-ddr-platform/ces-backend-python/alembic/`, when `alembic upgrade head` runs `001_initial_schema.py`, then `users` table schema matches Go migration output exactly: same table name, columns, PostgreSQL types, nullability, primary key default, unique constraint, and timestamp defaults.
+5. Given both migration tracks exist, when `shared/schema/baseline.sql` is reviewed, then it documents the canonical `users` schema and matches Go migration SQL.
+6. Given either migration track creates the database, when a developer inspects `\d users`, then the visible structure is identical regardless of whether Go or Python migration created it.
+
+## Tasks / Subtasks
+
+- [ ] Add Go migration tooling and SQL migrations (AC: 1-3)
+  - [ ] Create `ces-backend-go/migrations/001_initial_schema.up.sql`.
+  - [ ] Create `ces-backend-go/migrations/001_initial_schema.down.sql`.
+  - [ ] Add `golang-migrate` command guidance or script in the existing backend docs without changing health API behavior.
+  - [ ] Ensure up SQL is idempotent where required by ACs, using `CREATE TABLE IF NOT EXISTS` and safe extension setup.
+- [ ] Add Python Alembic tooling (AC: 4)
+  - [ ] Add Alembic dependencies to `ces-backend-python/pyproject.toml`.
+  - [ ] Create `ces-backend-python/alembic.ini`, `ces-backend-python/alembic/env.py`, and `ces-backend-python/alembic/versions/001_initial_schema.py`.
+  - [ ] Read `POSTGRES_DSN` through existing `AppSettings`; do not read env directly.
+  - [ ] Make Alembic produce the same PostgreSQL schema as Go SQL, including server defaults.
+- [ ] Add canonical shared schema (AC: 5)
+  - [ ] Replace `shared/schema/.gitkeep` with `shared/schema/baseline.sql`.
+  - [ ] Keep baseline aligned to Go canonical SQL, not Alembic autogenerate output.
+- [ ] Add migration validation tests or smoke checks (AC: 1-6)
+  - [ ] Add a Go-side migration smoke path or documented command using `migrate -path ces-backend-go/migrations -database "$POSTGRES_DSN" up`.
+  - [ ] Add a Python test or verification command that runs Alembic upgrade against PostgreSQL and inspects `users`.
+  - [ ] Validate down/up cycle for Go and upgrade/downgrade for Alembic.
+  - [ ] Compare schema via `psql \d users` or information_schema queries after each track.
+- [ ] Preserve existing scaffold behavior (AC: all)
+  - [ ] Keep `GET /health` in Go and Python returning exactly `{ "status": "ok" }`.
+  - [ ] Do not implement login, JWT middleware, password seeding, RBAC, upload, DDR schema, occurrence schema, or correction schema in this story.
+
+## Dev Notes
+
+### Story Scope
+
+This story creates only the first database schema slice: `users` plus migration tooling for both backends and canonical baseline SQL. Authentication API starts in Story 1.3 and depends on this table. Do not add auth handlers, JWT validation, seed users, frontend login UI, or additional business tables here. [Source: _bmad-output/planning-artifacts/epics.md#Story 1.2]
+
+Epic 1 goal is authenticated platform foundation across frontend, Python backend, Go backend, and shared DB schema. Story 1.1 already created scaffold and health endpoints; this story must extend that scaffold without breaking it. [Source: _bmad-output/implementation-artifacts/stories/1-1-project-scaffold-development-infrastructure.md]
+
+### Required Schema
+
+Canonical table:
+
+```sql
+CREATE TABLE IF NOT EXISTS users (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    username VARCHAR(255) UNIQUE NOT NULL,
+    password_hash TEXT NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+```
+
+Use table name `users`, plural and snake_case. Primary key is UUID v4 column named `id`; timestamps are `created_at` and `updated_at`, both `timestamptz NOT NULL`. [Source: _bmad-output/planning-artifacts/architecture.md#Naming Patterns]
+
+Use `password_hash`, not `password`, `hashed_password`, or plaintext credential fields. PRD security requires credentials stored hashed and no plaintext passwords at any layer. [Source: _bmad-output/planning-artifacts/epics.md#NonFunctional Requirements]
+
+### Migration Strategy
+
+Go is canonical. Put SQL files in `ces-ddr-platform/ces-backend-go/migrations/*.sql`; Python Alembic must match Go output exactly. `shared/schema/baseline.sql` is the canonical schema reference and should mirror Go SQL. [Source: _bmad-output/planning-artifacts/architecture.md#Migration Strategy]
+
+Migration order is Go first, then Python configured to match. Do not let Alembic autogenerate a divergent schema or rename constraints/types. If using SQLAlchemy operations, explicitly set `server_default=sa.text("gen_random_uuid()")` and `server_default=sa.text("now()")`. [Source: _bmad-output/planning-artifacts/architecture.md#Data Architecture]
+
+Required Go files:
+
+```text
+ces-ddr-platform/ces-backend-go/migrations/
+├── 001_initial_schema.up.sql
+└── 001_initial_schema.down.sql
+```
+
+Required Python files:
+
+```text
+ces-ddr-platform/ces-backend-python/
+├── alembic.ini
+└── alembic/
+    ├── env.py
+    └── versions/
+        └── 001_initial_schema.py
+```
+
+### Existing Code To Preserve
+
+`ces-backend-python/app/config.py` already defines `BackendBaseSettings` and `AppSettings` using `decouple.config`. Alembic must import/use this settings path for `postgres_dsn`; do not add `os.environ.get`, `os.getenv`, or scattered env reads. [Source: AGENTS.md#Backend Guidelines]
+
+`ces-backend-python/app/main.py` uses `AppFactory` and registers `HealthRouter`. Keep app creation and health endpoint behavior unchanged.
+
+`ces-backend-go/internal/config/config.go` already centralizes config and loads `.env`. Adding migration command documentation or helper code must use `Config.PostgresDSN` or shell `$POSTGRES_DSN`; do not spread new env reads outside `internal/config`.
+
+`ces-backend-go/internal/api/router.go` registers `HealthHandler`. Do not change router mode, health route, or health response unless tests are updated and ACs still pass.
+
+`ces-ddr-platform/docker-compose.yml` already starts PostgreSQL 16 on `5432` and Qdrant on `6333/6334`; use this database for migration validation. Do not add new database services.
+
+### Backend Guardrails
+
+- Python config must use `decouple + BackendBaseSettings`; never use `os.environ.get` or `os.getenv`.
+- No loose standalone utility clutter. Keep migration-related Python config small and class/settings driven where possible.
+- No file comments unless absolutely needed. Generated Alembic boilerplate often includes comments; remove nonessential comments.
+- Before running Python files or tests, activate the UV virtualenv: `source .venv/bin/activate`.
+- Do not block async event loop with sync SDK calls. This story should not add SDK calls.
+[Source: AGENTS.md#Backend Guidelines]
+
+### Latest Technical Information
+
+- `golang-migrate/migrate` uses separate up/down migration files and supports filesystem sources with CLI form `migrate -source file://path/to/migrations -database postgres://... up`; latest GitHub release shown is `v4.19.1` on November 29, 2025. Source: https://github.com/golang-migrate/migrate
+- Alembic operation functions require migration context configured in `env.py`. `op.create_table(..., if_not_exists=True)` is supported in Alembic 1.13.3+ and current docs show this option in 1.18.4. Source: https://alembic.sqlalchemy.org/en/latest/ops.html
+- PostgreSQL `gen_random_uuid()` returns a version 4 random UUID. Current PostgreSQL docs note the pgcrypto version calls the core function of same name; using `CREATE EXTENSION IF NOT EXISTS pgcrypto` remains acceptable for compatibility and clarity. Source: https://www.postgresql.org/docs/current/pgcrypto.html
+
+### Dependency Guidance
+
+Python currently has FastAPI, Pydantic Settings, decouple, uvicorn, pytest, and httpx. Add only migration/database dependencies needed now, likely:
+
+```toml
+"alembic>=1.18.4,<2.0.0",
+"sqlalchemy>=2.0.0,<3.0.0",
+"psycopg[binary]>=3.2.0,<4.0.0"
+```
+
+Do not add async database client abstractions for app runtime until a story needs runtime DB access. Alembic can use synchronous migration connections.
+
+Go currently has Gin and godotenv. Do not add a runtime DB layer unless needed for migration validation. Prefer CLI `golang-migrate` command or documented Docker command over embedding migration logic in the web server for this story.
+
+### Testing Requirements
+
+Run from `ces-ddr-platform/`:
+
+```bash
+docker compose up -d postgres
+migrate -path ces-backend-go/migrations -database "$POSTGRES_DSN" up
+psql "$POSTGRES_DSN" -c "\d users"
+migrate -path ces-backend-go/migrations -database "$POSTGRES_DSN" down 1
+migrate -path ces-backend-go/migrations -database "$POSTGRES_DSN" up
+```
+
+Run from `ces-ddr-platform/ces-backend-python/`:
+
+```bash
+source .venv/bin/activate
+alembic upgrade head
+psql "$POSTGRES_DSN" -c "\d users"
+alembic downgrade base
+alembic upgrade head
+pytest
+```
+
+Run existing regression checks:
+
+```bash
+cd ces-ddr-platform/ces-backend-go && GOTOOLCHAIN=local go test ./...
+cd ces-ddr-platform/ces-backend-python && source .venv/bin/activate && pytest
+```
+
+If local `migrate`, `alembic`, `psql`, or Docker are unavailable, document exact blocker in Dev Agent Record and still commit/create files so review can run in a provisioned environment.
+
+### Previous Story Intelligence
+
+Story 1.1 created the monorepo scaffold and verified frontend build, Python health, Go health, and Docker Compose health. It also established these patterns:
+
+- Python code is class-oriented: `AppFactory`, `HealthRouter`, `ExceptionHandlers`, `AppSettings`.
+- Go config is centralized in `internal/config`; direct env reads are contained there.
+- Qdrant healthcheck had to avoid missing tools in the container; use simple validation commands.
+- Generated `.env` once contained a real Gemini key and was removed from tracked files; keep only placeholders in examples and do not print secrets.
+- No Git repository was detected during Story 1.1 and this story creation, so commit intelligence is unavailable.
+
+### Project Structure Notes
+
+Current scaffold has no `migrations/`, no `alembic/`, and `shared/schema/` only contains `.gitkeep`. This story creates those paths. Keep generated files inside `ces-ddr-platform/`; do not add app code at repository root.
+
+### References
+
+- [Source: AGENTS.md#Backend Guidelines]
+- [Source: _bmad-output/planning-artifacts/epics.md#Story 1.2]
+- [Source: _bmad-output/planning-artifacts/architecture.md#Data Architecture]
+- [Source: _bmad-output/planning-artifacts/architecture.md#Migration Strategy]
+- [Source: _bmad-output/planning-artifacts/architecture.md#Naming Patterns]
+- [Source: _bmad-output/implementation-artifacts/stories/1-1-project-scaffold-development-infrastructure.md]
+- [Source: https://github.com/golang-migrate/migrate]
+- [Source: https://alembic.sqlalchemy.org/en/latest/ops.html]
+- [Source: https://www.postgresql.org/docs/current/pgcrypto.html]
+
+## Dev Agent Record
+
+### Agent Model Used
+
+TBD by dev agent.
+
+### Debug Log References
+
+### Completion Notes List
+
+### File List

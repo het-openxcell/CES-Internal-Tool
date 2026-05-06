@@ -1,0 +1,1146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CES DDR Intelligence Platform — Design Directions</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: Inter, system-ui, sans-serif; background: #111827; color: #F9FAFB; }
+
+  /* ── Brand tokens ── */
+  :root {
+    --ces-red:       #C41230;
+    --ces-red-dark:  #A31028;
+    --ces-red-light: #F8E4E8;
+    --white:         #FFFFFF;
+    --surface:       #F9FAFB;
+    --border:        #E5E7EB;
+    --text:          #111827;
+    --text-2:        #6B7280;
+    --success:       #16A34A;
+    --warning:       #D97706;
+    --error:         #DC2626;
+    --edit-dot:      #D97706;
+  }
+
+  /* ── Page nav ── */
+  .page-nav { display:flex; gap:0; background:#1F2937; border-bottom:1px solid #374151; padding:0 24px; position:sticky; top:0; z-index:100; overflow-x:auto; }
+  .page-nav button { padding:14px 18px; background:none; border:none; color:#9CA3AF; font-size:13px; font-weight:500; cursor:pointer; white-space:nowrap; border-bottom:2px solid transparent; transition:all .15s; }
+  .page-nav button.active, .page-nav button:hover { color:#fff; border-bottom-color:var(--ces-red); }
+
+  /* ── Direction panels ── */
+  .direction { display:none; padding:32px 24px; }
+  .direction.active { display:block; }
+  .dir-label { font-size:11px; font-weight:700; letter-spacing:.1em; text-transform:uppercase; color:var(--ces-red); margin-bottom:6px; }
+  .dir-title { font-size:22px; font-weight:700; color:#F9FAFB; margin-bottom:4px; }
+  .dir-desc  { font-size:14px; color:#9CA3AF; margin-bottom:24px; line-height:1.6; }
+
+  /* ── Mockup shell ── */
+  .mockup { border-radius:10px; overflow:hidden; box-shadow:0 25px 60px rgba(0,0,0,.55); border:1px solid #374151; background:var(--white); }
+
+  /* ── CES nav bar ── */
+  .ces-nav { background:var(--white); border-bottom:1px solid var(--border); height:56px; display:flex; align-items:stretch; padding:0 20px; }
+  .ces-logo { display:flex; align-items:center; gap:10px; margin-right:20px; }
+  .ces-logo svg { width:32px; height:32px; }
+  .ces-logo-text { font-size:15px; font-weight:700; color:var(--text); line-height:1.1; }
+  .ces-logo-text span { display:block; font-size:10px; font-weight:400; color:var(--text-2); }
+  .ces-menu { display:flex; align-items:stretch; }
+  .ces-menu a { display:flex; align-items:center; padding:0 16px; font-size:13px; font-weight:500; color:var(--text-2); text-decoration:none; border-bottom:3px solid transparent; transition:all .12s; }
+  .ces-menu a:hover { color:var(--ces-red); }
+  .ces-menu a.active { color:var(--white); background:var(--ces-red); border-bottom-color:var(--ces-red-dark); }
+  .ces-right { margin-left:auto; display:flex; align-items:center; gap:10px; }
+  .ces-avatar { width:30px; height:30px; border-radius:50%; background:var(--ces-red); color:var(--white); font-size:12px; font-weight:700; display:flex; align-items:center; justify-content:center; }
+
+  /* ── Buttons ── */
+  .btn { padding:6px 14px; border-radius:5px; font-size:12px; font-weight:500; border:none; cursor:pointer; display:inline-flex; align-items:center; gap:6px; transition:all .12s; }
+  .btn-red    { background:var(--ces-red); color:#fff; }
+  .btn-red:hover { background:var(--ces-red-dark); }
+  .btn-outline { background:#fff; color:#374151; border:1px solid var(--border); }
+  .btn-outline:hover { background:var(--surface); }
+  .btn-danger { background:#FEF2F2; color:#DC2626; border:1px solid #FECACA; }
+  .btn-sm { padding:4px 10px; font-size:11px; }
+
+  /* ── Layout ── */
+  .mockup-body { display:flex; height:560px; }
+  .sidebar { width:220px; background:var(--surface); border-right:1px solid var(--border); padding:14px 10px; flex-shrink:0; overflow-y:auto; }
+  .main { flex:1; display:flex; flex-direction:column; overflow:hidden; }
+
+  /* ── Sidebar items ── */
+  .sb-label { font-size:10px; font-weight:700; letter-spacing:.08em; text-transform:uppercase; color:var(--text-2); margin-bottom:6px; padding-left:8px; }
+  .sb-section { margin-bottom:18px; }
+  .sb-item { display:flex; align-items:center; gap:8px; padding:7px 8px; border-radius:5px; font-size:13px; color:#374151; cursor:pointer; margin-bottom:1px; transition:all .1s; }
+  .sb-item:hover { background:#F3F4F6; }
+  .sb-item.active { background:var(--ces-red-light); color:var(--ces-red); font-weight:600; }
+  .sb-badge { margin-left:auto; font-size:10px; padding:1px 6px; border-radius:9px; background:#E5E7EB; color:#6B7280; }
+  .sb-item.active .sb-badge { background:rgba(196,18,48,.15); color:var(--ces-red); }
+  .sb-badge-err { background:#FEE2E2; color:#991B1B; }
+
+  /* ── Content header ── */
+  .c-header { padding:14px 18px 10px; border-bottom:1px solid var(--border); background:#fff; }
+  .c-title { font-size:15px; font-weight:600; color:var(--text); }
+  .c-sub   { font-size:11px; color:var(--text-2); margin-top:3px; }
+
+  /* ── Filter bar ── */
+  .filter-bar { padding:9px 18px; background:var(--surface); border-bottom:1px solid var(--border); display:flex; gap:7px; align-items:center; flex-wrap:wrap; }
+  .f-chip { padding:3px 10px; border-radius:20px; font-size:11px; border:1px solid var(--border); background:#fff; color:#374151; cursor:pointer; transition:all .1s; }
+  .f-chip.active { background:var(--ces-red); color:#fff; border-color:var(--ces-red); }
+  .f-search { padding:5px 10px; border:1px solid var(--border); border-radius:5px; font-size:12px; color:var(--text); background:#fff; width:180px; }
+
+  /* ── Table ── */
+  .tbl-wrap { flex:1; overflow:auto; }
+  table { width:100%; border-collapse:collapse; font-size:13px; }
+  thead { position:sticky; top:0; background:var(--surface); z-index:5; }
+  th { padding:8px 12px; text-align:left; font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.06em; color:var(--text-2); border-bottom:1px solid var(--border); white-space:nowrap; }
+  tbody tr { border-bottom:1px solid #F3F4F6; transition:background .1s; }
+  tbody tr:hover { background:#FAFAFA; }
+  tbody tr.failed  { background:#FEF2F2; border-left:3px solid var(--ces-red); }
+  tbody tr.edited  { border-left:3px solid var(--edit-dot); }
+  td { padding:9px 12px; color:var(--text); vertical-align:middle; }
+  .td-mono { font-family:'Courier New',monospace; font-size:12px; color:var(--text-2); }
+
+  /* ── Badges ── */
+  .badge { display:inline-flex; align-items:center; padding:2px 8px; border-radius:12px; font-size:11px; font-weight:600; white-space:nowrap; }
+  .b-stuck  { background:#FEE2E2; color:#991B1B; }
+  .b-lost   { background:#FEF3C7; color:#92400E; }
+  .b-tight  { background:#EDE9FE; color:#5B21B6; }
+  .b-back   { background:#DCFCE7; color:#166534; }
+  .b-ream   { background:#E0F2FE; color:#075985; }
+  .b-kick   { background:#FCE7F3; color:#9D174D; }
+  .b-cement { background:#F3F4F6; color:#374151; }
+  .b-surf   { background:#D1FAE5; color:#065F46; }
+  .b-int    { background:#E0F2FE; color:#075985; }
+  .b-main   { background:#EDE9FE; color:#4C1D95; }
+  .b-ok     { background:#D1FAE5; color:#065F46; }
+  .b-warn   { background:#FEF3C7; color:#92400E; }
+  .b-err    { background:#FEE2E2; color:#991B1B; }
+
+  /* ── Edit dot ── */
+  .edit-dot { width:8px; height:8px; border-radius:50%; background:var(--edit-dot); display:inline-block; margin-right:4px; flex-shrink:0; }
+
+  /* ── Status counts ── */
+  .sc { display:flex; gap:5px; }
+  .sc span { padding:1px 6px; border-radius:4px; font-size:10px; font-weight:600; }
+  .sc .ok   { background:#D1FAE5; color:#065F46; }
+  .sc .warn { background:#FEF3C7; color:#92400E; }
+  .sc .err  { background:#FEE2E2; color:#991B1B; }
+
+  /* ── Queue row ── */
+  .q-row { display:flex; align-items:flex-start; gap:12px; padding:11px 18px; border-bottom:1px solid #F3F4F6; background:#fff; }
+  .q-row:hover { background:var(--surface); }
+  .q-dot { width:8px; height:8px; border-radius:50%; flex-shrink:0; margin-top:4px; }
+  .q-name { font-size:13px; font-weight:500; color:var(--text); }
+  .q-sub  { font-size:11px; color:var(--text-2); margin-top:2px; }
+  .progress { height:3px; background:#E5E7EB; border-radius:2px; margin-top:5px; width:120px; }
+  .progress-fill { height:100%; border-radius:2px; background:var(--ces-red); }
+  .q-meta { margin-left:auto; text-align:right; font-size:11px; color:var(--text-2); }
+
+  /* ── NL query ── */
+  .nl-wrap { padding:18px 20px; background:#fff; border-bottom:1px solid var(--border); }
+  .nl-row  { display:flex; gap:8px; }
+  .nl-input { flex:1; padding:9px 14px; border:1.5px solid var(--ces-red); border-radius:6px; font-size:14px; color:var(--text); }
+  .nl-chips { display:flex; gap:6px; margin-top:10px; flex-wrap:wrap; }
+  .nl-chip  { padding:4px 12px; background:var(--surface); border:1px solid var(--border); border-radius:20px; font-size:11px; color:#374151; cursor:pointer; }
+  .nl-chip:hover { border-color:var(--ces-red); color:var(--ces-red); }
+
+  /* ── Modal ── */
+  .modal-wrap { position:absolute; background:#fff; border-radius:8px; padding:18px; width:340px; box-shadow:0 16px 40px rgba(0,0,0,.18); border:1.5px solid var(--ces-red); z-index:20; }
+  .modal-title { font-size:14px; font-weight:600; color:var(--text); margin-bottom:6px; }
+  .modal-sub   { font-size:11px; padding:7px 10px; background:var(--ces-red-light); border-radius:5px; border-left:2px solid var(--ces-red); color:var(--ces-red-dark); margin-bottom:12px; font-weight:500; }
+  .modal-label { font-size:11px; font-weight:600; color:#374151; margin-bottom:4px; }
+  .modal-input { width:100%; padding:8px 10px; border:1.5px solid var(--ces-red); border-radius:5px; font-size:13px; color:var(--text); margin-bottom:12px; }
+  .modal-actions { display:flex; gap:8px; justify-content:flex-end; }
+
+  /* ── Pros/cons ── */
+  .pros-cons { display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-top:20px; }
+  .pc-box { background:#1F2937; border-radius:8px; padding:14px; }
+  .pc-box h4 { font-size:11px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; margin-bottom:8px; }
+  .pc-box.pros h4 { color:#4ADE80; }
+  .pc-box.cons h4 { color:#F87171; }
+  .pc-box li { font-size:12px; color:#D1D5DB; line-height:1.7; margin-left:16px; }
+
+  /* ── Toast ── */
+  .toast { position:fixed; bottom:24px; right:24px; background:#111827; color:#F9FAFB; padding:10px 16px; border-radius:7px; font-size:13px; display:flex; align-items:center; gap:8px; box-shadow:0 8px 24px rgba(0,0,0,.4); border-left:3px solid var(--ces-red); z-index:999; }
+</style>
+</head>
+<body>
+
+<nav class="page-nav">
+  <button class="active" onclick="show('d1',this)">Direction 1 — Brand-Anchored ⭐</button>
+  <button onclick="show('d2',this)">Direction 2 — Minimal White</button>
+  <button onclick="show('d3',this)">Direction 3 — Filter-First</button>
+  <button onclick="show('d4',this)">Direction 4 — Dashboard-First</button>
+  <button onclick="show('d5',this)">Direction 5 — Full-Width Table</button>
+  <button onclick="show('d6',this)">Direction 6 — Split Pane</button>
+</nav>
+
+<!-- ══════════════════════════════════════════
+     D1 — BRAND-ANCHORED (Recommended)
+══════════════════════════════════════════ -->
+<div class="direction active" id="d1">
+  <div class="dir-label">Direction 1 — Recommended</div>
+  <div class="dir-title">Brand-Anchored — CES Crimson + White + Sidebar</div>
+  <div class="dir-desc">CES crimson red as the primary brand color — active nav tab, primary buttons, logo mark. White content surfaces. Left sidebar for report navigation and type filters. Compact occurrence table with color-coded type badges and amber edit-dot indicators. Inline reason-capture modal anchored near the edited row.</div>
+
+  <div class="mockup">
+    <!-- NAV -->
+    <div class="ces-nav">
+      <div class="ces-logo">
+        <!-- CES starburst mark in red -->
+        <svg viewBox="0 0 32 32" fill="none">
+          <g transform="translate(16,16)">
+            <line x1="0" y1="-13" x2="0" y2="-7" stroke="#C41230" stroke-width="2.8" stroke-linecap="round"/>
+            <line x1="0" y1="7"  x2="0" y2="13"  stroke="#C41230" stroke-width="2.8" stroke-linecap="round"/>
+            <line x1="-13" y1="0" x2="-7" y2="0" stroke="#C41230" stroke-width="2.8" stroke-linecap="round"/>
+            <line x1="7"  y1="0" x2="13" y2="0"  stroke="#C41230" stroke-width="2.8" stroke-linecap="round"/>
+            <line x1="-9.2" y1="-9.2" x2="-5"  y2="-5"   stroke="#C41230" stroke-width="2" stroke-linecap="round"/>
+            <line x1="5"    y1="5"    x2="9.2"  y2="9.2"  stroke="#C41230" stroke-width="2" stroke-linecap="round"/>
+            <line x1="9.2"  y1="-9.2" x2="5"   y2="-5"   stroke="#C41230" stroke-width="2" stroke-linecap="round"/>
+            <line x1="-5"   y1="5"    x2="-9.2" y2="9.2"  stroke="#C41230" stroke-width="2" stroke-linecap="round"/>
+          </g>
+        </svg>
+        <div class="ces-logo-text">CES Energy<span>DDR Intelligence</span></div>
+      </div>
+      <nav class="ces-menu">
+        <a href="#" class="active">Reports</a>
+        <a href="#">History</a>
+        <a href="#">Query</a>
+        <a href="#">Monitor</a>
+        <a href="#">Settings</a>
+      </nav>
+      <div class="ces-right">
+        <button class="btn btn-red btn-sm">+ Upload DDR</button>
+        <div class="ces-avatar">R</div>
+      </div>
+    </div>
+
+    <!-- BODY -->
+    <div class="mockup-body">
+      <!-- SIDEBAR -->
+      <div class="sidebar">
+        <div class="sb-section">
+          <div class="sb-label">Recent Reports</div>
+          <div class="sb-item active">WDF_0508851 <span class="sb-badge">23</span></div>
+          <div class="sb-item">ABK_0491203 <span class="sb-badge">18</span></div>
+          <div class="sb-item">MNT_0502847 <span class="sb-badge sb-badge-err">2!</span></div>
+          <div class="sb-item">WDF_0497621 <span class="sb-badge">31</span></div>
+        </div>
+        <div class="sb-section">
+          <div class="sb-label">Filter by Type</div>
+          <div class="sb-item">Stuck Pipe    <span class="sb-badge">8</span></div>
+          <div class="sb-item">Lost Circ.    <span class="sb-badge">5</span></div>
+          <div class="sb-item">Tight Hole    <span class="sb-badge">4</span></div>
+          <div class="sb-item">Back Ream     <span class="sb-badge">3</span></div>
+          <div class="sb-item">Kick          <span class="sb-badge">2</span></div>
+        </div>
+        <div class="sb-section">
+          <div class="sb-label">Section</div>
+          <div class="sb-item">Surface       <span class="sb-badge" style="background:#D1FAE5;color:#065F46;">4</span></div>
+          <div class="sb-item">Intermediate  <span class="sb-badge" style="background:#E0F2FE;color:#075985;">9</span></div>
+          <div class="sb-item">Main          <span class="sb-badge" style="background:#EDE9FE;color:#4C1D95;">10</span></div>
+        </div>
+      </div>
+
+      <!-- MAIN -->
+      <div class="main">
+        <div class="c-header" style="display:flex;justify-content:space-between;align-items:flex-start;">
+          <div>
+            <div class="c-title">~QWT~AB_WDF_0508851.pdf</div>
+            <div class="c-sub">Processed 2026-05-04 · 15 dates · <span style="color:#16A34A;font-weight:600;">13 success</span> · <span style="color:#D97706;font-weight:600;">1 warning</span> · <span style="color:#DC2626;font-weight:600;">1 failed</span></div>
+          </div>
+          <div style="display:flex;gap:8px;margin-left:16px;">
+            <button class="btn btn-outline btn-sm">View Errors</button>
+            <button class="btn btn-red btn-sm">Export .xlsx</button>
+          </div>
+        </div>
+
+        <div class="filter-bar">
+          <input class="f-search" placeholder="Search occurrences...">
+          <div class="f-chip active">All Types</div>
+          <div class="f-chip">Stuck Pipe</div>
+          <div class="f-chip">Lost Circ.</div>
+          <div class="f-chip">Tight Hole</div>
+          <span style="font-size:11px;color:#9CA3AF;margin-left:auto;">23 occurrences</span>
+        </div>
+
+        <div class="tbl-wrap" style="position:relative;">
+          <table>
+            <thead>
+              <tr>
+                <th style="width:22px;"></th>
+                <th>Well Name</th>
+                <th>Surface Location</th>
+                <th>Type</th>
+                <th>Section</th>
+                <th>mMD (m)</th>
+                <th>Density</th>
+                <th>Notes</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td></td>
+                <td style="font-weight:500;">HZ Kakwa 16-21</td>
+                <td class="td-mono">16-21-064-05W6</td>
+                <td><span class="badge b-stuck">Stuck Pipe</span></td>
+                <td><span class="badge b-main">Main</span></td>
+                <td class="td-mono">3,847</td>
+                <td class="td-mono">1,480</td>
+                <td style="font-size:12px;color:#6B7280;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">Pipe stuck at 3847m, worked free after 2hrs circulation</td>
+              </tr>
+              <tr class="edited">
+                <td><span class="edit-dot"></span></td>
+                <td style="font-weight:500;">HZ Kakwa 16-21</td>
+                <td class="td-mono">16-21-064-05W6</td>
+                <td><span class="badge b-back">Back Ream</span></td>
+                <td><span class="badge b-main">Main</span></td>
+                <td class="td-mono">3,612</td>
+                <td class="td-mono">1,480</td>
+                <td style="font-size:12px;color:#6B7280;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">Backreamed to free obstruction at 3612m</td>
+              </tr>
+              <tr>
+                <td></td>
+                <td style="font-weight:500;">HZ Kakwa 16-21</td>
+                <td class="td-mono">16-21-064-05W6</td>
+                <td><span class="badge b-lost">Lost Circulation</span></td>
+                <td><span class="badge b-int">Int.</span></td>
+                <td class="td-mono">2,104</td>
+                <td class="td-mono">1,390</td>
+                <td style="font-size:12px;color:#6B7280;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">Lost 8m³ mud, LCM pill pumped, returns restored</td>
+              </tr>
+              <tr>
+                <td></td>
+                <td style="font-weight:500;">HZ Kakwa 16-21</td>
+                <td class="td-mono">16-21-064-05W6</td>
+                <td><span class="badge b-tight">Tight Hole</span></td>
+                <td><span class="badge b-int">Int.</span></td>
+                <td class="td-mono">1,892</td>
+                <td class="td-mono">1,350</td>
+                <td style="font-size:12px;color:#6B7280;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">Tight hole on connection, overpull 15 klbs</td>
+              </tr>
+              <tr class="failed">
+                <td></td>
+                <td style="font-weight:500;color:#DC2626;">Date 2026-03-31</td>
+                <td colspan="4" style="font-size:12px;color:#DC2626;">Tour Sheet Serial not detected on pages 44–52</td>
+                <td></td>
+                <td><button class="btn btn-danger btn-sm">Re-run</button></td>
+              </tr>
+              <tr>
+                <td></td>
+                <td style="font-weight:500;">HZ Kakwa 16-21</td>
+                <td class="td-mono">16-21-064-05W6</td>
+                <td><span class="badge b-kick">Kick</span></td>
+                <td><span class="badge b-main">Main</span></td>
+                <td class="td-mono">4,201</td>
+                <td class="td-mono">1,520</td>
+                <td style="font-size:12px;color:#6B7280;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">Minor kick, shut-in 45min, circulated out</td>
+              </tr>
+              <tr>
+                <td></td>
+                <td style="font-weight:500;">HZ Kakwa 16-21</td>
+                <td class="td-mono">16-21-064-05W6</td>
+                <td><span class="badge b-stuck">Stuck Pipe</span></td>
+                <td><span class="badge b-main">Main</span></td>
+                <td class="td-mono">3,991</td>
+                <td class="td-mono">1,480</td>
+                <td style="font-size:12px;color:#6B7280;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">Differentially stuck, spotting fluid, free 3hrs</td>
+              </tr>
+            </tbody>
+          </table>
+
+          <!-- INLINE REASON MODAL (anchored to row 2) -->
+          <div class="modal-wrap" style="top:108px;left:280px;">
+            <div class="modal-title">Reason for Change</div>
+            <div class="modal-sub">Type: <strong>Ream</strong> → <strong>Back Ream</strong></div>
+            <div class="modal-label">Why was this changed?</div>
+            <input class="modal-input" value="Text said 'backreamed to free' — this is Back Ream, not Ream.">
+            <div class="modal-actions">
+              <button class="btn btn-outline btn-sm">Cancel</button>
+              <button class="btn btn-red btn-sm">Save Correction ↵</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="pros-cons">
+    <div class="pc-box pros">
+      <h4>Strengths</h4>
+      <ul>
+        <li>CES crimson immediately recognizable — matches public website</li>
+        <li>Sidebar persistent — report + type navigation always visible</li>
+        <li>Failed row red left-border unmissable</li>
+        <li>Edit modal anchored near corrected row, no scroll loss</li>
+        <li>Amber edit-dot distinct from red — visual grammar clear</li>
+      </ul>
+    </div>
+    <div class="pc-box cons">
+      <h4>Trade-offs</h4>
+      <ul>
+        <li>Sidebar consumes 220px of table width</li>
+        <li>Notes column truncates on smaller viewports</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════
+     D2 — MINIMAL WHITE
+══════════════════════════════════════════ -->
+<div class="direction" id="d2">
+  <div class="dir-label">Direction 2</div>
+  <div class="dir-title">Minimal White — Maximum Table, Red Accents Only</div>
+  <div class="dir-desc">All-white surface. Crimson used only for active states, links, and the logo. No persistent sidebar — filter chips in toolbar. Maximum horizontal width for the occurrence table. Notes column fully visible. Cleanest possible data surface for Ryan's core workflow.</div>
+
+  <div class="mockup">
+    <div class="ces-nav" style="border-bottom:2px solid var(--ces-red);">
+      <div class="ces-logo">
+        <svg viewBox="0 0 32 32" fill="none"><g transform="translate(16,16)">
+          <line x1="0" y1="-13" x2="0" y2="-7" stroke="#C41230" stroke-width="2.8" stroke-linecap="round"/>
+          <line x1="0" y1="7" x2="0" y2="13" stroke="#C41230" stroke-width="2.8" stroke-linecap="round"/>
+          <line x1="-13" y1="0" x2="-7" y2="0" stroke="#C41230" stroke-width="2.8" stroke-linecap="round"/>
+          <line x1="7" y1="0" x2="13" y2="0" stroke="#C41230" stroke-width="2.8" stroke-linecap="round"/>
+          <line x1="-9.2" y1="-9.2" x2="-5" y2="-5" stroke="#C41230" stroke-width="2" stroke-linecap="round"/>
+          <line x1="5" y1="5" x2="9.2" y2="9.2" stroke="#C41230" stroke-width="2" stroke-linecap="round"/>
+          <line x1="9.2" y1="-9.2" x2="5" y2="-5" stroke="#C41230" stroke-width="2" stroke-linecap="round"/>
+          <line x1="-5" y1="5" x2="-9.2" y2="9.2" stroke="#C41230" stroke-width="2" stroke-linecap="round"/>
+        </g></svg>
+        <div class="ces-logo-text">CES Energy<span>DDR Intelligence</span></div>
+      </div>
+      <nav class="ces-menu">
+        <a href="#" style="color:var(--ces-red);font-weight:600;border-bottom:2px solid var(--ces-red);">Reports</a>
+        <a href="#">History</a>
+        <a href="#">Query</a>
+        <a href="#">Monitor</a>
+      </nav>
+      <div class="ces-right">
+        <button class="btn btn-red btn-sm">+ Upload DDR</button>
+        <div class="ces-avatar">R</div>
+      </div>
+    </div>
+
+    <div style="padding:14px 20px;background:#fff;border-bottom:1px solid var(--border);">
+      <div style="font-size:16px;font-weight:600;color:var(--text);">~QWT~AB_WDF_0508851.pdf</div>
+      <div style="font-size:11px;color:var(--text-2);margin-top:3px;">15 dates · <span style="color:#16A34A;font-weight:600;">13 success</span> · <span style="color:#D97706;font-weight:600;">1 warning</span> · <span style="color:#DC2626;font-weight:600;">1 failed</span></div>
+    </div>
+
+    <div style="padding:9px 20px;background:#fff;border-bottom:1px solid var(--border);display:flex;gap:8px;align-items:center;">
+      <input class="f-search" style="width:200px;" placeholder="Filter occurrences...">
+      <div class="f-chip active">All</div>
+      <div class="f-chip">Stuck Pipe</div>
+      <div class="f-chip">Lost Circ.</div>
+      <div class="f-chip">Tight Hole</div>
+      <div class="f-chip">Kick</div>
+      <div style="margin-left:auto;display:flex;gap:8px;">
+        <button class="btn btn-outline btn-sm">View Errors (1)</button>
+        <button class="btn btn-red btn-sm">Export .xlsx</button>
+      </div>
+    </div>
+
+    <div style="height:440px;overflow:auto;background:#fff;">
+      <table>
+        <thead><tr>
+          <th style="width:22px;"></th>
+          <th>Well Name</th>
+          <th>Surface Location</th>
+          <th>Type</th>
+          <th>Section</th>
+          <th>mMD (m)</th>
+          <th>Density</th>
+          <th>Notes</th>
+          <th style="width:56px;"></th>
+        </tr></thead>
+        <tbody>
+          <tr>
+            <td></td>
+            <td style="font-weight:500;">HZ Kakwa 16-21</td>
+            <td class="td-mono">16-21-064-05W6</td>
+            <td><span class="badge b-stuck">Stuck Pipe</span></td>
+            <td><span class="badge b-main">Main</span></td>
+            <td class="td-mono">3,847</td>
+            <td class="td-mono">1,480</td>
+            <td style="font-size:12px;color:#6B7280;">Pipe stuck at 3847m, worked free after 2hrs circulation</td>
+            <td><button class="btn btn-outline btn-sm">Edit</button></td>
+          </tr>
+          <tr class="edited">
+            <td><span class="edit-dot"></span></td>
+            <td style="font-weight:500;">HZ Kakwa 16-21</td>
+            <td class="td-mono">16-21-064-05W6</td>
+            <td><span class="badge b-back">Back Ream</span></td>
+            <td><span class="badge b-main">Main</span></td>
+            <td class="td-mono">3,612</td>
+            <td class="td-mono">1,480</td>
+            <td style="font-size:12px;color:#6B7280;">Backreamed to free obstruction — tight in same zone</td>
+            <td><button class="btn btn-outline btn-sm">Edit</button></td>
+          </tr>
+          <tr>
+            <td></td>
+            <td style="font-weight:500;">HZ Kakwa 16-21</td>
+            <td class="td-mono">16-21-064-05W6</td>
+            <td><span class="badge b-lost">Lost Circulation</span></td>
+            <td><span class="badge b-int">Int.</span></td>
+            <td class="td-mono">2,104</td>
+            <td class="td-mono">1,390</td>
+            <td style="font-size:12px;color:#6B7280;">Lost 8m³ mud, LCM pill, returns restored after 1.5hr</td>
+            <td><button class="btn btn-outline btn-sm">Edit</button></td>
+          </tr>
+          <tr class="failed">
+            <td></td>
+            <td style="color:#DC2626;font-weight:500;font-size:12px;">2026-03-31</td>
+            <td colspan="5" style="font-size:12px;color:#DC2626;">Tour Sheet Serial not detected · pages 44–52</td>
+            <td><button class="btn btn-danger btn-sm">Re-run</button></td>
+          </tr>
+          <tr>
+            <td></td>
+            <td style="font-weight:500;">HZ Kakwa 16-21</td>
+            <td class="td-mono">16-21-064-05W6</td>
+            <td><span class="badge b-tight">Tight Hole</span></td>
+            <td><span class="badge b-int">Int.</span></td>
+            <td class="td-mono">1,892</td>
+            <td class="td-mono">1,350</td>
+            <td style="font-size:12px;color:#6B7280;">Tight on connection, overpull 15 klbs, slow rotation</td>
+            <td><button class="btn btn-outline btn-sm">Edit</button></td>
+          </tr>
+          <tr>
+            <td></td>
+            <td style="font-weight:500;">HZ Kakwa 16-21</td>
+            <td class="td-mono">16-21-064-05W6</td>
+            <td><span class="badge b-kick">Kick</span></td>
+            <td><span class="badge b-main">Main</span></td>
+            <td class="td-mono">4,201</td>
+            <td class="td-mono">1,520</td>
+            <td style="font-size:12px;color:#6B7280;">Minor kick, shut-in 45min, circulated out</td>
+            <td><button class="btn btn-outline btn-sm">Edit</button></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="pros-cons">
+    <div class="pc-box pros">
+      <h4>Strengths</h4>
+      <ul>
+        <li>Maximum horizontal space — Notes column fully readable</li>
+        <li>Cleanest surface — nothing competes with data</li>
+        <li>Edit button on each row — always discoverable</li>
+        <li>Red active nav tab still anchors brand clearly</li>
+      </ul>
+    </div>
+    <div class="pc-box cons">
+      <h4>Trade-offs</h4>
+      <ul>
+        <li>No persistent report navigation — must use dropdown or back</li>
+        <li>Filter workflow requires chip interaction each session</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════
+     D3 — FILTER-FIRST
+══════════════════════════════════════════ -->
+<div class="direction" id="d3">
+  <div class="dir-label">Direction 3</div>
+  <div class="dir-title">Filter-First — Wide Sidebar, Power User Controls</div>
+  <div class="dir-desc">260px sidebar with checkbox filters for all dimensions: type, section, depth range, date. Designed for Sarah's offset well research workflow and Het's cross-DDR analysis. Table is narrower but every filter dimension is one click away without leaving the page.</div>
+
+  <div class="mockup">
+    <div class="ces-nav">
+      <div class="ces-logo">
+        <svg viewBox="0 0 32 32" fill="none"><g transform="translate(16,16)">
+          <line x1="0" y1="-13" x2="0" y2="-7" stroke="#C41230" stroke-width="2.8" stroke-linecap="round"/>
+          <line x1="0" y1="7" x2="0" y2="13" stroke="#C41230" stroke-width="2.8" stroke-linecap="round"/>
+          <line x1="-13" y1="0" x2="-7" y2="0" stroke="#C41230" stroke-width="2.8" stroke-linecap="round"/>
+          <line x1="7" y1="0" x2="13" y2="0" stroke="#C41230" stroke-width="2.8" stroke-linecap="round"/>
+        </g></svg>
+        <div class="ces-logo-text">CES Energy<span>DDR Intelligence</span></div>
+      </div>
+      <nav class="ces-menu">
+        <a href="#" class="active">History</a>
+        <a href="#">Reports</a>
+        <a href="#">Query</a>
+        <a href="#">Monitor</a>
+      </nav>
+      <div class="ces-right">
+        <button class="btn btn-red btn-sm">+ Upload DDR</button>
+        <div class="ces-avatar">S</div>
+      </div>
+    </div>
+
+    <div class="mockup-body">
+      <div class="sidebar" style="width:256px;">
+        <div style="font-size:12px;font-weight:600;color:var(--ces-red);padding:0 4px 10px;border-bottom:1px solid var(--border);margin-bottom:12px;">Filters</div>
+        <div class="sb-section">
+          <div class="sb-label">Occurrence Type</div>
+          <div style="display:flex;flex-direction:column;gap:5px;">
+            <label style="font-size:12px;color:#374151;display:flex;gap:8px;align-items:center;"><input type="checkbox" checked style="accent-color:var(--ces-red);"> Stuck Pipe <span style="margin-left:auto;font-size:10px;color:#9CA3AF;">8</span></label>
+            <label style="font-size:12px;color:#374151;display:flex;gap:8px;align-items:center;"><input type="checkbox" checked style="accent-color:var(--ces-red);"> Lost Circulation <span style="margin-left:auto;font-size:10px;color:#9CA3AF;">5</span></label>
+            <label style="font-size:12px;color:#374151;display:flex;gap:8px;align-items:center;"><input type="checkbox" checked style="accent-color:var(--ces-red);"> Tight Hole <span style="margin-left:auto;font-size:10px;color:#9CA3AF;">4</span></label>
+            <label style="font-size:12px;color:#374151;display:flex;gap:8px;align-items:center;"><input type="checkbox" style="accent-color:var(--ces-red);"> Back Ream <span style="margin-left:auto;font-size:10px;color:#9CA3AF;">3</span></label>
+            <label style="font-size:12px;color:#374151;display:flex;gap:8px;align-items:center;"><input type="checkbox" style="accent-color:var(--ces-red);"> Kick <span style="margin-left:auto;font-size:10px;color:#9CA3AF;">2</span></label>
+          </div>
+        </div>
+        <div class="sb-section">
+          <div class="sb-label">Section</div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap;">
+            <span class="badge b-surf" style="cursor:pointer;">Surface</span>
+            <span class="badge b-int"  style="cursor:pointer;">Int.</span>
+            <span class="badge b-main" style="cursor:pointer;opacity:.4;">Main</span>
+          </div>
+        </div>
+        <div class="sb-section">
+          <div class="sb-label">Depth Range (mMD)</div>
+          <div style="display:flex;gap:6px;align-items:center;">
+            <input style="width:68px;padding:5px 7px;border:1px solid var(--border);border-radius:4px;font-size:11px;" placeholder="Min m">
+            <span style="color:#9CA3AF;font-size:11px;">—</span>
+            <input style="width:68px;padding:5px 7px;border:1px solid var(--border);border-radius:4px;font-size:11px;" placeholder="Max m">
+          </div>
+        </div>
+        <div class="sb-section">
+          <div class="sb-label">Date Range</div>
+          <input style="width:100%;padding:5px 8px;border:1px solid var(--border);border-radius:4px;font-size:11px;color:var(--text);" value="2026-03-01 → 2026-04-30">
+        </div>
+        <div class="sb-section">
+          <div class="sb-label">Well / Area</div>
+          <input style="width:100%;padding:5px 8px;border:1px solid var(--border);border-radius:4px;font-size:11px;" placeholder="Filter by well name...">
+        </div>
+        <button class="btn btn-red" style="width:100%;justify-content:center;margin-top:4px;">Apply Filters</button>
+        <button class="btn btn-outline" style="width:100%;justify-content:center;margin-top:6px;font-size:11px;">Reset All</button>
+      </div>
+
+      <div class="main">
+        <div class="c-header" style="display:flex;justify-content:space-between;">
+          <div>
+            <div class="c-title">All Occurrences — History</div>
+            <div class="c-sub">17 of 487 shown · 3 filters active</div>
+          </div>
+          <button class="btn btn-red btn-sm" style="margin-top:2px;">Export Filtered .xlsx</button>
+        </div>
+        <div class="tbl-wrap">
+          <table>
+            <thead><tr>
+              <th style="width:22px;"></th>
+              <th>Well Name</th>
+              <th>Type</th>
+              <th>Section</th>
+              <th>mMD (m)</th>
+              <th>Density</th>
+              <th>Notes</th>
+            </tr></thead>
+            <tbody>
+              <tr><td></td><td style="font-weight:500;font-size:12px;">HZ Kakwa 16-21</td><td><span class="badge b-stuck">Stuck Pipe</span></td><td><span class="badge b-main">Main</span></td><td class="td-mono">3,847</td><td class="td-mono">1,480</td><td style="font-size:12px;color:#6B7280;">Pipe stuck, free 2hrs</td></tr>
+              <tr class="edited"><td><span class="edit-dot"></span></td><td style="font-weight:500;font-size:12px;">HZ Kakwa 16-21</td><td><span class="badge b-lost">Lost Circulation</span></td><td><span class="badge b-int">Int.</span></td><td class="td-mono">2,104</td><td class="td-mono">1,390</td><td style="font-size:12px;color:#6B7280;">Lost 8m³ mud, LCM pill</td></tr>
+              <tr><td></td><td style="font-weight:500;font-size:12px;">HZ Montney 08-14</td><td><span class="badge b-tight">Tight Hole</span></td><td><span class="badge b-int">Int.</span></td><td class="td-mono">1,654</td><td class="td-mono">1,340</td><td style="font-size:12px;color:#6B7280;">Tight at 1654m, same zone as ABK well</td></tr>
+              <tr><td></td><td style="font-weight:500;font-size:12px;">HZ Montney 08-14</td><td><span class="badge b-stuck">Stuck Pipe</span></td><td><span class="badge b-main">Main</span></td><td class="td-mono">3,991</td><td class="td-mono">1,480</td><td style="font-size:12px;color:#6B7280;">Differential stick, free 3hrs</td></tr>
+              <tr><td></td><td style="font-weight:500;font-size:12px;">HZ Kakwa 22-07</td><td><span class="badge b-lost">Lost Circulation</span></td><td><span class="badge b-int">Int.</span></td><td class="td-mono">1,880</td><td class="td-mono">1,360</td><td style="font-size:12px;color:#6B7280;">Partial losses, LCM treatment</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="pros-cons">
+    <div class="pc-box pros">
+      <h4>Strengths</h4>
+      <ul>
+        <li>Ideal for Sarah — offset well research across all DDRs</li>
+        <li>Depth range + date range filter built into sidebar</li>
+        <li>Multi-select type via checkboxes — faster than chip clicks</li>
+        <li>Best layout for the History view use case</li>
+      </ul>
+    </div>
+    <div class="pc-box cons">
+      <h4>Trade-offs</h4>
+      <ul>
+        <li>256px sidebar too wide for Ryan's single-report review</li>
+        <li>Filter complexity is overkill for daily upload → review workflow</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════
+     D4 — DASHBOARD FIRST
+══════════════════════════════════════════ -->
+<div class="direction" id="d4">
+  <div class="dir-label">Direction 4</div>
+  <div class="dir-title">Dashboard-First — Pipeline Metrics + Queue + Corrections</div>
+  <div class="dir-desc">Landing page shows pipeline health: DDRs processed, occurrences, AI cost, errors, and recent corrections. Processing queue status visible on login. Best for Het's monitoring and management reporting use cases. Occurrence table accessed by clicking a report from the queue.</div>
+
+  <div class="mockup">
+    <div class="ces-nav">
+      <div class="ces-logo">
+        <svg viewBox="0 0 32 32" fill="none"><g transform="translate(16,16)">
+          <line x1="0" y1="-13" x2="0" y2="-7" stroke="#C41230" stroke-width="2.8" stroke-linecap="round"/>
+          <line x1="0" y1="7" x2="0" y2="13" stroke="#C41230" stroke-width="2.8" stroke-linecap="round"/>
+          <line x1="-13" y1="0" x2="-7" y2="0" stroke="#C41230" stroke-width="2.8" stroke-linecap="round"/>
+          <line x1="7" y1="0" x2="13" y2="0" stroke="#C41230" stroke-width="2.8" stroke-linecap="round"/>
+        </g></svg>
+        <div class="ces-logo-text">CES Energy<span>DDR Intelligence</span></div>
+      </div>
+      <nav class="ces-menu">
+        <a href="#" class="active">Dashboard</a>
+        <a href="#">Reports</a>
+        <a href="#">History</a>
+        <a href="#">Query</a>
+      </nav>
+      <div class="ces-right">
+        <button class="btn btn-red btn-sm">+ Upload DDR</button>
+        <div class="ces-avatar">H</div>
+      </div>
+    </div>
+
+    <div style="height:560px;overflow-y:auto;background:var(--surface);">
+      <!-- METRICS -->
+      <div style="padding:16px 20px 0;">
+        <div style="font-size:12px;font-weight:700;color:var(--text-2);letter-spacing:.06em;text-transform:uppercase;margin-bottom:10px;">This Week</div>
+        <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-bottom:16px;">
+          <div style="background:#fff;border:1px solid var(--border);border-radius:7px;padding:12px 14px;">
+            <div style="font-size:22px;font-weight:700;color:var(--text);">31</div>
+            <div style="font-size:11px;color:var(--text-2);margin-top:2px;">DDRs Processed</div>
+          </div>
+          <div style="background:#fff;border:1px solid var(--border);border-radius:7px;padding:12px 14px;">
+            <div style="font-size:22px;font-weight:700;color:var(--text);">487</div>
+            <div style="font-size:11px;color:var(--text-2);margin-top:2px;">Occurrences</div>
+          </div>
+          <div style="background:#fff;border:1px solid var(--border);border-radius:7px;padding:12px 14px;">
+            <div style="font-size:22px;font-weight:700;color:#16A34A;">$2.14</div>
+            <div style="font-size:11px;color:var(--text-2);margin-top:2px;">AI Compute Cost</div>
+          </div>
+          <div style="background:#fff;border:1px solid var(--border);border-radius:7px;padding:12px 14px;">
+            <div style="font-size:22px;font-weight:700;color:#D97706;">14</div>
+            <div style="font-size:11px;color:var(--text-2);margin-top:2px;">Corrections Made</div>
+          </div>
+          <div style="background:#FEF2F2;border:1px solid #FECACA;border-radius:7px;padding:12px 14px;border-left:3px solid var(--ces-red);">
+            <div style="font-size:22px;font-weight:700;color:var(--ces-red);">1</div>
+            <div style="font-size:11px;color:var(--ces-red);margin-top:2px;">Failed Dates</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- QUEUE -->
+      <div style="margin:0 20px 16px;background:#fff;border:1px solid var(--border);border-radius:8px;overflow:hidden;">
+        <div style="padding:11px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;">
+          <span style="font-size:13px;font-weight:600;color:var(--text);">Processing Queue</span>
+          <span style="font-size:11px;color:var(--text-2);">2 active · 29 complete</span>
+        </div>
+        <div class="q-row">
+          <div class="q-dot" style="background:#16A34A;"></div>
+          <div style="flex:1;">
+            <div class="q-name">~QWT~AB_WDF_0508851.pdf</div>
+            <div class="q-sub">Processing · Date 11 of 15</div>
+            <div class="progress"><div class="progress-fill" style="width:73%;"></div></div>
+          </div>
+          <div class="q-meta">
+            <div class="sc"><span class="ok">10 ✓</span><span class="warn">0 !</span><span class="err">0 ✕</span></div>
+            <div style="margin-top:4px;">~35s remaining</div>
+          </div>
+        </div>
+        <div class="q-row">
+          <div class="q-dot" style="background:#D97706;"></div>
+          <div style="flex:1;">
+            <div class="q-name">~QWT~AB_MNT_0502847.pdf</div>
+            <div class="q-sub">Complete · 2026-05-04</div>
+          </div>
+          <div class="q-meta">
+            <div class="sc"><span class="ok">11 ✓</span><span class="warn">1 !</span><span class="err">1 ✕</span></div>
+            <div style="margin-top:4px;"><a href="#" style="color:var(--ces-red);font-size:11px;text-decoration:none;">View →</a></div>
+          </div>
+        </div>
+        <div class="q-row">
+          <div class="q-dot" style="background:#9CA3AF;"></div>
+          <div style="flex:1;">
+            <div class="q-name">~QWT~AB_ABK_0491203.pdf</div>
+            <div class="q-sub">Complete · 2026-05-03</div>
+          </div>
+          <div class="q-meta">
+            <div class="sc"><span class="ok">18 ✓</span><span class="warn">0 !</span><span class="err">0 ✕</span></div>
+            <div style="margin-top:4px;"><a href="#" style="color:var(--ces-red);font-size:11px;text-decoration:none;">View →</a></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- CORRECTIONS -->
+      <div style="margin:0 20px 16px;background:#fff;border:1px solid var(--border);border-radius:8px;overflow:hidden;">
+        <div style="padding:11px 16px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;">
+          <span style="font-size:13px;font-weight:600;color:var(--text);">Recent Corrections</span>
+          <a href="#" style="font-size:11px;color:var(--ces-red);text-decoration:none;">View all 14 →</a>
+        </div>
+        <table style="width:100%;">
+          <thead><tr style="background:var(--surface);">
+            <th style="padding:7px 12px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text-2);text-align:left;">Field</th>
+            <th style="padding:7px 12px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text-2);text-align:left;">Original</th>
+            <th style="padding:7px 12px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text-2);text-align:left;">Corrected</th>
+            <th style="padding:7px 12px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text-2);text-align:left;">DDR</th>
+          </tr></thead>
+          <tbody>
+            <tr style="border-bottom:1px solid #F3F4F6;">
+              <td style="padding:8px 12px;font-size:12px;font-weight:500;">Type</td>
+              <td style="padding:8px 12px;"><span class="badge b-ream" style="font-size:10px;">Ream</span></td>
+              <td style="padding:8px 12px;"><span class="badge b-back" style="font-size:10px;">Back Ream</span></td>
+              <td style="padding:8px 12px;font-size:11px;color:var(--text-2);">WDF_0508851</td>
+            </tr>
+            <tr>
+              <td style="padding:8px 12px;font-size:12px;font-weight:500;">Type</td>
+              <td style="padding:8px 12px;"><span class="badge b-tight" style="font-size:10px;">Tight Hole</span></td>
+              <td style="padding:8px 12px;"><span class="badge b-stuck" style="font-size:10px;">Stuck Pipe</span></td>
+              <td style="padding:8px 12px;font-size:11px;color:var(--text-2);">ABK_0491203</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="pros-cons">
+    <div class="pc-box pros">
+      <h4>Strengths</h4>
+      <ul>
+        <li>Het sees pipeline health + cost on login — no navigation</li>
+        <li>Processing queue + correction store in one view</li>
+        <li>Failed date count prominent — catches errors immediately</li>
+        <li>Good for management reporting</li>
+      </ul>
+    </div>
+    <div class="pc-box cons">
+      <h4>Trade-offs</h4>
+      <ul>
+        <li>Ryan's primary workflow (occurrence table) is one nav click away</li>
+        <li>Dashboard overhead for users who just need to upload + review</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════
+     D5 — FULL-WIDTH TABLE
+══════════════════════════════════════════ -->
+<div class="direction" id="d5">
+  <div class="dir-label">Direction 5</div>
+  <div class="dir-title">Full-Width Table — Maximum Data, No Sidebar</div>
+  <div class="dir-desc">No sidebar — every pixel goes to the occurrence table. Notes column fully visible. Report selected via compact dropdown in toolbar. Filters and actions in a single toolbar row above the table. Cleanest for Ryan's daily upload → review → export workflow.</div>
+
+  <div class="mockup">
+    <div class="ces-nav">
+      <div class="ces-logo">
+        <svg viewBox="0 0 32 32" fill="none"><g transform="translate(16,16)">
+          <line x1="0" y1="-13" x2="0" y2="-7" stroke="#C41230" stroke-width="2.8" stroke-linecap="round"/>
+          <line x1="0" y1="7" x2="0" y2="13" stroke="#C41230" stroke-width="2.8" stroke-linecap="round"/>
+          <line x1="-13" y1="0" x2="-7" y2="0" stroke="#C41230" stroke-width="2.8" stroke-linecap="round"/>
+          <line x1="7" y1="0" x2="13" y2="0" stroke="#C41230" stroke-width="2.8" stroke-linecap="round"/>
+        </g></svg>
+        <div class="ces-logo-text">CES Energy<span>DDR Intelligence</span></div>
+      </div>
+      <nav class="ces-menu">
+        <a href="#" class="active">Reports</a>
+        <a href="#">History</a>
+        <a href="#">Query</a>
+        <a href="#">Monitor</a>
+      </nav>
+      <div class="ces-right">
+        <button class="btn btn-red btn-sm">+ Upload DDR</button>
+        <div class="ces-avatar">R</div>
+      </div>
+    </div>
+
+    <!-- REPORT SELECTOR -->
+    <div style="padding:10px 20px;background:#fff;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:12px;">
+      <select style="padding:6px 10px;border:1px solid var(--border);border-radius:5px;font-size:13px;color:var(--text);font-weight:500;background:#fff;accent-color:var(--ces-red);">
+        <option>~QWT~AB_WDF_0508851.pdf</option>
+      </select>
+      <div style="font-size:12px;color:var(--text-2);">15 dates · <span style="color:#16A34A;font-weight:600;">13 ✓</span> · <span style="color:#D97706;font-weight:600;">1 !</span> · <span style="color:var(--ces-red);font-weight:600;">1 ✕</span></div>
+      <div style="margin-left:auto;display:flex;gap:8px;">
+        <button class="btn btn-outline btn-sm">View Errors (1)</button>
+        <button class="btn btn-red btn-sm">Export .xlsx</button>
+      </div>
+    </div>
+
+    <div style="padding:9px 20px;background:var(--surface);border-bottom:1px solid var(--border);display:flex;gap:8px;align-items:center;">
+      <input class="f-search" style="width:200px;" placeholder="Search occurrences...">
+      <div class="f-chip active">All Types</div>
+      <div class="f-chip">Stuck Pipe</div>
+      <div class="f-chip">Lost Circ.</div>
+      <div class="f-chip">Tight Hole</div>
+      <div class="f-chip">+ More</div>
+      <div style="margin-left:auto;font-size:11px;color:#9CA3AF;">23 occurrences · 1 edited</div>
+    </div>
+
+    <div style="height:430px;overflow:auto;background:#fff;">
+      <table style="width:100%;">
+        <thead style="position:sticky;top:0;background:var(--surface);z-index:5;"><tr>
+          <th style="width:24px;padding:8px 10px;"></th>
+          <th style="padding:8px 12px;text-align:left;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text-2);">Well Name</th>
+          <th style="padding:8px 12px;text-align:left;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text-2);">Surface Location</th>
+          <th style="padding:8px 12px;text-align:left;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text-2);">Type</th>
+          <th style="padding:8px 12px;text-align:left;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text-2);">Section</th>
+          <th style="padding:8px 12px;text-align:left;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text-2);">mMD (m)</th>
+          <th style="padding:8px 12px;text-align:left;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text-2);">Density</th>
+          <th style="padding:8px 12px;text-align:left;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text-2);">Notes</th>
+          <th style="width:56px;padding:8px 10px;"></th>
+        </tr></thead>
+        <tbody>
+          <tr style="border-bottom:1px solid #F3F4F6;">
+            <td style="padding:9px 10px;"></td>
+            <td style="padding:9px 12px;font-weight:500;">HZ Kakwa 16-21</td>
+            <td style="padding:9px 12px;font-family:monospace;font-size:12px;color:#6B7280;">16-21-064-05W6</td>
+            <td style="padding:9px 12px;"><span class="badge b-stuck">Stuck Pipe</span></td>
+            <td style="padding:9px 12px;"><span class="badge b-main">Main</span></td>
+            <td style="padding:9px 12px;font-family:monospace;font-size:12px;color:#6B7280;">3,847</td>
+            <td style="padding:9px 12px;font-family:monospace;font-size:12px;color:#6B7280;">1,480</td>
+            <td style="padding:9px 12px;font-size:13px;color:#6B7280;">Pipe stuck at 3847m, worked free after 2hrs circulation with 40klbs overpull</td>
+            <td style="padding:9px 8px;"><button class="btn btn-outline btn-sm">Edit</button></td>
+          </tr>
+          <tr style="border-bottom:1px solid #F3F4F6;border-left:3px solid var(--edit-dot);">
+            <td style="padding:9px 10px;"><span class="edit-dot"></span></td>
+            <td style="padding:9px 12px;font-weight:500;">HZ Kakwa 16-21</td>
+            <td style="padding:9px 12px;font-family:monospace;font-size:12px;color:#6B7280;">16-21-064-05W6</td>
+            <td style="padding:9px 12px;"><span class="badge b-back">Back Ream</span></td>
+            <td style="padding:9px 12px;"><span class="badge b-main">Main</span></td>
+            <td style="padding:9px 12px;font-family:monospace;font-size:12px;color:#6B7280;">3,612</td>
+            <td style="padding:9px 12px;font-family:monospace;font-size:12px;color:#6B7280;">1,480</td>
+            <td style="padding:9px 12px;font-size:13px;color:#6B7280;">Backreamed to free obstruction at 3612m — tight in same zone as prior event</td>
+            <td style="padding:9px 8px;"><button class="btn btn-outline btn-sm">Edit</button></td>
+          </tr>
+          <tr style="border-bottom:1px solid #F3F4F6;">
+            <td style="padding:9px 10px;"></td>
+            <td style="padding:9px 12px;font-weight:500;">HZ Kakwa 16-21</td>
+            <td style="padding:9px 12px;font-family:monospace;font-size:12px;color:#6B7280;">16-21-064-05W6</td>
+            <td style="padding:9px 12px;"><span class="badge b-lost">Lost Circulation</span></td>
+            <td style="padding:9px 12px;"><span class="badge b-int">Int.</span></td>
+            <td style="padding:9px 12px;font-family:monospace;font-size:12px;color:#6B7280;">2,104</td>
+            <td style="padding:9px 12px;font-family:monospace;font-size:12px;color:#6B7280;">1,390</td>
+            <td style="padding:9px 12px;font-size:13px;color:#6B7280;">Lost 8m³ mud, LCM pill pumped, returns restored after 1.5hr</td>
+            <td style="padding:9px 8px;"><button class="btn btn-outline btn-sm">Edit</button></td>
+          </tr>
+          <tr style="border-bottom:1px solid #F3F4F6;background:#FEF2F2;border-left:3px solid var(--ces-red);">
+            <td style="padding:9px 10px;"></td>
+            <td style="padding:9px 12px;font-size:12px;color:var(--ces-red);font-weight:500;">2026-03-31</td>
+            <td colspan="6" style="padding:9px 12px;font-size:12px;color:var(--ces-red);">Extraction failed — Tour Sheet Serial not detected on pages 44–52</td>
+            <td style="padding:9px 8px;"><button class="btn btn-danger btn-sm">Re-run</button></td>
+          </tr>
+          <tr style="border-bottom:1px solid #F3F4F6;">
+            <td style="padding:9px 10px;"></td>
+            <td style="padding:9px 12px;font-weight:500;">HZ Kakwa 16-21</td>
+            <td style="padding:9px 12px;font-family:monospace;font-size:12px;color:#6B7280;">16-21-064-05W6</td>
+            <td style="padding:9px 12px;"><span class="badge b-tight">Tight Hole</span></td>
+            <td style="padding:9px 12px;"><span class="badge b-int">Int.</span></td>
+            <td style="padding:9px 12px;font-family:monospace;font-size:12px;color:#6B7280;">1,892</td>
+            <td style="padding:9px 12px;font-family:monospace;font-size:12px;color:#6B7280;">1,350</td>
+            <td style="padding:9px 12px;font-size:13px;color:#6B7280;">Tight hole on connection, overpull 15 klbs, slow rotation to free</td>
+            <td style="padding:9px 8px;"><button class="btn btn-outline btn-sm">Edit</button></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="pros-cons">
+    <div class="pc-box pros">
+      <h4>Strengths</h4>
+      <ul>
+        <li>Notes column fully readable — no truncation</li>
+        <li>Maximum horizontal space — all 7 columns breathe</li>
+        <li>Least cognitive overhead for Ryan's core workflow</li>
+        <li>Failed row red left-border unmissable</li>
+      </ul>
+    </div>
+    <div class="pc-box cons">
+      <h4>Trade-offs</h4>
+      <ul>
+        <li>No persistent report list — must use dropdown to switch</li>
+        <li>History / Monitor require top nav — more clicks for Het</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════
+     D6 — SPLIT PANE
+══════════════════════════════════════════ -->
+<div class="direction" id="d6">
+  <div class="dir-label">Direction 6</div>
+  <div class="dir-title">Split Pane — DDR List Left, Occurrence Table Right</div>
+  <div class="dir-desc">Two-panel layout. Left: DDR list with per-report status indicators (colored dot, date count, error count, edit count). Right: occurrence table for selected DDR. Selecting a report immediately loads its occurrences — no page navigation. Familiar email-client mental model.</div>
+
+  <div class="mockup">
+    <div class="ces-nav">
+      <div class="ces-logo">
+        <svg viewBox="0 0 32 32" fill="none"><g transform="translate(16,16)">
+          <line x1="0" y1="-13" x2="0" y2="-7" stroke="#C41230" stroke-width="2.8" stroke-linecap="round"/>
+          <line x1="0" y1="7" x2="0" y2="13" stroke="#C41230" stroke-width="2.8" stroke-linecap="round"/>
+          <line x1="-13" y1="0" x2="-7" y2="0" stroke="#C41230" stroke-width="2.8" stroke-linecap="round"/>
+          <line x1="7" y1="0" x2="13" y2="0" stroke="#C41230" stroke-width="2.8" stroke-linecap="round"/>
+        </g></svg>
+        <div class="ces-logo-text">CES Energy<span>DDR Intelligence</span></div>
+      </div>
+      <nav class="ces-menu">
+        <a href="#" class="active">Reports</a>
+        <a href="#">History</a>
+        <a href="#">Query</a>
+        <a href="#">Monitor</a>
+      </nav>
+      <div class="ces-right">
+        <button class="btn btn-red btn-sm">+ Upload DDR</button>
+        <div class="ces-avatar">R</div>
+      </div>
+    </div>
+
+    <div style="display:flex;height:560px;">
+      <!-- LEFT: DDR LIST -->
+      <div style="width:280px;border-right:1px solid var(--border);background:var(--surface);display:flex;flex-direction:column;flex-shrink:0;">
+        <div style="padding:9px 12px;border-bottom:1px solid var(--border);background:#fff;">
+          <input class="f-search" style="width:100%;" placeholder="Search reports...">
+        </div>
+        <!-- Active row -->
+        <div style="padding:10px 12px;background:var(--ces-red);cursor:pointer;">
+          <div style="font-size:12px;font-weight:600;color:#fff;">WDF_0508851</div>
+          <div style="font-size:10px;color:rgba(255,255,255,.7);margin-top:2px;">2026-05-04 · 23 occurrences</div>
+          <div style="display:flex;gap:5px;margin-top:6px;">
+            <span style="padding:1px 6px;border-radius:4px;font-size:10px;font-weight:600;background:rgba(255,255,255,.2);color:#fff;">13 ✓</span>
+            <span style="padding:1px 6px;border-radius:4px;font-size:10px;font-weight:600;background:rgba(255,255,255,.15);color:rgba(255,255,255,.9);">1 !</span>
+            <span style="padding:1px 6px;border-radius:4px;font-size:10px;font-weight:600;background:rgba(255,255,255,.15);color:rgba(255,255,255,.9);">1 ✕</span>
+            <span style="margin-left:auto;font-size:10px;color:rgba(255,255,255,.7);">1 edit</span>
+          </div>
+        </div>
+        <!-- Other rows -->
+        <div style="padding:10px 12px;background:#fff;border-bottom:1px solid #F3F4F6;cursor:pointer;">
+          <div style="font-size:12px;font-weight:500;color:var(--text);">ABK_0491203</div>
+          <div style="font-size:10px;color:var(--text-2);margin-top:2px;">2026-05-03 · 18 occurrences</div>
+          <div class="sc" style="margin-top:6px;"><span class="ok">18 ✓</span><span class="warn">0 !</span><span class="err">0 ✕</span></div>
+        </div>
+        <div style="padding:10px 12px;background:#fff;border-bottom:1px solid #F3F4F6;cursor:pointer;">
+          <div style="font-size:12px;font-weight:500;color:var(--text);">MNT_0502847</div>
+          <div style="font-size:10px;color:var(--text-2);margin-top:2px;">2026-05-03 · 14 occurrences</div>
+          <div class="sc" style="margin-top:6px;"><span class="ok">11 ✓</span><span class="warn">1 !</span><span class="err">2 ✕</span></div>
+        </div>
+        <div style="padding:10px 12px;background:#fff;border-bottom:1px solid #F3F4F6;cursor:pointer;">
+          <div style="font-size:12px;font-weight:500;color:var(--text);">WDF_0497621</div>
+          <div style="font-size:10px;color:var(--text-2);margin-top:2px;">2026-05-02 · 31 occurrences</div>
+          <div class="sc" style="margin-top:6px;"><span class="ok">28 ✓</span><span class="warn">3 !</span><span class="err">0 ✕</span>
+            <span style="margin-left:auto;font-size:10px;color:#D97706;font-weight:600;">5 edits</span>
+          </div>
+        </div>
+        <div style="padding:10px 12px;background:#fff;cursor:pointer;display:flex;gap:8px;align-items:flex-start;">
+          <div style="width:8px;height:8px;border-radius:50%;background:#16A34A;margin-top:3px;flex-shrink:0;"></div>
+          <div style="flex:1;">
+            <div style="font-size:12px;font-weight:500;color:var(--text);">ABK_0508902</div>
+            <div style="font-size:10px;color:var(--text-2);margin-top:1px;">Processing · Date 6 of 12</div>
+            <div class="progress" style="margin-top:5px;width:100%;"><div class="progress-fill" style="width:50%;"></div></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- RIGHT: OCCURRENCE TABLE -->
+      <div style="flex:1;display:flex;flex-direction:column;overflow:hidden;">
+        <div style="padding:11px 16px;border-bottom:1px solid var(--border);background:#fff;display:flex;align-items:center;justify-content:space-between;">
+          <div>
+            <div style="font-size:14px;font-weight:600;color:var(--text);">~QWT~AB_WDF_0508851.pdf</div>
+            <div style="font-size:11px;color:var(--text-2);margin-top:1px;">23 occurrences · 1 edited</div>
+          </div>
+          <div style="display:flex;gap:6px;">
+            <button class="btn btn-outline btn-sm">Errors (1)</button>
+            <button class="btn btn-red btn-sm">Export .xlsx</button>
+          </div>
+        </div>
+        <div style="padding:7px 14px;background:var(--surface);border-bottom:1px solid var(--border);display:flex;gap:6px;flex-wrap:wrap;">
+          <div class="f-chip active">All</div>
+          <div class="f-chip">Stuck Pipe</div>
+          <div class="f-chip">Lost Circ.</div>
+          <div class="f-chip">Tight Hole</div>
+        </div>
+        <div style="flex:1;overflow:auto;">
+          <table style="width:100%;">
+            <thead style="position:sticky;top:0;background:var(--surface);z-index:5;"><tr>
+              <th style="width:20px;padding:7px 10px;"></th>
+              <th style="padding:7px 10px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text-2);text-align:left;">Type</th>
+              <th style="padding:7px 10px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text-2);text-align:left;">Section</th>
+              <th style="padding:7px 10px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text-2);text-align:left;">mMD</th>
+              <th style="padding:7px 10px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text-2);text-align:left;">Notes</th>
+            </tr></thead>
+            <tbody>
+              <tr style="border-bottom:1px solid #F3F4F6;">
+                <td style="padding:8px 10px;"></td>
+                <td style="padding:8px 10px;"><span class="badge b-stuck" style="font-size:11px;">Stuck Pipe</span></td>
+                <td style="padding:8px 10px;"><span class="badge b-main" style="font-size:11px;">Main</span></td>
+                <td style="padding:8px 10px;font-family:monospace;font-size:11px;color:#6B7280;">3,847</td>
+                <td style="padding:8px 10px;font-size:12px;color:#6B7280;">Pipe stuck, free 2hrs</td>
+              </tr>
+              <tr style="border-bottom:1px solid #F3F4F6;border-left:2px solid var(--edit-dot);">
+                <td style="padding:8px 10px;"><span class="edit-dot"></span></td>
+                <td style="padding:8px 10px;"><span class="badge b-back" style="font-size:11px;">Back Ream</span></td>
+                <td style="padding:8px 10px;"><span class="badge b-main" style="font-size:11px;">Main</span></td>
+                <td style="padding:8px 10px;font-family:monospace;font-size:11px;color:#6B7280;">3,612</td>
+                <td style="padding:8px 10px;font-size:12px;color:#6B7280;">Backreamed to free obstruction</td>
+              </tr>
+              <tr style="border-bottom:1px solid #F3F4F6;">
+                <td style="padding:8px 10px;"></td>
+                <td style="padding:8px 10px;"><span class="badge b-lost" style="font-size:11px;">Lost Circulation</span></td>
+                <td style="padding:8px 10px;"><span class="badge b-int" style="font-size:11px;">Int.</span></td>
+                <td style="padding:8px 10px;font-family:monospace;font-size:11px;color:#6B7280;">2,104</td>
+                <td style="padding:8px 10px;font-size:12px;color:#6B7280;">Lost 8m³ mud, LCM pill</td>
+              </tr>
+              <tr style="border-bottom:1px solid #F3F4F6;background:#FEF2F2;border-left:2px solid var(--ces-red);">
+                <td style="padding:8px 10px;"></td>
+                <td colspan="3" style="padding:8px 10px;font-size:11px;color:var(--ces-red);font-weight:500;">2026-03-31 — Extraction Failed</td>
+                <td style="padding:8px 10px;"><button class="btn btn-danger btn-sm" style="font-size:10px;">Re-run</button></td>
+              </tr>
+              <tr style="border-bottom:1px solid #F3F4F6;">
+                <td style="padding:8px 10px;"></td>
+                <td style="padding:8px 10px;"><span class="badge b-tight" style="font-size:11px;">Tight Hole</span></td>
+                <td style="padding:8px 10px;"><span class="badge b-int" style="font-size:11px;">Int.</span></td>
+                <td style="padding:8px 10px;font-family:monospace;font-size:11px;color:#6B7280;">1,892</td>
+                <td style="padding:8px 10px;font-size:12px;color:#6B7280;">Tight on connection, overpull 15k</td>
+              </tr>
+              <tr style="border-bottom:1px solid #F3F4F6;">
+                <td style="padding:8px 10px;"></td>
+                <td style="padding:8px 10px;"><span class="badge b-kick" style="font-size:11px;">Kick</span></td>
+                <td style="padding:8px 10px;"><span class="badge b-main" style="font-size:11px;">Main</span></td>
+                <td style="padding:8px 10px;font-family:monospace;font-size:11px;color:#6B7280;">4,201</td>
+                <td style="padding:8px 10px;font-size:12px;color:#6B7280;">Minor kick, circulated out 45min</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="pros-cons">
+    <div class="pc-box pros">
+      <h4>Strengths</h4>
+      <ul>
+        <li>Select report → occurrences load instantly, no page nav</li>
+        <li>All report statuses visible in left panel at all times</li>
+        <li>Processing job visible while reviewing another report</li>
+        <li>Familiar email/file-browser mental model</li>
+      </ul>
+    </div>
+    <div class="pc-box cons">
+      <h4>Trade-offs</h4>
+      <ul>
+        <li>Right pane too narrow — Well Name + Surface Location columns dropped</li>
+        <li>Layout doesn't generalize cleanly to History and Query views</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- TOAST -->
+<div class="toast">
+  <span style="color:var(--ces-red);">●</span>
+  Correction saved — will inform future extractions
+</div>
+
+<script>
+function show(id, btn) {
+  document.querySelectorAll('.direction').forEach(d => d.classList.remove('active'));
+  document.querySelectorAll('.page-nav button').forEach(b => b.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  btn.classList.add('active');
+}
+</script>
+</body>
+</html>
