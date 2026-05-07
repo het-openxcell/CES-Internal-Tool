@@ -8,6 +8,14 @@ export default defineConfig(({ mode }) => {
 
   return {
     plugins: [react(), tailwindcss()],
+    define: {
+      "import.meta.env.VITE_API_URL": JSON.stringify(backendUrl),
+    },
+    test: {
+      environment: "jsdom",
+      globals: true,
+      setupFiles: "./src/test/setup.ts",
+    },
     server: {
       port: 5173,
       proxy: {
