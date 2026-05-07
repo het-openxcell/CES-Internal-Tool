@@ -73,7 +73,7 @@ def test_upload_service_rejects_non_pdf_before_write(tmp_path) -> None:
         try:
             await service.upload(upload)
         except DDRUploadValidationError as exc:
-            assert exc.detail == "Only PDF files accepted"
+            assert exc.detail == "only_pdf_files_accepted"
         else:
             raise AssertionError("expected validation error")
 
@@ -92,7 +92,7 @@ def test_upload_service_rejects_spoofed_pdf_before_write(tmp_path) -> None:
         try:
             await service.upload(upload)
         except DDRUploadValidationError as exc:
-            assert exc.detail == "Only PDF files accepted"
+            assert exc.detail == "only_pdf_files_accepted"
         else:
             raise AssertionError("expected validation error")
 
@@ -223,7 +223,10 @@ def test_upload_route_rejects_non_pdf_without_file_write(tmp_path, monkeypatch) 
         monkeypatch.setattr(settings, "UPLOAD_DIR", previous_upload_dir)
 
     assert response.status_code == 400
-    assert response.json() == {"error": "Only PDF files accepted", "code": "VALIDATION_ERROR", "details": {}}
+    body = response.json()
+    assert body["success"] is False
+    assert body["error_code"] == 400
+    assert body["message"]["description"] == "only_pdf_files_accepted"
     assert repository.created == []
     assert list(tmp_path.iterdir()) == []
 
@@ -255,7 +258,10 @@ def test_get_ddr_route_returns_detail_or_not_found() -> None:
     assert found.status_code == 200
     assert found.json()["id"] == "22222222-2222-2222-2222-222222222222"
     assert missing.status_code == 404
-    assert missing.json() == {"error": "DDR not found", "code": "NOT_FOUND", "details": {}}
+    body = missing.json()
+    assert body["success"] is False
+    assert body["error_code"] == 404
+    assert body["message"]["description"] == "ddr_not_found"
 
 
 def test_ddr_routes_require_authentication() -> None:

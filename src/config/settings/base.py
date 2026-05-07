@@ -74,7 +74,7 @@ class BackendBaseSettings(BaseSettings):
     LOG_LEVEL: str = config("LOG_LEVEL", default="INFO", cast=str)
 
     PERFORMANCE_THRESHOLD_MS: float = config("PERFORMANCE_THRESHOLD_MS", default=1000.0, cast=float)
-    UPLOAD_DIR: str = config("UPLOAD_DIR", default="/app/uploads", cast=str)
+    UPLOAD_DIR: str = config("UPLOAD_DIR", default="/home/het/Desktop/Canadian%20Energy%20Service%20Internal%20Tool/extras/uploads/", cast=str)
 
     ASYNC_LOGGING: bool = config("ASYNC_LOGGING", default=True, cast=bool)
     BACKTRACE_ENABLED: bool = config("BACKTRACE_ENABLED", default=True, cast=bool)
@@ -86,6 +86,11 @@ class BackendBaseSettings(BaseSettings):
     HASHING_SALT: str = config("HASHING_SALT", default="change-me-local-only", cast=str)
 
     KEY_HEX: str = config("KEY_HEX", cast=str, default="")
+
+    GEMINI_API_KEY: str = config("GEMINI_API_KEY", cast=str, default="")
+    GEMINI_MODEL: str = config("GEMINI_MODEL", cast=str, default="gemini-2.5-flash-lite")
+    GEMINI_EXTRACTION_MAX_CONCURRENT: int = config("GEMINI_EXTRACTION_MAX_CONCURRENT", cast=int, default=3)
+    GEMINI_EXTRACTION_MAX_RETRIES: int = config("GEMINI_EXTRACTION_MAX_RETRIES", cast=int, default=3)
 
     @property
     def set_backend_app_attributes(self) -> dict[str, str | bool | None]:

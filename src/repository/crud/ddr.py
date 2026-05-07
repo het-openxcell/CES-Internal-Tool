@@ -36,13 +36,31 @@ class DDRCRUDRepository(BaseCRUDRepository[DDR]):
         query = await self.async_session.execute(statement=stmt)
         return query.scalars().all()
 
-    async def update_status(self, ddr: DDR, status: str) -> DDR:
-        return await self.update(ddr, {"status": DDRStatus.validate(status), "updated_at": int(time.time())})
+    async def update_status(self, ddr: DDR, status: str, commit: bool = True) -> DDR:
+        ddr.status = DDRStatus.validate(status)
+        ddr.updated_at = int(time.time())
+        self.async_session.add(ddr)
+        if commit:
+            await self.async_session.commit()
+            await self.async_session.refresh(ddr)
+        else:
+            await self.async_session.flush()
+        return ddr
 
     async def read_all_descending(self) -> typing.Sequence[DDR]:
         stmt = sqlalchemy.select(DDR).order_by(DDR.created_at.desc())
         query = await self.async_session.execute(statement=stmt)
         return query.scalars().all()
+
+    async def finalize_status_from_dates(self, ddr: DDR, date_statuses: typing.Iterable[str]) -> DDR:
+        statuses = list(date_statuses)
+        if not statuses:
+            final = DDRStatus.FAILED
+        elif any(status == DDRDateStatus.SUCCESS for status in statuses):
+            final = DDRStatus.COMPLETE
+        else:
+            final = DDRStatus.FAILED
+        return await self.update(ddr, {"status": final, "updated_at": int(time.time())})
 
     async def create_queued_with_queue(
         self,
@@ -89,6 +107,113 @@ class DDRDateCRUDRepository(BaseCRUDRepository[DDRDate]):
 
     async def update_status(self, ddr_date: DDRDate, status: str) -> DDRDate:
         return await self.update(ddr_date, {"status": DDRDateStatus.validate(status), "updated_at": int(time.time())})
+
+    async def bulk_create_queued(
+        self,
+        ddr_id: str,
+        dates: typing.Iterable[str],
+        commit: bool = True,
+    ) -> typing.Sequence[DDRDate]:
+        now = int(time.time())
+        requested_dates = list(dict.fromkeys(dates))
+        existing_rows = await self.read_dates_by_ddr_id(ddr_id)
+        existing_dates = {row.date for row in existing_rows}
+        records = [
+            DDRDate(
+                ddr_id=ddr_id,
+                date=date,
+                status=DDRDateStatus.validate(DDRDateStatus.QUEUED),
+                created_at=now,
+                updated_at=now,
+            )
+            for date in requested_dates
+            if date not in existing_dates
+        ]
+        for record in records:
+            self.async_session.add(record)
+        if commit:
+            await self.async_session.commit()
+            for record in records:
+                await self.async_session.refresh(record)
+        else:
+            await self.async_session.flush()
+        return [*existing_rows, *records]
+
+    async def mark_success(
+        self,
+        ddr_date: DDRDate,
+        raw_response: dict,
+        final_json: dict,
+    ) -> DDRDate:
+        return await self.update(
+            ddr_date,
+            {
+                "status": DDRDateStatus.SUCCESS,
+                "raw_response": raw_response,
+                "final_json": final_json,
+                "error_log": None,
+                "updated_at": int(time.time()),
+            },
+        )
+
+    async def mark_failed(
+        self,
+        ddr_date: DDRDate,
+        error_log: dict,
+        raw_response: dict | None = None,
+    ) -> DDRDate:
+        return await self.update(
+            ddr_date,
+            {
+                "status": DDRDateStatus.FAILED,
+                "raw_response": raw_response,
+                "final_json": None,
+                "error_log": error_log,
+                "updated_at": int(time.time()),
+            },
+        )
+
+    async def mark_warning(
+        self,
+        ddr_date: DDRDate,
+        error_log: dict,
+        raw_response: dict | None = None,
+    ) -> DDRDate:
+        return await self.update(
+            ddr_date,
+            {
+                "status": DDRDateStatus.WARNING,
+                "raw_response": raw_response,
+                "final_json": None,
+                "error_log": error_log,
+                "updated_at": int(time.time()),
+            },
+        )
+
+    async def create_failed_boundary(
+        self,
+        ddr_id: str,
+        date: str,
+        reason: str,
+        raw_page_content: str,
+        commit: bool = True,
+    ) -> DDRDate:
+        now = int(time.time())
+        record = DDRDate(
+            ddr_id=ddr_id,
+            date=date,
+            status=DDRDateStatus.validate(DDRDateStatus.FAILED),
+            error_log={"reason": reason, "raw_page_content": raw_page_content},
+            created_at=now,
+            updated_at=now,
+        )
+        self.async_session.add(record)
+        if commit:
+            await self.async_session.commit()
+            await self.async_session.refresh(record)
+        else:
+            await self.async_session.flush()
+        return record
 
 
 class ProcessingQueueCRUDRepository(BaseCRUDRepository[ProcessingQueue]):

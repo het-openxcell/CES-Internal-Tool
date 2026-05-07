@@ -1,0 +1,17 @@
+{
+  "time_logs": [
+    {"start_time": "00:00", "end_time": "06:00", "duration_hours": 6.0, "activity": "Drilling", "depth_md": 1500.0, "comment": null},
+    {"start_time": "06:00", "end_time": "12:00", "duration_hours": 6.0, "activity": "Tripping", "depth_md": 1500.0, "comment": null},
+    {"start_time": "12:00", "end_time": "18:00", "duration_hours": 6.0, "activity": "Circulating", "depth_md": 1620.0, "comment": "Mud check"},
+    {"start_time": "18:00", "end_time": "24:00", "duration_hours": 6.0, "activity": "Drilling", "depth_md": 1750.0, "comment": null}
+  ],
+  "mud_records": [
+    {"depth_md": 1500.0, "mud_weight": 9.2, "viscosity": 45.0, "ph": 9.5, "comment": null}
+  ],
+  "deviation_surveys": [
+    {"depth_md": 1500.0, "inclination": 1.2, "azimuth": 180.0, "tvd": 1499.5}
+  ],
+  "bit_records": [
+    {"bit_number": "B-001", "bit_size": 8.5, "depth_in": 1400.0, "depth_out": 1750.0, "hours": 18.0, "comment": null}
+  ]
+}

@@ -89,12 +89,11 @@ async def exception_json_response(
         status_code=status_code,
         content=Response(
             success=False,
-            error_code=123,
+            error_code=status_code,
             message=MessageModel(
-                title="title",
+                title=error or "request_error",
                 description=detail
             ),
-            error=error,
             call_hierarchy=call_hierarchy
         ).model_dump(),
         headers=kwargs.get('headers', {})
@@ -109,9 +108,12 @@ async def general_exception_handler(request: Request, exc: Exception):
     return JSONResponse(
         status_code=500,
         content=Response(
-            status=False,
-            message="An internal server error occurred",
-            error=str(exc),
+            success=False,
+            error_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            message=MessageModel(
+                title="internal_server_error",
+                description="An internal server error occurred"
+            ),
             call_hierarchy=hierarchy
         ).model_dump(),
     )
@@ -122,9 +124,8 @@ class BaseTrackedException(Exception):
     def __init__(self, detail: str, format_data: dict = None):
         self.detail = detail
         self.format_data = format_data or {}
-        # Automatically capture call hierarchy when exception is created
         self._call_hierarchy = get_call_hierarchy_from_stack()
-        super().__init__(detail)
+        Exception.__init__(self, detail)
     
     def set_hierarchy(self, hierarchy: str):
         self._call_hierarchy = hierarchy
