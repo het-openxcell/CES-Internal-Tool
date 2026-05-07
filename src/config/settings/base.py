@@ -74,6 +74,7 @@ class BackendBaseSettings(BaseSettings):
     LOG_LEVEL: str = config("LOG_LEVEL", default="INFO", cast=str)
 
     PERFORMANCE_THRESHOLD_MS: float = config("PERFORMANCE_THRESHOLD_MS", default=1000.0, cast=float)
+    UPLOAD_DIR: str = config("UPLOAD_DIR", default="/app/uploads", cast=str)
 
     ASYNC_LOGGING: bool = config("ASYNC_LOGGING", default=True, cast=bool)
     BACKTRACE_ENABLED: bool = config("BACKTRACE_ENABLED", default=True, cast=bool)

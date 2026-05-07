@@ -1,19 +1,15 @@
-from functools import wraps
-from typing import Optional, Dict, Any
+from typing import Optional
 
-from fastapi import Request, Depends, HTTPException, status
-from fastapi.security import HTTPAuthorizationCredentials, OAuth2PasswordBearer
-from jose import JWTError as JoseJWTError
+from fastapi import Depends, Request
 from fastapi.security import HTTPBearer
+from fastapi.security import HTTPAuthorizationCredentials, OAuth2PasswordBearer
 from fastapi.security.utils import get_authorization_scheme_param
 import sqlalchemy
 
-from src.utilities.exceptions.exceptions import AuthorizationHeaderException, SecurityException
-from src.securities.authorizations.jwt import jwt_generator
-from src.repository.crud.user import UserCRUDRepository
-from src.api.dependencies.repository import get_repository
 from src.models.db.user import User
 from src.repository.database import async_db
+from src.securities.authorizations.jwt import jwt_generator
+from src.utilities.exceptions.exceptions import AuthorizationHeaderException, SecurityException
 
 
 class CustomHTTPBearer(HTTPBearer):
@@ -60,14 +56,7 @@ class CustomOAuth2PasswordBearer(OAuth2PasswordBearer):
 
 async def get_current_user(user_id: int) -> User:
     async for async_session in async_db.get_session():
-        stmt = sqlalchemy.select(User).where(User.id == user_id, User.is_active == True)
-        result = await async_session.execute(statement=stmt)
-        return result.scalar_one_or_none()
-
-
-async def get_user_by_email(email: str) -> User:
-    async for async_session in async_db.get_session():
-        stmt = sqlalchemy.select(User).where(User.email == email, User.is_active == True)
+        stmt = sqlalchemy.select(User).where(User.id == user_id)
         result = await async_session.execute(statement=stmt)
         return result.scalar_one_or_none()
 
@@ -75,7 +64,7 @@ async def get_user_by_email(email: str) -> User:
 async def jwt_authentication(
     request: Request,
     credentials: HTTPAuthorizationCredentials = Depends(security)
-) -> Dict[str, Any]:
+) -> User:
     token = credentials.credentials
     if token is None:
         raise AuthorizationHeaderException('sign_in_required')
@@ -83,7 +72,6 @@ async def jwt_authentication(
     try:
         token_data = jwt_generator.retrieve_details_from_token(token)
         user_id = token_data.get("user_id")
-        email = token_data.get("email")
 
         current_user = await get_current_user(user_id=user_id)
         if not current_user:
@@ -92,12 +80,9 @@ async def jwt_authentication(
         request.state.user = current_user
         request.state.token_data = token_data
 
-        return {
-            "user": current_user,
-            "token_data": token_data
-        }
+        return current_user
 
     except SecurityException as security_error:
         raise AuthorizationHeaderException(detail=str(security_error))
-    except Exception as e:
+    except Exception:
         raise AuthorizationHeaderException(detail='sign_in_required')
