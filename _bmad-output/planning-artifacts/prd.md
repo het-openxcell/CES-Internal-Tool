@@ -15,7 +15,7 @@ classification:
   domain: 'energy'
   complexity: 'high'
   projectContext: 'greenfield'
-  notes: 'Dual backend track — Go and Python both built to feature parity; final backend selection deferred until post-PoC validation. Single user role — no RBAC.'
+  notes: 'Python-only backend track using FastAPI, Alembic, Pydantic, pdfplumber, pypdf, openpyxl, and google-genai. Single user role — no RBAC.'
 ---
 
 # Product Requirements Document - Canadian Energy Service Internal Tool
@@ -37,7 +37,7 @@ No commercial product solves DDR extraction for oilfield service companies. Paso
 
 The core insight that collapsed the solution space: **DDR PDFs are native text, not scanned images.** Every prior extraction approach (Docling, LlamaExtract) treated these as OCR problems and paid the cost — 12+ minutes on a GPU, multi-stage ML pipelines. pdfplumber reads text coordinates directly. Gemini 2.5 Flash-Lite maps fields to schema. The result: a full 30-day DDR processed in under 90 seconds at ~$0.02/report.
 
-The backend is built on a dual-track strategy — Go and Python implementations maintained in parallel to feature parity. Final backend selection is deferred until post-validation. This preserves optionality on performance vs. ecosystem tradeoffs without blocking early development.
+The backend is Python-only using FastAPI, Alembic, Pydantic v2, pdfplumber, pypdf, openpyxl, and the google-genai SDK. Backend selection is complete; no parallel Go implementation will be maintained.
 
 ## Project Classification
 
@@ -47,7 +47,7 @@ The backend is built on a dual-track strategy — Go and Python implementations 
 | Domain | Energy — oil & gas / oilfield services |
 | Complexity | High (domain-specific PDF format, AI extraction pipeline, operational data) |
 | Project Context | Greenfield |
-| Backend Strategy | Dual-track: Go + Python (feature parity; selection deferred) |
+| Backend Strategy | Python-only FastAPI backend |
 | Access Model | Single role — all authenticated users have full access |
 
 ## Success Criteria
@@ -83,7 +83,7 @@ The backend is built on a dual-track strategy — Go and Python implementations 
 | Processing speed (30-day DDR) | < 90s sequential / < 30s parallel async |
 | NL query response | < 3s end-to-end |
 | AI compute cost | < $1/day at 10–15 DDRs/day |
-| Go ↔ Python backend parity | Identical test suite passes both before selection |
+| Python backend test coverage | Identical test suite passes both before selection |
 | Pre-splitter date boundary detection | 100% on both sample PDFs (109-page + 229-page) |
 | Correction context payload size | Minimal — summarized corrections only, not full history dump |
 
@@ -112,7 +112,7 @@ The backend is built on a dual-track strategy — Go and Python implementations 
 - Error logging + per-date re-run capability with manual date override
 - Keyword list management — update keyword→type mappings without code deploy
 - Single authenticated user role — all users have full access to all features
-- Dual-backend: Go + Python at feature parity (same API surface, same test suite)
+- Python backend: FastAPI API surface, Alembic migrations, Pydantic validation, async-safe service layer, and pytest coverage
 
 ### Growth Features (Post-MVP)
 
@@ -233,7 +233,7 @@ Monday: 31 DDRs processed, 1 failed, 2 warnings. Gemini cost: $2.14 for the week
 - Gemini API key stored as environment variable, never in code or logs
 - Qdrant: vector store for NL query (self-hosted or Qdrant Cloud)
 - PostgreSQL: primary store — JSONB for raw responses and final JSON
-- Excel export: `excelize` (Go) / `openpyxl` (Python) — `.xlsx` is the primary client deliverable format
+- Excel export: `openpyxl` — `.xlsx` is the primary client deliverable format
 
 ### Performance & Availability
 
@@ -249,7 +249,7 @@ Monday: 31 DDRs processed, 1 failed, 2 warnings. Gemini cost: $2.14 for the week
 | Keyword misclassification becomes systemic | Correction store surfaces patterns; any user can update keyword list without redeploy |
 | Tour Sheet Serial format changes across contractors | Graceful fallback + manual date override on re-run; error logged with raw page content |
 | mMD incorrectly inferred | Problem-line depth prioritized; backward scan only as fallback; mMD editable inline |
-| Go vs. Python parity drift | Shared test suite; identical API contract; selection decision gates V1 launch |
+| Backend implementation drift | Single Python backend; pytest contract and integration tests gate V1 launch |
 | Multi-date overflow — Tour 3 of date X spills onto page containing date Y header | Pre-splitter must detect both serial numbers on same page and assign pages correctly; validated in PoC on 109-page + 229-page samples |
 | TIME LOG row order disrupted — Gemini reorders rows when `Details` text is long | Validate row-order preservation in PoC; prompt instructs model to preserve input row sequence; Pydantic checks row count vs. page density |
 
@@ -267,7 +267,7 @@ Occurrences are generated by a deterministic keyword rule engine (~250 keywords)
 The ~250-keyword classification table is user-editable at runtime without a code deploy. This externalizes domain expertise from code into a data artifact that field experts can maintain directly. Standard ML systems require retraining; this system improves through expert curation.
 
 **4. Dual-Backend Validation Pattern**
-Go and Python backends built to identical feature parity and API contract, validated by a shared test suite. Selection deferred to post-PoC evidence. Deliberate architectural optionality — avoids premature lock-in where the right answer is genuinely unknown until measured.
+Python backend built to identical feature test coverage and API contract, validated by a shared test suite. Selection deferred to post-PoC evidence. Deliberate architectural optionality — avoids premature lock-in where the right answer is genuinely unknown until measured.
 
 ### Market Context & Competitive Landscape
 
@@ -285,7 +285,7 @@ Go and Python backends built to identical feature parity and API contract, valid
 | Native-text pipeline | 3-day PoC on 109-page + 229-page sample PDFs | ≥ 95% field accuracy vs. ground truth |
 | Occurrence keyword engine | Compare vs. Het's converter ground truth on known DDRs | ≥ 90% type classification accuracy |
 | Correction context injection | 30 corrections ingested → measure edit rate on next 10 DDRs | Edit rate drops measurably |
-| Dual-backend parity | Shared test suite must pass both before selection decision | 100% test parity |
+| Python-only test coverage | Shared test suite must pass both before selection decision | 100% test test coverage |
 
 ### Innovation Risk Mitigation
 
@@ -293,7 +293,7 @@ Go and Python backends built to identical feature parity and API contract, valid
 |---|---|
 | responseSchema rejects complex schema → Gemini 400 | Escalate to `responseJsonSchema` (supports `$ref`, added Nov 2025) |
 | Correction context grows too large → prompt bloat | Hard cap: inject only last N corrections, summarized not verbatim |
-| Keyword list diverges between Go + Python backends | Single source-of-truth file; both backends read same artifact |
+| Keyword list diverges between Python backends | Single source-of-truth file; the Python backend read same artifact |
 | Native-text assumption wrong for some contractors | pdfplumber scan confirms text layer before pipeline starts; flag if empty |
 
 ## Web Application Specific Requirements
@@ -306,7 +306,7 @@ Single-page application (React/Vite/Tailwind). Internal tool behind authenticati
 
 **Frontend stack (locked):** React + Vite + Tailwind CSS. Static credentials for V1 auth — no OAuth/SSO required.
 
-**API contract:** Frontend talks to one backend URL. Same API surface served by both Go and Python backends — frontend must not assume language-specific behavior. JSON throughout.
+**API contract:** Frontend talks to one backend URL. Same API surface served by both Python backend — frontend must not assume language-specific behavior. JSON throughout.
 
 **State management:** React `useState`/`useEffect` sufficient for V1. Processing status via polling (`useEffect` interval) or SSE — not WebSocket.
 
@@ -342,7 +342,7 @@ Basic usability for V1 — keyboard navigation for primary flows, sufficient col
 
 **Approach:** Problem-solving single release — deliver the complete core workflow (upload → extract → occurrences → edit → export) reliably. No partial feature delivery. Users get the full job-to-be-done on day one.
 
-**Resource Requirements:** 1–2 developers. Dual-backend is the primary resource multiplier — explicit selection milestone gates indefinite parallel maintenance.
+**Resource Requirements:** 1–2 developers. Python-only is the primary resource multiplier — explicit selection milestone gates indefinite parallel maintenance.
 
 ### Complete Feature Set
 
@@ -374,7 +374,7 @@ Basic usability for V1 — keyboard navigation for primary flows, sufficient col
 | Risk | Mitigation |
 |---|---|
 | NL query (Qdrant) more complex than expected | BM25 keyword search ships first; Qdrant vector search added after. Journey 2 functions on BM25 alone. |
-| Dual-backend doubles timeline | Hard gate: backend selection milestone before V1 launch. If parity not achieved, default to Python (AI ecosystem advantage). |
+| Backend scope expands beyond one codebase | Keep V1 backend Python-only and gate launch on pytest coverage for API, pipeline, schema, search, export, and failure-isolation behavior. |
 | Correction context injection degrades accuracy | A/B test: 10 DDRs with vs. without correction context. Revert if accuracy drops. |
 | Gemini responseSchema rejects complex nested schema | Escalation path: responseJsonSchema (supports $ref, available Nov 2025). |
 | Native-text assumption fails for some contractors | pdfplumber confirms text layer present before pipeline starts; flags empty pages. |
@@ -390,7 +390,7 @@ Basic usability for V1 — keyboard navigation for primary flows, sufficient col
 
 | Risk | Mitigation |
 |---|---|
-| Dual-backend consuming 2× development time | Selection decision is time-boxed — not indefinite. Gate is explicit. |
+| Python-only consuming 2× development time | Selection decision is time-boxed — not indefinite. Gate is explicit. |
 | NL query (Qdrant) bottlenecking launch | Qdrant is the most isolatable subsystem — can be deferred to post-launch without blocking occurrence table, edit, or Excel export. |
 
 ## Functional Requirements

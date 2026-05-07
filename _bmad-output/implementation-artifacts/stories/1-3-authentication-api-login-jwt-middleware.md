@@ -17,7 +17,7 @@ so that I can access all platform features without re-authenticating for 8 hours
 3. Given any endpoint except `POST /auth/login` is called without `Authorization: Bearer <token>`, when JWT middleware processes the request, then HTTP 401 is returned with `{ "error": "Authentication required", "code": "UNAUTHORIZED", "details": {} }`.
 4. Given a JWT with expired `exp` claim is sent, when JWT middleware validates it, then HTTP 401 is returned with `UNAUTHORIZED` error code.
 5. Given structured logging middleware is active, when any request is processed, then each log line is JSON containing `{ "timestamp", "level", "service", "request_id", "message" }`, `request_id` is a UUID generated per request and present on all log lines for that request, and `Authorization` header value, `JWT_SECRET`, and `POSTGRES_PASSWORD` values never appear in logs.
-6. Given both Go and Python backends implement the login endpoint, when same credentials are sent to each, then both return tokens validated by the same JWT middleware logic, with Go behavior canonical and Python matching exactly.
+6. Given both Python backend implement the login endpoint, when same credentials are sent to each, then both return tokens validated by the same JWT middleware logic, with Go behavior canonical and Python matching exactly.
 
 ## Tasks / Subtasks
 
@@ -25,31 +25,31 @@ so that I can access all platform features without re-authenticating for 8 hours
   - [x] Verify `users` table exists with `id`, `username`, `password_hash`, `created_at`, and `updated_at`.
   - [x] Verify migrations and shared schema have landed before adding runtime DB queries.
 - [x] Add shared auth API contract fixtures (AC: 1-6)
-  - [x] Add request/response/error fixtures under `ces-ddr-platform/shared/test-fixtures/auth/`.
+  - [x] Add request/response/error fixtures under `ces-ddr-platform/ces-backend/tests/fixtures/auth/`.
   - [x] Keep JSON field names exactly `token`, `expires_at`, `error`, `code`, and `details`.
-  - [x] Add parity notes or tests proving Go and Python use same fixture expectations.
+  - [x] Add tests proving Python uses the fixture expectations.
 - [x] Implement Go auth dependencies and structure (AC: 1-6)
-  - [x] Extend `ces-backend-go/internal/config/config.go` with `JWTSecret` using existing centralized config pattern.
-  - [x] Add `ces-backend-go/internal/db/pool.go` for pgx pool setup using context-first APIs.
-  - [x] Add `ces-backend-go/internal/db/queries/users.go` for username lookup only.
-  - [x] Add `ces-backend-go/internal/models/user.go` for user data shape.
-  - [x] Add `ces-backend-go/internal/auth/jwt.go`, `middleware.go`, and `password.go`.
-  - [x] Add `ces-backend-go/internal/api/auth.go` and register `POST /auth/login`.
+  - [x] Extend `ces-backend/internal/config/config.go` with `JWTSecret` using existing centralized config pattern.
+  - [x] Add `ces-backend/internal/db/pool.go` for pgx pool setup using context-first APIs.
+  - [x] Add `ces-backend/internal/db/queries/users.go` for username lookup only.
+  - [x] Add `ces-backend/internal/models/user.go` for user data shape.
+  - [x] Add `ces-backend/internal/auth/jwt.go`, `middleware.go`, and `password.go`.
+  - [x] Add `ces-backend/internal/api/auth.go` and register `POST /auth/login`.
   - [x] Wrap all non-login routes with JWT middleware while preserving `GET /health`.
 - [x] Implement Python auth dependencies and structure (AC: 1-6)
-  - [x] Extend `ces-backend-python/app/config.py` with `jwt_secret` through `decouple + BackendBaseSettings`.
-  - [x] Add `ces-backend-python/app/db/pool.py` using asyncpg.
-  - [x] Add `ces-backend-python/app/db/queries/users.py` for async username lookup only.
-  - [x] Add `ces-backend-python/app/models/user.py`.
-  - [x] Add `ces-backend-python/app/auth/jwt.py`, `middleware.py`, and `password.py`.
-  - [x] Add `ces-backend-python/app/api/auth.py` and register `POST /auth/login`.
-  - [x] Add dependency or middleware protection for every route except `/auth/login` while preserving `GET /health` behavior unless parity decision explicitly protects health later.
-- [x] Add structured request logging in both backends (AC: 5)
+  - [x] Extend `ces-backend/app/config.py` with `jwt_secret` through `decouple + BackendBaseSettings`.
+  - [x] Add `ces-backend/app/db/pool.py` using asyncpg.
+  - [x] Add `ces-backend/app/db/queries/users.py` for async username lookup only.
+  - [x] Add `ces-backend/app/models/user.py`.
+  - [x] Add `ces-backend/app/auth/jwt.py`, `middleware.py`, and `password.py`.
+  - [x] Add `ces-backend/app/api/auth.py` and register `POST /auth/login`.
+  - [x] Add dependency or middleware protection for every route except `/auth/login` while preserving `GET /health` behavior unless test coverage decision explicitly protects health later.
+- [x] Add structured request logging in the Python backend (AC: 5)
   - [x] Generate one UUID `request_id` per request at request entry.
   - [x] Emit JSON log lines with required keys and backend-specific `service`.
   - [x] Propagate request ID through Go context and Python `request.state`.
   - [x] Sanitize `Authorization`, `JWT_SECRET`, `POSTGRES_PASSWORD`, and raw secret values before any log write.
-- [x] Add authentication tests and parity coverage (AC: 1-6)
+- [x] Add authentication tests and test coverage coverage (AC: 1-6)
   - [x] Test valid login returns token and ISO8601 `expires_at` roughly 8 hours ahead.
   - [x] Test JWT payload contains `user_id` and `exp`, signed with HS256.
   - [x] Test nonexistent username and wrong password return identical 401 body and use constant-time-safe failure path.
@@ -61,15 +61,15 @@ so that I can access all platform features without re-authenticating for 8 hours
 
 ### Review Findings
 
-- [x] [Review][Patch] Reject missing or placeholder JWT secrets instead of signing with a known default [ces-ddr-platform/ces-backend-go/internal/config/config.go:33]
-- [x] [Review][Patch] Reject Go JWTs that omit the required `exp` claim [ces-ddr-platform/ces-backend-go/internal/auth/jwt.go:49]
-- [x] [Review][Patch] Reject Python JWTs that omit `exp` or use a non-string `user_id` claim [ces-ddr-platform/ces-backend-python/app/auth/jwt.py:31]
-- [x] [Review][Patch] Implement actual log secret sanitization before writing request logs [ces-ddr-platform/ces-backend-go/internal/auth/logging.go:24]
-- [x] [Review][Patch] Remove production `/protected-test` routes from both backends [ces-ddr-platform/ces-backend-go/internal/api/router.go:54]
-- [x] [Review][Patch] Return an infrastructure error for Go user-store failures instead of masking them as invalid credentials [ces-ddr-platform/ces-backend-go/internal/api/auth.go:39]
-- [x] [Review][Patch] Add real cross-backend JWT parity coverage using a shared fixture user/hash [ces-ddr-platform/ces-backend-go/internal/api/auth_test.go:59]
-- [x] [Review][Patch] Handle malformed Python bcrypt hashes without leaking an unhandled 500 [ces-ddr-platform/ces-backend-python/app/auth/password.py:16]
-- [x] [Review][Patch] Guard lazy Python asyncpg pool initialization against concurrent first-request races [ces-ddr-platform/ces-backend-python/app/db/pool.py:10]
+- [x] [Review][Patch] Reject missing or placeholder JWT secrets instead of signing with a known default [ces-ddr-platform/ces-backend/internal/config/config.go:33]
+- [x] [Review][Patch] Reject Go JWTs that omit the required `exp` claim [ces-ddr-platform/ces-backend/internal/auth/jwt.go:49]
+- [x] [Review][Patch] Reject Python JWTs that omit `exp` or use a non-string `user_id` claim [ces-ddr-platform/ces-backend/app/auth/jwt.py:31]
+- [x] [Review][Patch] Implement actual log secret sanitization before writing request logs [ces-ddr-platform/ces-backend/internal/auth/logging.go:24]
+- [x] [Review][Patch] Remove production `/protected-test` routes from the Python backend [ces-ddr-platform/ces-backend/internal/api/router.go:54]
+- [x] [Review][Patch] Return an infrastructure error for Go user-store failures instead of masking them as invalid credentials [ces-ddr-platform/ces-backend/internal/api/auth.go:39]
+- [x] [Review][Patch] Add real cross-backend JWT test coverage coverage using a shared fixture user/hash [ces-ddr-platform/ces-backend/internal/api/auth_test.go:59]
+- [x] [Review][Patch] Handle malformed Python bcrypt hashes without leaking an unhandled 500 [ces-ddr-platform/ces-backend/app/auth/password.py:16]
+- [x] [Review][Patch] Guard lazy Python asyncpg pool initialization against concurrent first-request races [ces-ddr-platform/ces-backend/app/db/pool.py:10]
 
 ## Dev Notes
 
@@ -130,23 +130,23 @@ Python password verification is synchronous CPU work. Keep async route correctne
 
 ### Route Protection Boundary
 
-Architecture says all routes except `/auth/login` require bearer JWT. Current scaffold has only `GET /health`; Story 1.1 tests require it returns `{ "status": "ok" }`. Preserve health response and test compatibility while adding middleware structure that can protect future business routes by default. If dev chooses to protect `/health`, update parity tests and document the intentional decision; otherwise keep `/health` public as operational healthcheck and make that exception explicit in middleware. [Source: _bmad-output/planning-artifacts/architecture.md#Architectural Boundaries]
+Architecture says all routes except `/auth/login` require bearer JWT. Current scaffold has only `GET /health`; Story 1.1 tests require it returns `{ "status": "ok" }`. Preserve health response and test compatibility while adding middleware structure that can protect future business routes by default. If dev chooses to protect `/health`, update test coverage tests and document the intentional decision; otherwise keep `/health` public as operational healthcheck and make that exception explicit in middleware. [Source: _bmad-output/planning-artifacts/architecture.md#Architectural Boundaries]
 
 ### Logging Requirements
 
-Add structured request logging middleware in both backends. Required JSON keys:
+Add structured request logging middleware in the Python backend. Required JSON keys:
 
 ```json
-{ "timestamp": "ISO8601", "level": "info|warn|error", "service": "ces-backend-go|ces-backend-python", "request_id": "uuid", "message": "string" }
+{ "timestamp": "ISO8601", "level": "info|warn|error", "service": "ces-backend|ces-backend", "request_id": "uuid", "message": "string" }
 ```
 
 Generate request ID at request entry. Thread it via Go request context and Python `request.state`. Sanitization is mandatory before write: never log `Authorization` header value, `JWT_SECRET`, `POSTGRES_PASSWORD`, or raw values read from config. [Source: _bmad-output/planning-artifacts/architecture.md#Logging Pattern]
 
 ### Go Implementation Guardrails
 
-Current Go backend has:
+Current Python backend has:
 
-- `internal/api/router.go`: `NewRouter()` sets Gin release mode, creates `gin.New()`, registers health only.
+- `internal/api/router.go`: `NewRouter()` sets FastAPI release mode, creates `gin.New()`, registers health only.
 - `internal/api/health.go`: `HealthHandler` returns `{"status":"ok"}`.
 - `internal/config/config.go`: `Config` loads env through centralized `value`.
 - `main.go`: loads config, creates router, runs server.
@@ -155,7 +155,7 @@ Current Go backend has:
 Preserve the class/struct style already used: handlers as structs with `Register` methods. Do not place DB queries inside handlers. Expected structure from architecture:
 
 ```text
-ces-backend-go/internal/
+ces-backend/internal/
 ├── api/auth.go
 ├── auth/jwt.go
 ├── auth/middleware.go
@@ -180,7 +180,7 @@ Current Python backend has:
 Continue class/service encapsulation. Do not add loose utility functions or global state beyond constants. Expected structure from architecture:
 
 ```text
-ces-backend-python/app/
+ces-backend/app/
 ├── api/auth.py
 ├── auth/jwt.py
 ├── auth/middleware.py
@@ -220,7 +220,7 @@ Passlib stable bcrypt docs identify bcrypt `"2b"` as current default. Python-jos
 
 Do not regress:
 
-- `GET /health` JSON response and status in both backends.
+- `GET /health` JSON response and status in the Python backend.
 - `AppFactory` creation pattern.
 - `HealthRouter` class pattern.
 - `ExceptionHandlers().register(app)` flow.
@@ -233,14 +233,14 @@ No secret values may be committed or printed. A real `.env` exists locally under
 
 ### Testing Requirements
 
-Run Python tests from `ces-ddr-platform/ces-backend-python/`:
+Run Python tests from `ces-ddr-platform/ces-backend/`:
 
 ```bash
 source .venv/bin/activate
 pytest
 ```
 
-Run Go tests from `ces-ddr-platform/ces-backend-go/`:
+Run Go tests from `ces-ddr-platform/ces-backend/`:
 
 ```bash
 GOTOOLCHAIN=local go test ./...
@@ -255,7 +255,7 @@ Add tests that verify:
 - Bad signature and malformed token return standard `UNAUTHORIZED` error.
 - Logs contain `request_id` and required keys.
 - Logs do not contain bearer token, raw `Authorization` header value, `JWT_SECRET`, configured JWT secret value, `POSTGRES_PASSWORD`, or configured password value.
-- Go and Python accept same bcrypt-hashed fixture user and generate mutually valid HS256 tokens with same secret.
+- Python accepts the bcrypt-hashed fixture user and generates a valid HS256 token with the configured secret.
 
 If PostgreSQL, migrations, or Story 1.2 files are not available locally, document exact blocker in Dev Agent Record and keep unit-level JWT/password/error tests in place.
 
@@ -274,7 +274,7 @@ Recent Git history only shows README path movement and initial scaffolding; no a
 
 ### Project Structure Notes
 
-This story adds first runtime DB access layer and first auth layer. Keep files inside `ces-ddr-platform/ces-backend-go` and `ces-ddr-platform/ces-backend-python`. Do not add backend code at repository root. Do not modify frontend files; Story 1.4 owns login UI, localStorage token helpers, and protected routing.
+This story adds first runtime DB access layer and first auth layer. Keep files inside `ces-ddr-platform/ces-backend` and `ces-ddr-platform/ces-backend`. Do not add backend code at repository root. Do not modify frontend files; Story 1.4 owns login UI, localStorage token helpers, and protected routing.
 
 ### References
 
@@ -300,62 +300,62 @@ GPT-5
 
 - 2026-05-06: Red tests failed before implementation because Go auth package and Python `app.auth` package were absent.
 - 2026-05-06: Latest `pgx/v5` required Go 1.25 and attempted to bump `go.mod`; pinned `pgx/v5` to Go-1.22-compatible `v5.5.5` and preserved `go 1.22.2`.
-- 2026-05-06: Full Go and Python regression suites passed after auth implementation.
+- 2026-05-06: Python regression suite passed after auth implementation.
 
 ### Completion Notes List
 
 - Confirmed Story 1.2 schema prerequisite is done and reused canonical `users` table shape for runtime lookup.
-- Added shared auth request, success, and error fixtures under `shared/test-fixtures/auth`.
+- Added shared auth request, success, and error fixtures under `ces-backend/tests/fixtures/auth`.
 - Implemented Go login handler, JWT generation/validation, bcrypt password verification with dummy hash path, pgx pool/user query layer, auth middleware, and structured JSON request logging.
 - Implemented Python login router, JWT generation/validation, bcrypt verification wrapped in `asyncio.to_thread()`, asyncpg pool/user repository, auth middleware, and structured JSON request logging.
-- Kept `/health` public and unchanged in both backends while protecting non-public routes by default.
+- Kept `/health` public and unchanged in the Python backend while protecting non-public routes by default.
 - Added auth tests covering valid login, invalid credentials, missing/malformed/bad/expired bearer tokens, shared fixture shape, health regression, and log secret redaction.
 
 ### File List
 
 - _bmad-output/implementation-artifacts/sprint-status.yaml
 - _bmad-output/implementation-artifacts/stories/1-3-authentication-api-login-jwt-middleware.md
-- ces-ddr-platform/ces-backend-go/go.mod
-- ces-ddr-platform/ces-backend-go/go.sum
-- ces-ddr-platform/ces-backend-go/main.go
-- ces-ddr-platform/ces-backend-go/internal/api/auth.go
-- ces-ddr-platform/ces-backend-go/internal/api/auth_test.go
-- ces-ddr-platform/ces-backend-go/internal/api/router.go
-- ces-ddr-platform/ces-backend-go/internal/auth/errors.go
-- ces-ddr-platform/ces-backend-go/internal/auth/jwt.go
-- ces-ddr-platform/ces-backend-go/internal/auth/logging.go
-- ces-ddr-platform/ces-backend-go/internal/auth/middleware.go
-- ces-ddr-platform/ces-backend-go/internal/auth/password.go
-- ces-ddr-platform/ces-backend-go/internal/auth/store.go
-- ces-ddr-platform/ces-backend-go/internal/config/config.go
-- ces-ddr-platform/ces-backend-go/internal/db/pool.go
-- ces-ddr-platform/ces-backend-go/internal/db/queries/users.go
-- ces-ddr-platform/ces-backend-go/internal/models/user.go
-- ces-ddr-platform/ces-backend-python/app/api/auth.py
-- ces-ddr-platform/ces-backend-python/app/auth/__init__.py
-- ces-ddr-platform/ces-backend-python/app/auth/errors.py
-- ces-ddr-platform/ces-backend-python/app/auth/jwt.py
-- ces-ddr-platform/ces-backend-python/app/auth/middleware.py
-- ces-ddr-platform/ces-backend-python/app/auth/password.py
-- ces-ddr-platform/ces-backend-python/app/config.py
-- ces-ddr-platform/ces-backend-python/app/db/__init__.py
-- ces-ddr-platform/ces-backend-python/app/db/pool.py
-- ces-ddr-platform/ces-backend-python/app/db/queries/__init__.py
-- ces-ddr-platform/ces-backend-python/app/db/queries/users.py
-- ces-ddr-platform/ces-backend-python/app/main.py
-- ces-ddr-platform/ces-backend-python/app/models/__init__.py
-- ces-ddr-platform/ces-backend-python/app/models/user.py
-- ces-ddr-platform/ces-backend-python/pyproject.toml
-- ces-ddr-platform/ces-backend-python/tests/api/test_auth.py
-- ces-ddr-platform/ces-backend-python/tests/conftest.py
-- ces-ddr-platform/shared/test-fixtures/auth/README.md
-- ces-ddr-platform/shared/test-fixtures/auth/authentication-required-response.json
-- ces-ddr-platform/shared/test-fixtures/auth/login-invalid-credentials-response.json
-- ces-ddr-platform/shared/test-fixtures/auth/login-success-response.json
-- ces-ddr-platform/shared/test-fixtures/auth/login-valid-request.json
-- ces-ddr-platform/shared/test-fixtures/auth/shared-user.json
+- ces-ddr-platform/ces-backend/go.mod
+- ces-ddr-platform/ces-backend/go.sum
+- ces-ddr-platform/ces-backend/main.go
+- ces-ddr-platform/ces-backend/internal/api/auth.go
+- ces-ddr-platform/ces-backend/internal/api/auth_test.go
+- ces-ddr-platform/ces-backend/internal/api/router.go
+- ces-ddr-platform/ces-backend/internal/auth/errors.go
+- ces-ddr-platform/ces-backend/internal/auth/jwt.go
+- ces-ddr-platform/ces-backend/internal/auth/logging.go
+- ces-ddr-platform/ces-backend/internal/auth/middleware.go
+- ces-ddr-platform/ces-backend/internal/auth/password.go
+- ces-ddr-platform/ces-backend/internal/auth/store.go
+- ces-ddr-platform/ces-backend/internal/config/config.go
+- ces-ddr-platform/ces-backend/internal/db/pool.go
+- ces-ddr-platform/ces-backend/internal/db/queries/users.go
+- ces-ddr-platform/ces-backend/internal/models/user.go
+- ces-ddr-platform/ces-backend/app/api/auth.py
+- ces-ddr-platform/ces-backend/app/auth/__init__.py
+- ces-ddr-platform/ces-backend/app/auth/errors.py
+- ces-ddr-platform/ces-backend/app/auth/jwt.py
+- ces-ddr-platform/ces-backend/app/auth/middleware.py
+- ces-ddr-platform/ces-backend/app/auth/password.py
+- ces-ddr-platform/ces-backend/app/config.py
+- ces-ddr-platform/ces-backend/app/db/__init__.py
+- ces-ddr-platform/ces-backend/app/db/pool.py
+- ces-ddr-platform/ces-backend/app/db/queries/__init__.py
+- ces-ddr-platform/ces-backend/app/db/queries/users.py
+- ces-ddr-platform/ces-backend/app/main.py
+- ces-ddr-platform/ces-backend/app/models/__init__.py
+- ces-ddr-platform/ces-backend/app/models/user.py
+- ces-ddr-platform/ces-backend/pyproject.toml
+- ces-ddr-platform/ces-backend/tests/api/test_auth.py
+- ces-ddr-platform/ces-backend/tests/conftest.py
+- ces-ddr-platform/ces-backend/tests/fixtures/auth/README.md
+- ces-ddr-platform/ces-backend/tests/fixtures/auth/authentication-required-response.json
+- ces-ddr-platform/ces-backend/tests/fixtures/auth/login-invalid-credentials-response.json
+- ces-ddr-platform/ces-backend/tests/fixtures/auth/login-success-response.json
+- ces-ddr-platform/ces-backend/tests/fixtures/auth/login-valid-request.json
+- ces-ddr-platform/ces-backend/tests/fixtures/auth/shared-user.json
 
 ### Change Log
 
-- 2026-05-06: Implemented Story 1.3 authentication API, JWT middleware, structured logging, runtime user lookup layers, shared fixtures, dependencies, and parity tests for Go and Python.
-- 2026-05-06: Fixed code review findings for JWT secret validation, required JWT expiry, logging sanitization, production test routes, Go auth infrastructure errors, shared JWT parity coverage, malformed bcrypt hashes, and Python pool initialization.
+- 2026-05-06: Implemented Story 1.3 authentication API, JWT middleware, structured logging, runtime user lookup layers, fixtures, dependencies, and Python test coverage.
+- 2026-05-06: Fixed code review findings for JWT secret validation, required JWT expiry, logging sanitization, production test routes, malformed bcrypt hashes, and Python pool initialization.

@@ -53,6 +53,12 @@ describe("apiClient", () => {
     expect(window.location.pathname).toBe("/login");
   });
 
+  it("returns undefined for empty successful responses", async () => {
+    vi.mocked(fetch).mockResolvedValue(new Response(null, { status: 204 }));
+
+    await expect(apiClient.request("/history")).resolves.toBeUndefined();
+  });
+
   it("reads base URL from VITE_API_URL without hardcoded backend URL", () => {
     expect(apiSource).toContain("import.meta.env.VITE_API_URL");
     expect(apiSource).not.toMatch(/https?:\/\//);

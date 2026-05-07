@@ -27,7 +27,7 @@ class AppFactory:
         )
         app.add_middleware(
             RequestLoggingMiddleware,
-            service="ces-backend-python",
+            service="ces-backend",
             jwt_secret=self.settings.jwt_secret,
             postgres_password=self.settings.postgres_password,
         )

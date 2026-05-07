@@ -1,4 +1,4 @@
-import { type FormEvent, useEffect, useRef, useState } from "react";
+import { type FormEvent, useRef, useState } from "react";
 import { useNavigate } from "react-router";
 
 import { Button } from "@/components/ui/button";
@@ -84,27 +84,15 @@ function Spinner({ className }: { className?: string }) {
   );
 }
 
-const REMEMBER_KEY = "ces.login.remember";
-
 export default function LoginPage() {
   const navigate = useNavigate();
   const passwordRef = useRef<HTMLInputElement>(null);
-  const usernameRef = useRef<HTMLInputElement>(null);
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
-  const [rememberMe, setRememberMe] = useState(false);
   const [shake, setShake] = useState(false);
-
-  useEffect(() => {
-    const saved = localStorage.getItem(REMEMBER_KEY);
-    if (saved) {
-      setUsername(saved);
-      setRememberMe(true);
-    }
-  }, []);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -114,12 +102,6 @@ export default function LoginPage() {
     try {
       const response = await apiClient.login({ username, password });
       authToken.store(response.token);
-
-      if (rememberMe) {
-        localStorage.setItem(REMEMBER_KEY, username);
-      } else {
-        localStorage.removeItem(REMEMBER_KEY);
-      }
 
       navigate("/", { replace: true });
     } catch (caughtError) {
@@ -146,6 +128,9 @@ export default function LoginPage() {
           <CesLogo className="login-logo" />
           <div className="login-brand-text">
             <p className="eyebrow">CES Internal Tool</p>
+            <h1 id="login-title" className="login-title">
+              Sign in
+            </h1>
           </div>
         </div>
 
@@ -157,7 +142,6 @@ export default function LoginPage() {
             <div className="input-wrap">
               <UserIcon className="input-icon" />
               <input
-                ref={usernameRef}
                 autoComplete="username"
                 className="text-field text-field--icon"
                 id="username"
@@ -199,26 +183,6 @@ export default function LoginPage() {
                 {showPassword ? <EyeSlashIcon className="input-action-icon" /> : <EyeIcon className="input-action-icon" />}
               </button>
             </div>
-          </div>
-
-          <div className="login-options">
-            <label className="checkbox-field">
-              <input
-                type="checkbox"
-                checked={rememberMe}
-                onChange={(e) => setRememberMe(e.target.checked)}
-                aria-label="Remember username"
-              />
-              <span className="checkbox-check" aria-hidden="true">
-                <svg viewBox="0 0 12 12" fill="none">
-                  <path d="M2.5 6L5 8.5L9.5 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
-              </span>
-              <span className="checkbox-label">Remember me</span>
-            </label>
-            <a href="#" className="login-link" onClick={(e) => { e.preventDefault(); alert("Please contact your system administrator to reset your password."); }}>
-              Forgot password?
-            </a>
           </div>
 
           {error ? (

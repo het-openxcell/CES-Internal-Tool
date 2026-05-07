@@ -8,10 +8,10 @@ class BackendBaseSettings(BaseSettings):
 
 
 class AppSettings(BackendBaseSettings):
-    app_name: str = Field(default_factory=lambda: config("APP_NAME", default="CES DDR Python Backend"))
+    app_name: str = Field(default_factory=lambda: config("APP_NAME", default="CES DDR Backend"))
     app_env: str = Field(default_factory=lambda: config("APP_ENV", default="local"))
-    python_backend_host: str = Field(default_factory=lambda: config("PYTHON_BACKEND_HOST", default="0.0.0.0"))
-    python_backend_port: int = Field(default_factory=lambda: config("PYTHON_BACKEND_PORT", default=8000, cast=int))
+    backend_host: str = Field(default_factory=lambda: config("BACKEND_HOST", default="0.0.0.0"))
+    backend_port: int = Field(default_factory=lambda: config("BACKEND_PORT", default=8000, cast=int))
     postgres_dsn: str = Field(
         default_factory=lambda: config(
             "POSTGRES_DSN",

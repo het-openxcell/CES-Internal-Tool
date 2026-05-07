@@ -29,7 +29,7 @@ class FakeUserRepository:
 
 
 def test_shared_auth_fixtures_keep_contract_shape() -> None:
-    fixture_root = Path(__file__).parents[3] / "shared" / "test-fixtures" / "auth"
+    fixture_root = Path(__file__).parents[1] / "fixtures" / "auth"
 
     assert set(json.loads((fixture_root / "login-success-response.json").read_text()).keys()) == {"token", "expires_at"}
     assert set(json.loads((fixture_root / "login-invalid-credentials-response.json").read_text()).keys()) == {
@@ -156,7 +156,7 @@ def test_jwt_middleware_rejects_missing_malformed_bad_signature_and_expired_toke
 
 
 def test_request_logging_includes_request_id_and_excludes_secrets(caplog) -> None:
-    caplog.set_level(logging.INFO, logger="ces-backend-python")
+    caplog.set_level(logging.INFO, logger="ces-backend")
     client = TestClient(
         AppFactory(
             settings=AppSettings(jwt_secret="super-secret-value", postgres_password="postgres-secret-value"),
@@ -199,5 +199,5 @@ def test_corrupt_password_hash_returns_false() -> None:
 
 
 def shared_user_fixture() -> dict[str, str]:
-    fixture_root = Path(__file__).parents[3] / "shared" / "test-fixtures" / "auth"
+    fixture_root = Path(__file__).parents[1] / "fixtures" / "auth"
     return json.loads((fixture_root / "shared-user.json").read_text())

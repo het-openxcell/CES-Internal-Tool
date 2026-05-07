@@ -10,7 +10,6 @@ from app.migration_config import MigrationDatabaseUrl
 
 
 ROOT = Path(__file__).resolve().parents[1]
-PLATFORM_ROOT = ROOT.parent
 
 
 def test_alembic_dependencies_are_declared() -> None:
@@ -41,10 +40,9 @@ def test_migration_database_url_uses_psycopg_driver() -> None:
         assert MigrationDatabaseUrl(source).sqlalchemy_url() == expected
 
 
-def test_python_migration_matches_canonical_users_schema() -> None:
+def test_alembic_migration_defines_users_schema() -> None:
     migration = (ROOT / "alembic" / "versions" / "001_initial_schema.py").read_text()
     epoch_migration = (ROOT / "alembic" / "versions" / "002_datetime_epoch.py").read_text()
-    baseline = (PLATFORM_ROOT / "shared" / "schema" / "baseline.sql").read_text()
 
     expected_fragments = [
         "CREATE EXTENSION IF NOT EXISTS pgcrypto",
@@ -59,11 +57,8 @@ def test_python_migration_matches_canonical_users_schema() -> None:
     for fragment in expected_fragments:
         assert fragment in migration
 
-    assert "CREATE TABLE IF NOT EXISTS users" in baseline
     assert "ALTER COLUMN created_at TYPE BIGINT USING EXTRACT(EPOCH FROM created_at)::BIGINT" in epoch_migration
     assert "ALTER COLUMN updated_at TYPE BIGINT USING EXTRACT(EPOCH FROM updated_at)::BIGINT" in epoch_migration
-    assert "created_at BIGINT NOT NULL DEFAULT EXTRACT(EPOCH FROM now())::BIGINT" in baseline
-    assert "updated_at BIGINT NOT NULL DEFAULT EXTRACT(EPOCH FROM now())::BIGINT" in baseline
 
 
 def test_alembic_upgrade_generates_canonical_users_schema_sql(capsys) -> None:

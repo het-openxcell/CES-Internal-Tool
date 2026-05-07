@@ -14,15 +14,15 @@ so that development can begin on a stable, reproducible foundation.
 
 1. Given the monorepo root `ces-ddr-platform/` is created, when `docker compose up -d` is run, then PostgreSQL 16 starts healthy on port `5432`, Qdrant starts healthy on port `6333`, and `docker compose ps` shows both services as running.
 2. Given the frontend scaffold exists, when `npm run dev` is run in `ces-frontend/`, then Vite starts on port `5173`, `vite.config.ts` proxies `/api/*` to the backend URL, `tailwind.config.js` contains CES tokens `--ces-red: #C41230`, `--edit-indicator: #D97706`, `--surface: #F9FAFB`, shadcn/ui components live in `src/components/ui/`, and `<html class="light">` disables dark mode at root.
-3. Given the Python backend scaffold exists, when `uvicorn app.main:app --reload` is run in `ces-backend-python/`, then `GET /health` returns HTTP 200 with `{ "status": "ok" }`, and `app/config.py` uses Pydantic Settings with all config from environment variables.
-4. Given the Go backend scaffold exists, when `go run main.go` is run in `ces-backend-go/`, then `GET /health` returns HTTP 200 with `{ "status": "ok" }`, and `internal/config/config.go` contains a central `Config` struct loaded from environment variables.
-5. Given `.env.example` files exist in repo root, `ces-frontend/`, `ces-backend-python/`, and `ces-backend-go/`, when `.gitignore` is reviewed, then `.env` files are ignored at all levels, and `GEMINI_API_KEY`, `JWT_SECRET`, and `POSTGRES_PASSWORD` never appear in committed files.
+3. Given the Python backend scaffold exists, when `uvicorn app.main:app --reload` is run in `ces-backend/`, then `GET /health` returns HTTP 200 with `{ "status": "ok" }`, and `app/config.py` uses Pydantic Settings with all config from environment variables.
+4. Given the Python backend scaffold exists, when `go run main.go` is run in `ces-backend/`, then `GET /health` returns HTTP 200 with `{ "status": "ok" }`, and `internal/config/config.go` contains a central `Config` struct loaded from environment variables.
+5. Given `.env.example` files exist in repo root, `ces-frontend/`, `ces-backend/`, and `ces-backend/`, when `.gitignore` is reviewed, then `.env` files are ignored at all levels, and `GEMINI_API_KEY`, `JWT_SECRET`, and `POSTGRES_PASSWORD` never appear in committed files.
 
 ## Tasks / Subtasks
 
 - [x] Create monorepo scaffold under `ces-ddr-platform/` (AC: 1-5)
   - [x] Add root `README.md`, `.gitignore`, `.env.example`, `docker-compose.yml`, and optional `docker-compose.prod.yml` placeholder.
-  - [x] Add top-level folders `ces-frontend/`, `ces-backend-python/`, `ces-backend-go/`, `shared/`, `nginx/`, and `.github/workflows/`.
+  - [x] Add top-level folders `ces-frontend/`, `ces-backend/`, `nginx/`, and `.github/workflows/`.
   - [x] Keep scaffold aligned with CES internal DDR extraction/reporting scope from `AGENTS.md`.
 - [x] Add local infrastructure (AC: 1)
   - [x] Define `postgres:16-alpine` service with database `ces_ddr`, user `ces`, password from `${POSTGRES_PASSWORD}`, persisted volume `postgres_data`, and local port `5432`.
@@ -35,12 +35,12 @@ so that development can begin on a stable, reproducible foundation.
   - [x] Add CES design tokens and set root document class to `light`.
   - [x] Add minimal `App.tsx` shell that proves the app boots without adding auth, upload, table, or dashboard logic.
 - [x] Scaffold Python backend (AC: 3)
-  - [x] Create `ces-backend-python/pyproject.toml`, `app/main.py`, `app/config.py`, `app/api/health.py`, `app/exceptions.py`, and `tests/api/test_health.py`.
+  - [x] Create `ces-backend/pyproject.toml`, `app/main.py`, `app/config.py`, `app/api/health.py`, `app/exceptions.py`, and `tests/api/test_health.py`.
   - [x] Use `decouple` plus `BackendBaseSettings`; do not use `os.environ.get`, `os.getenv`, or direct environment reads in business logic.
   - [x] Expose `GET /health` returning exactly `{ "status": "ok" }`.
   - [x] Ensure any future sync SDK calls are intended to run through `asyncio.to_thread()`; this story should not add SDK calls.
-- [x] Scaffold Go backend (AC: 4)
-  - [x] Create `ces-backend-go/go.mod`, `main.go`, `internal/config/config.go`, `internal/api/router.go`, `internal/api/health.go`, and `internal/api/health_test.go`.
+- [x] Scaffold Python backend (AC: 4)
+  - [x] Create `ces-backend/go.mod`, `main.go`, `internal/config/config.go`, `internal/api/router.go`, `internal/api/health.go`, and `internal/api/health_test.go`.
   - [x] Centralize env loading in `internal/config.Config`; no scattered `os.Getenv()` outside config package.
   - [x] Expose `GET /health` returning exactly `{ "status": "ok" }`.
 - [x] Add env and secret safety (AC: 5)
@@ -60,8 +60,8 @@ so that development can begin on a stable, reproducible foundation.
 - [x] [Review][Patch] Qdrant image tag is floating and weakens reproducible infrastructure [ces-ddr-platform/docker-compose.yml:19]
 - [x] [Review][Patch] Tailwind config does not contain required CES token values [ces-ddr-platform/ces-frontend/tailwind.config.js:5]
 - [x] [Review][Patch] shadcn/ui primitive appears handmade instead of initialized shadcn component [ces-ddr-platform/ces-frontend/src/components/ui/button.tsx:5]
-- [x] [Review][Patch] Python backend allows Python 3.11 despite 3.12+ stack requirement [ces-ddr-platform/ces-backend-python/pyproject.toml:4]
-- [x] [Review][Patch] Go backend local config ignores `.env` files and silently falls back [ces-ddr-platform/ces-backend-go/internal/config/config.go:27]
+- [x] [Review][Patch] Python backend allows Python 3.11 despite 3.12+ stack requirement [ces-ddr-platform/ces-backend/pyproject.toml:4]
+- [x] [Review][Patch] Python backend local config ignores `.env` files and silently falls back [ces-ddr-platform/ces-backend/internal/config/config.go:27]
 
 ## Dev Notes
 
@@ -74,9 +74,9 @@ CES product scope is internal-only: employees upload Pason DDR PDFs, extract str
 ### Required Stack
 
 - Frontend: React + Vite + TypeScript + Tailwind CSS + shadcn/ui. [Source: _bmad-output/planning-artifacts/architecture.md#Technical Constraints & Dependencies]
-- Frontend table dependency for later stories: TanStack Table v8, but this story should only install baseline dependencies if needed for scaffold parity. [Source: _bmad-output/planning-artifacts/architecture.md#Stack Summary]
+- Frontend table dependency for later stories: TanStack Table v8, but this story should only install baseline dependencies if needed for scaffold test coverage. [Source: _bmad-output/planning-artifacts/architecture.md#Stack Summary]
 - Python backend: FastAPI + uvicorn, Python 3.12+, Pydantic v2 family settings. [Source: _bmad-output/planning-artifacts/architecture.md#Architectural Decisions Established]
-- Go backend: Go 1.22+ + Gin. [Source: _bmad-output/planning-artifacts/architecture.md#Stack Summary]
+- Python backend: Go 1.22+ + FastAPI. [Source: _bmad-output/planning-artifacts/architecture.md#Stack Summary]
 - Storage services: PostgreSQL 16 and Qdrant through Docker Compose. [Source: _bmad-output/planning-artifacts/architecture.md#Data Architecture]
 
 ### File Structure Requirements
@@ -94,10 +94,9 @@ ces-ddr-platform/
 │   └── nginx.conf
 ├── .github/
 │   └── workflows/
-├── shared/
-│   ├── keywords.json
-│   ├── schema/
-│   └── test-fixtures/
+├── ces-backend/
+│   ├── app/resources/
+│   └── tests/fixtures/
 ├── ces-frontend/
 │   ├── package.json
 │   ├── vite.config.ts
@@ -114,7 +113,7 @@ ces-ddr-platform/
 │       ├── hooks/
 │       ├── lib/
 │       └── types/
-├── ces-backend-python/
+├── ces-backend/
 │   ├── pyproject.toml
 │   ├── .env.example
 │   ├── app/
@@ -126,7 +125,7 @@ ces-ddr-platform/
 │   └── tests/
 │       └── api/
 │           └── test_health.py
-└── ces-backend-go/
+└── ces-backend/
     ├── go.mod
     ├── main.go
     ├── .env.example
@@ -158,7 +157,7 @@ Full future tree includes `pipeline/`, `occurrence/`, `search/`, `export/`, `cor
 
 ### API And Health Contract
 
-- Health endpoint path is `GET /health` in both backends. [Source: _bmad-output/planning-artifacts/architecture.md#Monitoring]
+- Health endpoint path is `GET /health` in the Python backend. [Source: _bmad-output/planning-artifacts/architecture.md#Monitoring]
 - Response body must be exactly `{ "status": "ok" }` with HTTP 200 in both implementations. [Source: _bmad-output/planning-artifacts/epics.md#Story 1.1]
 - Do not add `/api/health` unless reverse proxy routing needs it later; app-level contract remains `/health`.
 - Use direct success object responses. Do not wrap success responses in `{ data: ... }`. [Source: _bmad-output/planning-artifacts/architecture.md#API Response Format]
@@ -189,7 +188,7 @@ Full future tree includes `pipeline/`, `occurrence/`, `search/`, `export/`, `cor
 ### Testing Requirements
 
 - Frontend: install dependencies and run the project’s scaffold verification command. If tests are not yet configured, run `npm run build` as minimum proof that Vite/TypeScript compile.
-- Python: run `pytest` for `GET /health`; activate `.venv` first if present. Keep tests under `ces-backend-python/tests/`. [Source: AGENTS.md#Backend Guidelines]
+- Python: run `pytest` for `GET /health`; activate `.venv` first if present. Keep tests under `ces-backend/tests/`. [Source: AGENTS.md#Backend Guidelines]
 - Go: run `go test ./...`; keep tests co-located with packages. [Source: _bmad-output/planning-artifacts/architecture.md#Test Location]
 - Infrastructure: run `docker compose up -d`, `docker compose ps`, and confirm `postgres` and `qdrant` are running/healthy.
 - Secret check: search created scaffold for `GEMINI_API_KEY=`, `JWT_SECRET=`, and real password values; only placeholder examples may exist.
@@ -222,7 +221,7 @@ GPT-5
 
 - Red phase: Python `pytest` failed with `ModuleNotFoundError: No module named 'app'`.
 - Red phase: Go `go test ./...` failed because no Go module existed.
-- Green phase: added Python FastAPI health scaffold and Go Gin health scaffold.
+- Green phase: added Python FastAPI health scaffold and Go FastAPI health scaffold.
 - Frontend build initially failed on TypeScript 6 `baseUrl` deprecation and missing Vite CSS ambient types; fixed through `ignoreDeprecations` and `types`.
 - Docker validation initially showed Qdrant ready by host HTTP but healthcheck stuck because `wget` was absent in the Qdrant image; replaced with Bash TCP healthcheck.
 - Secret validation found a generated local `.env` containing a real Gemini key; removed it and verified no real secret remains in scaffold files.
@@ -234,7 +233,7 @@ GPT-5
 - Added Docker Compose services for PostgreSQL 16 and Qdrant with persisted volumes, local ports, and working healthchecks.
 - Added Vite 8 React TypeScript frontend with Tailwind 4, CES tokens, root light mode, `/api` proxy to `VITE_API_URL`, and minimal internal operations shell.
 - Added Python FastAPI backend using `decouple` plus `BackendBaseSettings`, class-based app/router setup, and exact `GET /health` contract with pytest coverage.
-- Added Go Gin backend with central config package, health router/handler, and Go unit test for exact `GET /health` contract.
+- Added Go FastAPI backend with central config package, health router/handler, and Go unit test for exact `GET /health` contract.
 - Verified no real secrets remain in scaffold files; only placeholder `.env.example` values exist.
 
 ### File List
@@ -248,9 +247,8 @@ GPT-5
 - `ces-ddr-platform/docker-compose.prod.yml`
 - `ces-ddr-platform/docker-compose.yml`
 - `ces-ddr-platform/nginx/nginx.conf`
-- `ces-ddr-platform/shared/keywords.json`
-- `ces-ddr-platform/shared/schema/.gitkeep`
-- `ces-ddr-platform/shared/test-fixtures/.gitkeep`
+- `ces-ddr-platform/ces-backend/app/resources/keywords.json`
+- `ces-ddr-platform/ces-backend/tests/fixtures/.gitkeep`
 - `ces-ddr-platform/ces-frontend/.env.example`
 - `ces-ddr-platform/ces-frontend/index.html`
 - `ces-ddr-platform/ces-frontend/package-lock.json`
@@ -269,24 +267,24 @@ GPT-5
 - `ces-ddr-platform/ces-frontend/tailwind.config.js`
 - `ces-ddr-platform/ces-frontend/tsconfig.json`
 - `ces-ddr-platform/ces-frontend/vite.config.ts`
-- `ces-ddr-platform/ces-backend-python/.env.example`
-- `ces-ddr-platform/ces-backend-python/app/__init__.py`
-- `ces-ddr-platform/ces-backend-python/app/api/__init__.py`
-- `ces-ddr-platform/ces-backend-python/app/api/health.py`
-- `ces-ddr-platform/ces-backend-python/app/config.py`
-- `ces-ddr-platform/ces-backend-python/app/exceptions.py`
-- `ces-ddr-platform/ces-backend-python/app/main.py`
-- `ces-ddr-platform/ces-backend-python/pyproject.toml`
-- `ces-ddr-platform/ces-backend-python/tests/api/test_health.py`
-- `ces-ddr-platform/ces-backend-python/uv.lock`
-- `ces-ddr-platform/ces-backend-go/.env.example`
-- `ces-ddr-platform/ces-backend-go/go.mod`
-- `ces-ddr-platform/ces-backend-go/go.sum`
-- `ces-ddr-platform/ces-backend-go/internal/api/health.go`
-- `ces-ddr-platform/ces-backend-go/internal/api/health_test.go`
-- `ces-ddr-platform/ces-backend-go/internal/api/router.go`
-- `ces-ddr-platform/ces-backend-go/internal/config/config.go`
-- `ces-ddr-platform/ces-backend-go/main.go`
+- `ces-ddr-platform/ces-backend/.env.example`
+- `ces-ddr-platform/ces-backend/app/__init__.py`
+- `ces-ddr-platform/ces-backend/app/api/__init__.py`
+- `ces-ddr-platform/ces-backend/app/api/health.py`
+- `ces-ddr-platform/ces-backend/app/config.py`
+- `ces-ddr-platform/ces-backend/app/exceptions.py`
+- `ces-ddr-platform/ces-backend/app/main.py`
+- `ces-ddr-platform/ces-backend/pyproject.toml`
+- `ces-ddr-platform/ces-backend/tests/api/test_health.py`
+- `ces-ddr-platform/ces-backend/uv.lock`
+- `ces-ddr-platform/ces-backend/.env.example`
+- `ces-ddr-platform/ces-backend/go.mod`
+- `ces-ddr-platform/ces-backend/go.sum`
+- `ces-ddr-platform/ces-backend/internal/api/health.go`
+- `ces-ddr-platform/ces-backend/internal/api/health_test.go`
+- `ces-ddr-platform/ces-backend/internal/api/router.go`
+- `ces-ddr-platform/ces-backend/internal/config/config.go`
+- `ces-ddr-platform/ces-backend/main.go`
 
 ## Change Log
 

@@ -40,6 +40,11 @@ project: Canadian Energy Service Internal Tool
 project_key: NOKEY
 tracking_system: file-system
 story_location: _bmad-output/implementation-artifacts/stories
+approved_changes:
+  python_only_backend_cleanup:
+    status: done
+    date: 2026-05-07
+    proposal: _bmad-output/planning-artifacts/sprint-change-proposal-2026-05-07.md
 
 development_status:
   # ── Epic 1: Platform Foundation & Authenticated Access ──
@@ -47,7 +52,7 @@ development_status:
   1-1-project-scaffold-development-infrastructure: done
   1-2-database-schema-users-table-migration-tooling: done
   1-3-authentication-api-login-jwt-middleware: done
-  1-4-frontend-authentication-shell-protected-routing: review
+  1-4-frontend-authentication-shell-protected-routing: done
   epic-1-retrospective: optional
 
   # ── Epic 2: DDR Upload & AI Extraction Pipeline ──

@@ -47,14 +47,14 @@ _This document builds collaboratively through step-by-step discovery. Sections a
 - **Complexity level:** High
 - **Primary domain:** Full-stack web + AI data pipeline + search
 - **Daily data volume:** 10–15 DDRs/day × ~30 dates = 300–450 Gemini API calls/day; ~500 status records/day; all raw responses retained indefinitely
-- **Estimated architectural components:** Frontend SPA, Backend API (×2 — Go + Python), PDF Pre-splitter, AI Extraction Pipeline, Occurrence Engine, Correction Store, BM25 Search, Qdrant Vector Search, Processing Queue, Excel Export Layer, Keyword Management, PostgreSQL, Auth Layer
+- **Estimated architectural components:** Frontend SPA, Backend API (×2 — Python), PDF Pre-splitter, AI Extraction Pipeline, Occurrence Engine, Correction Store, BM25 Search, Qdrant Vector Search, Processing Queue, Excel Export Layer, Keyword Management, PostgreSQL, Auth Layer
 
 ### Technical Constraints & Dependencies
 
 - **Locked frontend stack:** React + Vite + Tailwind CSS + shadcn/ui + TanStack Table
 - **Locked AI stack:** Gemini 2.5 Flash-Lite + pdfplumber + pypdf + Pydantic v2 + google-genai SDK
 - **Locked storage:** PostgreSQL (JSONB for raw responses); Qdrant for vector search
-- **Dual-backend constraint:** Go + Python both built to identical API surface; shared test suite; selection decision gates V1 launch — if parity not achieved, default to Python
+- **Backend constraint:** Python-only FastAPI backend. No second backend and no root backend coordination layer.
 - **PDF format:** Pason native-text DDR format (CAOEC tour sheet standard); non-standard contractor layouts must degrade gracefully with manual override
 - **Auth:** Static credentials for V1 — no OAuth/SSO, no session refresh complexity
 - **No external data at runtime:** Only Gemini API + Qdrant (self-hosted or Qdrant Cloud); no third-party analytics or CDN calls
@@ -62,14 +62,14 @@ _This document builds collaboratively through step-by-step discovery. Sections a
 
 ### Cross-Cutting Concerns Identified
 
-1. **Authentication** — every route and API endpoint must reject unauthenticated requests; applies to frontend routing + every backend endpoint in both Go and Python
+1. **Authentication** — every route and API endpoint must reject unauthenticated requests; applies to frontend routing + every backend endpoint in Python
 2. **Error logging and audit trail** — raw Gemini responses + Pydantic errors + validated JSON retained per date chunk with no TTL; applies throughout the extraction pipeline
 3. **Async processing state** — PDF upload triggers background pipeline; processing queue must be DB-backed (durable across restarts); frontend reflects state via polling or SSE
-4. **Dual-backend parity** — every feature, API endpoint, data schema, and test must be implemented identically in Go and Python; single keyword source-of-truth file read by both
+4. **Python backend test coverage** — every feature, API endpoint, data schema, and integration path must be covered by Python tests
 5. **Extraction failure isolation** — failure of one date chunk must not abort other dates; failed chunks flagged visibly, never silently omitted from counts or exports
-6. **API key security** — Gemini API key must never appear in logs, error messages, or source code; enforced at every logging and error-handling layer in both backends
+6. **API key security** — Gemini API key must never appear in logs, error messages, or source code; enforced at every logging and error-handling layer in the Python backend
 7. **Correction context injection** — summarized correction store injected into future occurrence generation prompts; must be capped to avoid prompt bloat
-8. **Excel compatibility** — exports must work in Excel 2016+ and LibreOffice Calc; applies to both Go (excelize) and Python (openpyxl) implementations
+8. **Excel compatibility** — exports must work in Excel 2016+ and LibreOffice Calc through the Python `openpyxl` implementation
 
 ## Starter Template Evaluation
 
@@ -87,13 +87,13 @@ decisions for implementation.
 | UI components | shadcn/ui (Radix UI primitives) | UX spec locked |
 | Data table | TanStack Table v8 | UX spec locked |
 | Python backend | FastAPI + uvicorn | PRD locked |
-| Go backend | Go + Gin | PRD + user confirmed |
+| Python backend | Go + FastAPI | PRD + user confirmed |
 | AI extraction | google-genai SDK + Gemini 2.5 Flash-Lite | Research locked |
 | PDF processing | pdfplumber + pypdf | Research locked |
 | Schema validation | Pydantic v2 | Research locked |
 | Primary DB | PostgreSQL (JSONB) | PRD locked |
 | Vector search | Qdrant (Docker self-hosted) | PRD + user confirmed |
-| Go Excel export | excelize | PRD locked |
+| Python Excel export | openpyxl | PRD locked |
 | Python Excel export | openpyxl | PRD locked |
 | Auth | JWT + static credentials V1 | PRD locked |
 
@@ -113,7 +113,7 @@ npm install lucide-react
 
 **Python backend:**
 ```bash
-mkdir ces-backend-python && cd ces-backend-python
+mkdir ces-backend && cd ces-backend
 python -m venv venv && source venv/bin/activate
 pip install fastapi uvicorn[standard] pydantic
 pip install "google-genai[aiohttp]" pdfplumber pypdf openpyxl
@@ -121,14 +121,14 @@ pip install psycopg[binary] asyncpg qdrant-client rank-bm25
 pip install python-jose[cryptography] passlib[bcrypt]
 ```
 
-**Go backend:**
+**Python backend:**
 ```bash
-mkdir ces-backend-go && cd ces-backend-go
+mkdir ces-backend && cd ces-backend
 go mod init github.com/ces/ddr-platform
 go get github.com/gin-gonic/gin
 go get github.com/lib/pq
 go get github.com/qdrant/go-client
-go get github.com/xuri/excelize/v2
+go get github.com/xuri/openpyxl/v2
 go get github.com/golang-jwt/jwt/v5
 go get github.com/google/generative-ai-go/genai
 ```
@@ -172,7 +172,7 @@ ces-ddr-platform/
 │   │   ├── hooks/
 │   │   ├── lib/
 │   │   └── types/
-├── ces-backend-python/
+├── ces-backend/
 │   ├── app/
 │   │   ├── api/
 │   │   ├── pipeline/
@@ -180,18 +180,6 @@ ces-ddr-platform/
 │   │   ├── search/
 │   │   ├── export/
 │   │   └── models/
-├── ces-backend-go/
-│   ├── internal/
-│   │   ├── api/
-│   │   ├── pipeline/
-│   │   ├── occurrence/
-│   │   ├── search/
-│   │   └── export/
-│   └── shared/
-├── shared/
-│   ├── keywords.json
-│   ├── schema/
-│   └── test-fixtures/
 └── docker-compose.yml
 ```
 
@@ -211,7 +199,7 @@ Vite for frontend. uvicorn for Python dev server. `go build` + `air` for Go hot-
 
 **Testing Framework:**
 Vitest + React Testing Library for frontend. pytest for Python. Go standard `testing` package.
-Shared parity test suite in `shared/test-fixtures/` — same fixtures, both backends must pass.
+Shared test coverage test suite in `ces-backend/tests/fixtures/` — same fixtures, the Python backend must pass.
 
 **Code Organization:**
 Frontend: feature-based component folders.
@@ -230,7 +218,7 @@ Frontend proxies API calls via Vite `server.proxy` — no CORS issues in dev.
 ### Decision Priority Analysis
 
 **Critical Decisions (Block Implementation):**
-- DB migration strategy — golang-migrate (Go) + Alembic (Python)
+- DB migration strategy — Alembic (Go) + Alembic (Python)
 - Processing status transport — SSE
 - API error format — standardized shape
 - Frontend routing — React Router v6
@@ -255,18 +243,18 @@ Frontend proxies API calls via Vite `server.proxy` — no CORS issues in dev.
 - No TTL on raw responses — audit trail requirement
 
 **Migration Strategy:**
-- Go backend: `golang-migrate` — migrations in `ces-backend-go/migrations/*.sql`
-- Python backend: Alembic — migrations in `ces-backend-python/alembic/versions/`
+- Python backend: `Alembic` — migrations in `ces-backend/migrations/*.sql`
+- Python backend: Alembic — migrations in `ces-backend/alembic/versions/`
 - Both migration sets must produce identical final DB schema
-- Shared baseline: `shared/schema/baseline.sql` documents the canonical schema as reference
-- Migration order: Go backend runs migrations first (primary); Python backend Alembic env configured to match
+- Shared baseline: `Alembic migrations` documents the canonical schema as reference
+- Migration order: Python backend runs migrations first (primary); Python backend Alembic env configured to match
 
 **Vector Storage:** Qdrant (Docker self-hosted)
 - Collection: `ddr_time_logs` — embeddings of time log `details` text
 - Metadata stored per vector: `ddr_id`, `date`, `time_from`, `time_to`, `code`
 - Graceful degradation: if Qdrant unavailable, NL query falls back to BM25 (rank-bm25 / Go BM25 impl)
 
-**Keyword Store:** `shared/keywords.json` — single source of truth read by both backends at startup; reload without redeploy via API endpoint (FR32)
+**Keyword Store:** `ces-backend/app/resources/keywords.json` — single source of truth read by the Python backend at startup; reload without redeploy via API endpoint (FR32)
 
 ---
 
@@ -329,10 +317,10 @@ GET    /export/timelogs/:well_id
 - Events: `{ event: "date_failed", data: { date, error, raw_response_id } }`
 - Events: `{ event: "processing_complete", data: { total_dates, failed_dates, total_occurrences } }`
 - Frontend: `EventSource` API, falls back to polling if SSE connection drops
-- Go: manual `text/event-stream` response via Gin
+- Go: manual `text/event-stream` response via FastAPI
 - Python: `fastapi.responses.StreamingResponse` with `text/event-stream`
 
-**Standard Error Response (both backends, identical):**
+**Standard Error Response (the Python backend, identical):**
 ```json
 {
   "error": "Human-readable message",
@@ -356,8 +344,8 @@ KEYWORD_UPDATE_FAILED — keyword store write error
 
 **API Documentation:** OpenAPI spec auto-generated
 - Python: FastAPI generates `/docs` + `/openapi.json` automatically
-- Go: `swaggo/swag` annotations → `gin-swagger` middleware
-- Both specs must be kept in sync as parity validation
+- Go: `FastAPI OpenAPI` annotations → `gin-swagger` middleware
+- Both specs must be kept in sync as test coverage validation
 
 ---
 
@@ -403,7 +391,7 @@ qdrant:latest
 **Deployment approach:**
 - Single `docker-compose.prod.yml` — all services on one host
 - Nginx handles SSL (Let's Encrypt), proxies `/api/*` to active backend, serves frontend static build
-- Both backend containers present in compose file during dual-backend phase; only one active behind Nginx proxy at a time
+- Both backend containers present in compose file during Python-only phase; only one active behind Nginx proxy at a time
 - Backend selection: change Nginx `proxy_pass` target + redeploy — no frontend changes required
 
 **Environment configuration:**
@@ -418,7 +406,7 @@ JWT_SECRET=
 `.env` file on host, mounted into containers. Never committed to git.
 
 **Logging:**
-- Structured JSON logs (both backends) — `{ timestamp, level, service, request_id, message, ... }`
+- Structured JSON logs (the Python backend) — `{ timestamp, level, service, request_id, message, ... }`
 - `request_id` generated per request, threaded through all log lines for that request
 - Gemini API key scrubbed from all log output at middleware layer
 - Logs written to stdout → Docker captures → `docker logs` or future CloudWatch agent
@@ -426,7 +414,7 @@ JWT_SECRET=
 **Monitoring (V1 minimal):**
 - AI cost tracked in `pipeline_runs` table: `gemini_input_tokens`, `gemini_output_tokens`, `cost_usd` per date chunk
 - Weekly cost summary aggregated from DB — no external monitoring service for V1
-- Application health: `GET /health` endpoint on both backends → Docker healthcheck
+- Application health: `GET /health` endpoint on the Python backend → Docker healthcheck
 
 **Backups:**
 - PostgreSQL: `pg_dump` cron on host → S3 bucket (nightly)
@@ -438,7 +426,7 @@ JWT_SECRET=
 
 **Implementation Sequence (order matters):**
 1. Docker Compose (Postgres + Qdrant) — everything else depends on this
-2. DB schema + migrations (golang-migrate / Alembic) — before any backend code
+2. DB schema + migrations (Alembic / Alembic) — before any backend code
 3. Auth endpoints + JWT middleware — gates all other endpoints
 4. PDF pre-splitter + Gemini extraction pipeline — core value
 5. Occurrence engine (keyword classification, mMD, density, dedup)
@@ -455,11 +443,11 @@ JWT_SECRET=
 - Correction context injection requires both correction store and Gemini extraction pipeline
 - NL query (Qdrant) requires time log data stored in PostgreSQL first (embedding happens post-extraction)
 - Excel export requires correction store (edit history sheet)
-- Keyword management (FR32) must reload both backends without restart — file watch or DB-backed store
+- Keyword management (FR32) must reload the Python backend without restart — file watch or DB-backed store
 
 ## Implementation Patterns & Consistency Rules
 
-**Critical conflict areas:** 9 areas where Go and Python agents could diverge — defined below.
+**Critical consistency areas:** areas where Python backend, frontend, database, and tests must stay aligned.
 
 ---
 
@@ -476,11 +464,11 @@ JWT_SECRET=
 
 **API Naming:**
 - Endpoints: plural nouns, lowercase, hyphens for multi-word — `/ddrs`, `/ddr-dates`, `/occurrences`
-- Route params: `:id` (Go Gin) / `{id}` (Python FastAPI) — both produce same URL shape
+- Route params: `:id` (Go FastAPI) / `{id}` (Python FastAPI) — both produce same URL shape
 - Query params: `snake_case` — `?well_name=`, `?date_from=`, `?occurrence_type=`
 - Request headers: standard casing — `Authorization`, `Content-Type`
 
-**JSON Field Naming (API request/response bodies — both backends):**
+**JSON Field Naming (API request/response bodies — the Python backend):**
 - All fields: `snake_case` — `ddr_id`, `well_name`, `tour_serial`, `raw_response`
 - Go structs: must use `json:"snake_case_name"` tags on every exported field — no exceptions
 - Python: Pydantic model fields defined in `snake_case` (default serialization)
@@ -505,7 +493,7 @@ JWT_SECRET=
 - Frontend: co-located `*.test.tsx` files next to component — `OccurrenceTable.test.tsx`
 - Python: `tests/` directory at project root, mirroring `app/` structure — `tests/pipeline/test_extract.py`
 - Go: co-located `*_test.go` files in same package — `extract_test.go` next to `extract.go`
-- Shared parity fixtures: `shared/test-fixtures/` — both backends must reference same files
+- Shared test coverage fixtures: `ces-backend/tests/fixtures/` — the Python backend must reference same files
 
 **Backend Package/Module Organization (identical logical structure in both):**
 ```
@@ -561,13 +549,13 @@ Error (defined in step 4):
 - Never return 200 with an error body
 - Never return 500 for expected failure modes (extraction failure = 200 with status field)
 
-**Processing/Date Status Values (exact strings — both backends):**
+**Processing/Date Status Values (exact strings — the Python backend):**
 ```
 DDR status:       "queued" | "processing" | "complete" | "failed"
 Per-date status:  "success" | "warning" | "failed"
 ```
 
-**SSE Event Names (exact strings — both backends):**
+**SSE Event Names (exact strings — the Python backend):**
 ```
 "date_complete"        — one date chunk finished successfully
 "date_failed"          — one date chunk failed
@@ -578,7 +566,7 @@ Per-date status:  "success" | "warning" | "failed"
 
 ### Communication Patterns
 
-**SSE Payload Structure (both backends identical):**
+**SSE Payload Structure (the Python backend identical):**
 ```json
 // date_complete
 { "date": "20241031", "status": "success", "occurrences_count": 3 }
@@ -597,7 +585,7 @@ Per-date status:  "success" | "warning" | "failed"
 - API base URL from `VITE_API_URL` env var — never hardcoded
 
 **Keyword Reload Pattern:**
-- Both backends load `shared/keywords.json` into memory at startup
+- Both backends load `ces-backend/app/resources/keywords.json` into memory at startup
 - `PUT /keywords` writes new content to file + triggers in-memory reload
 - Go: reload on each request from file (file is small, ~250 keywords — acceptable)
 - Python: reload on each request from file — same approach
@@ -638,9 +626,9 @@ func ProcessDate(ctx context.Context, date string, pdfBytes []byte) (*DDRDate, e
 func StoreRawResponse(ctx context.Context, sessionID string, raw []byte) error
 ```
 
-**Logging Pattern (both backends):**
+**Logging Pattern (the Python backend):**
 ```json
-{ "timestamp": "ISO8601", "level": "info|warn|error", "service": "ces-backend-go",
+{ "timestamp": "ISO8601", "level": "info|warn|error", "service": "ces-backend",
   "request_id": "uuid", "message": "...", "ddr_id": "uuid", "date": "20241031" }
 ```
 - `request_id` generated at request entry (middleware), passed via context (Go) / request state (Python)
@@ -697,13 +685,13 @@ const res = await fetch('/api/occurrences', { headers: { Authorization: `Bearer 
 const occurrences = await api.fetchOccurrences(ddrId)
 ```
 
-**Dual-backend canonical rule:** Go implementation is canonical during dual-backend phase. Python must match Go behavior, not the other way around.
+**Python-only canonical rule:** the FastAPI backend, Alembic migrations, Pydantic schemas, and pytest suite are the source of truth.
 
 ## Project Structure & Boundaries
 
 ### Requirements to Structure Mapping
 
-| FR Category | Location (both backends mirror this structure) |
+| FR Category | Location (the Python backend mirror this structure) |
 |---|---|
 | FR1–FR5 Document Ingestion & Processing | `pipeline/` — pre_split, extract, validate, store |
 | FR6–FR11 Occurrence Generation | `occurrence/` — classify, infer_mmd, density_join, dedup |
@@ -731,15 +719,14 @@ ces-ddr-platform/
 │
 ├── .github/
 │   └── workflows/
-│       ├── parity-check.yml
+│       ├── test coverage-check.yml
 │       └── frontend-test.yml
 │
-├── shared/
-│   ├── keywords.json
-│   ├── schema/
-│   │   ├── baseline.sql
+├── ces-backend/
+│   ├── app/resources/
+│   │   ├── keywords.json
 │   │   └── ddr_schema.json
-│   └── test-fixtures/
+│   └── tests/fixtures/
 │       ├── expected_occurrences.json
 │       ├── expected_timelogs.json
 │       └── sample_extraction_output.json
@@ -804,7 +791,7 @@ ces-ddr-platform/
 │       └── types/
 │           └── api.ts
 │
-├── ces-backend-python/
+├── ces-backend/
 │   ├── pyproject.toml
 │   ├── requirements.txt
 │   ├── .env.example
@@ -903,7 +890,7 @@ ces-ddr-platform/
 │           ├── test_auth.py
 │           └── test_occurrences.py
 │
-└── ces-backend-go/
+└── ces-backend/
     ├── go.mod
     ├── go.sum
     ├── main.go
@@ -951,7 +938,7 @@ ces-ddr-platform/
         │   └── query_handler.go + _test.go
         │
         ├── export/
-        │   ├── excel_report.go + _test.go   # excelize
+        │   ├── excel_report.go + _test.go   # openpyxl
         │   ├── excel_master.go + _test.go
         │   └── csv_timelogs.go + _test.go
         │
@@ -1006,7 +993,7 @@ ces-ddr-platform/
 - Validated extraction: `ddr_dates.final_json` (JSONB)
 - Occurrences: relational rows in `occurrences` — derived from `final_json` at generation time
 - Corrections: `corrections` table — append-only, never update/delete
-- Keywords: `shared/keywords.json` — in-memory at runtime, file is source of truth
+- Keywords: `ces-backend/app/resources/keywords.json` — in-memory at runtime, file is source of truth
 
 ---
 
@@ -1060,7 +1047,7 @@ ces-ddr-platform/
 - Frontend static served by Nginx from `/app/dist`
 
 **SSE:**
-- Go: Gin writes `text/event-stream` chunks from in-process channel
+- Go: FastAPI writes `text/event-stream` chunks from in-process channel
 - Python: FastAPI `StreamingResponse` with async generator reading asyncio queue
 - Frontend: `EventSource` + 3s polling fallback on connection drop
 
@@ -1068,9 +1055,9 @@ ces-ddr-platform/
 
 ### Coherence Validation ✅
 
-All technology choices compatible. FastAPI + asyncio + google-genai[aiohttp] fully async. Go + Gin + pgx + excelize idiomatic. PostgreSQL 16 JSONB handled natively by both asyncpg and pgx. JWT (HS256) interoperable between python-jose and golang-jwt.
+All technology choices compatible. FastAPI + asyncio + google-genai[aiohttp] fully async. Go + FastAPI + pgx + openpyxl idiomatic. PostgreSQL 16 JSONB handled natively by both asyncpg and pgx. JWT (HS256) interoperable between python-jose and golang-jwt.
 
-Pattern consistency confirmed: snake_case JSON enforced via Go struct tags + Pydantic defaults. UUID v4 PKs identical format across both. SSE payload structure explicitly defined. Error response shape standardized. Go-canonical rule resolves all dual-backend ambiguity.
+Pattern consistency confirmed: snake_case JSON enforced via Go struct tags + Pydantic defaults. UUID v4 PKs identical format across both. SSE payload structure explicitly defined. Error response shape standardized. Python-only backend rule resolves all Python-only ambiguity.
 
 ### Requirements Coverage Validation ✅
 
@@ -1121,7 +1108,7 @@ FastAPI `BackgroundTasks` sufficient at 10–15 DDRs/day. `POST /ddrs/upload` re
 
 **Key Strengths:**
 1. Complete FR→file mapping — every requirement has an exact implementation home
-2. Dual-backend parity enforced structurally — mirror packages, shared fixtures, Go-canonical rule
+2. Python-only test coverage enforced structurally — mirror packages, shared fixtures, Python-only backend rule
 3. All 16 NFRs addressed architecturally — not deferred to implementation
 4. 3 minor gaps identified and resolved inline — no blocking unknowns remain
 5. Correction store + context injection fully specified — core differentiator protected
@@ -1138,14 +1125,14 @@ FastAPI `BackgroundTasks` sufficient at 10–15 DDRs/day. `POST /ddrs/upload` re
 - Follow all architectural decisions exactly — no independent stack choices
 - Use implementation patterns for all naming, error handling, logging, response shapes
 - `api/` handlers call domain packages — domain packages never import `api/`
-- Go implementation is canonical; Python must match Go during dual-backend phase
+- Python backend implementation is canonical for backend behavior.
 
 **First Implementation Priority:**
 ```bash
 docker-compose up -d
-migrate -path ces-backend-go/migrations -database $POSTGRES_DSN up
+migrate -path ces-backend/migrations -database $POSTGRES_DSN up
 npm create vite@latest ces-frontend -- --template react-ts
 # Then: pipeline/pre_split — core PoC validation first
 ```
 
-**Parity Gate (before V1 launch):** `shared/test-fixtures/` suite must pass both backends. Backend selection decision made. One codebase maintained forward.
+**Test coverage Gate (before V1 launch):** `ces-backend/tests/fixtures/` suite must pass the Python backend. Backend selection decision made. One codebase maintained forward.

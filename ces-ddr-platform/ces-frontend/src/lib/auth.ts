@@ -1,7 +1,7 @@
 const TOKEN_KEY = "ces.auth.token";
 
 type JwtPayload = {
-  exp?: number;
+  exp?: unknown;
 };
 
 class AuthToken {
@@ -31,7 +31,7 @@ class AuthToken {
   private isExpiredOrMalformed(token: string) {
     const payload = this.decodePayload(token);
 
-    if (!payload?.exp) {
+    if (typeof payload?.exp !== "number" || !Number.isFinite(payload.exp)) {
       return true;
     }
 

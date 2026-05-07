@@ -51,7 +51,17 @@ class ApiClient {
       throw new ApiError("Request failed", "API_ERROR", response.status);
     }
 
-    return (await response.json()) as TResponse;
+    if (response.status === 204) {
+      return undefined as TResponse;
+    }
+
+    const body = await response.text();
+
+    if (!body) {
+      return undefined as TResponse;
+    }
+
+    return JSON.parse(body) as TResponse;
   }
 
   private headers(options: RequestInit & { skipAuth?: boolean }) {

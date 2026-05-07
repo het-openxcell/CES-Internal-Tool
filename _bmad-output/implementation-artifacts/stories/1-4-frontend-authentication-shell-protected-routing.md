@@ -1,6 +1,6 @@
 # Story 1.4: Frontend Authentication Shell & Protected Routing
 
-Status: review
+Status: done
 
 Completion note: Ultimate context engine analysis completed - comprehensive developer guide created.
 
@@ -65,6 +65,17 @@ so that unauthenticated users are redirected to login and authenticated users ca
   - [x] Do not add backend auth implementation, seeded credentials, RBAC, refresh tokens, password reset, user management, SSR, React Router Framework Mode, or business feature screens.
   - [x] Do not modify `src/components/ui/` primitives unless a primitive is missing and needed for auth UI.
   - [x] Do not read or print real `.env` values.
+
+### Review Findings
+
+- [x] [Review][Patch] Username is persisted outside JWT-only auth storage [ces-ddr-platform/ces-frontend/src/pages/LoginPage.tsx:87]
+- [x] [Review][Patch] Unknown routes render blank instead of passing through protected routing [ces-ddr-platform/ces-frontend/src/App.tsx:10]
+- [x] [Review][Patch] Non-numeric JWT `exp` can be treated as authenticated [ces-ddr-platform/ces-frontend/src/lib/auth.ts:34]
+- [x] [Review][Patch] API client throws raw parse errors on empty successful responses [ces-ddr-platform/ces-frontend/src/lib/api.ts:54]
+- [x] [Review][Patch] Login panel references missing `login-title` label [ces-ddr-platform/ces-frontend/src/pages/LoginPage.tsx:144]
+- [x] [Review][Patch] Password reset UI was added despite scope boundary [ces-ddr-platform/ces-frontend/src/pages/LoginPage.tsx:219]
+- [x] [Review][Patch] Login background adds decorative gradients against UI guardrails [ces-ddr-platform/ces-frontend/src/styles.css:74]
+- [x] [Review][Patch] File comment violates repo no-comments rule [ces-ddr-platform/ces-frontend/src/styles.css:57]
 
 ## Dev Notes
 

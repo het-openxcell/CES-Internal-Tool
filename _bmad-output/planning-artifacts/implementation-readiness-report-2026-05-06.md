@@ -113,7 +113,7 @@ documentsIncluded:
 
 ### Additional Requirements / Constraints
 
-- **Backend strategy:** Dual-track Go + Python at feature parity; selection gated before V1 launch
+- **Backend strategy:** Python-only Python at feature test coverage; selection gated before V1 launch
 - **Auth model:** Static credentials for V1 — no OAuth/SSO; single role, full access
 - **Viewport:** Desktop-only, min 1280px — no mobile breakpoints
 - **Browser matrix:** Chrome/Edge/Firefox latest required; Safari best-effort
@@ -281,7 +281,7 @@ Implementation cannot begin without epics and stories. All 35 FRs are untraced t
 | Concern | Detail |
 |---------|--------|
 | Greenfield setup story needed | Architecture doc identifies initialization commands (Docker Compose, Vite, Go/Python setup) — Epic 1 Story 1 must cover this |
-| Dual-backend is a structural risk | Each epic/story must clarify which backend is being implemented; parity approach must be reflected in story structure |
+| Python-only is a structural risk | Each epic/story must clarify which backend is being implemented; test coverage approach must be reflected in story structure |
 | NL query is isolatable | Architecture explicitly calls Qdrant out as deferrable — stories must not create a forward dependency where core occurrence table blocks on Qdrant being done first |
 | Correction context injection needs ordering | Correction store (FR14) must be complete before context injection (FR15) can be implemented — stories must respect this within-epic dependency |
 | DB tables must be created per-story, not upfront | Common anti-pattern in greenfield: one story creates all schema. Each story should create only the tables it needs |
@@ -368,7 +368,7 @@ Tablet breakpoints add 3+ component states and specific TanStack Table column vi
 | M1 | UX spec: Design System Foundation section says `--primary: deep navy (#1e3a5f)` but Visual Design Foundation correctly uses crimson `#C41230` | Developer confusion — which token is real? | Delete the deep navy reference from Design System Foundation section. Crimson is correct. |
 | M2 | PRD executive summary mentions "deep navy header/navigation, white content surfaces, amber-gold accent" | Misleading if implementation references exec summary | Update PRD exec summary visual description to crimson + white |
 | M3 | FR24 (deviation survey view) and FR25 (bit record view) have no dedicated user journey coverage | Thin requirements basis | Document J4-Sarah explicitly using these views in next PRD revision; confirm columns and data format |
-| M4 | Architecture CI workflows (`parity-check.yml`, `frontend-test.yml`) do not include `@axe-core/react` or Storybook a11y addon | UX spec testing strategy not reflected in architecture | Add axe-core CI job to `frontend-test.yml` once accessibility level conflict (MAJOR-1) is resolved |
+| M4 | Architecture CI workflows (`test coverage-check.yml`, `frontend-test.yml`) do not include `@axe-core/react` or Storybook a11y addon | UX spec testing strategy not reflected in architecture | Add axe-core CI job to `frontend-test.yml` once accessibility level conflict (MAJOR-1) is resolved |
 | M5 | NL query history (↑ key cycles last 5 queries) specified in UX but not in architecture | Risk of frontend developer missing this feature | Add explicit note to NLQueryBar component spec in architecture |
 
 ---
@@ -383,7 +383,7 @@ Tablet breakpoints add 3+ component states and specific TanStack Table column vi
    - Epic 1 Story 1 = "Initialize project from scratch: Docker Compose + DB schema + repo structure"
    - Qdrant story is explicitly marked deferrable within Epic 6
    - Each story creates only the DB tables it needs (no upfront schema dump story)
-   - Dual-backend stories reflect Go-canonical rule: Go first, Python mirrors
+   - Python-only stories reflect Python-only backend rule: Go first, Python mirrors
 
 4. **Update UX spec** — remove deep navy from Design System Foundation, remove or mark tablet breakpoints as V2.
 

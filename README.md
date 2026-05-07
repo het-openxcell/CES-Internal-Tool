@@ -17,16 +17,8 @@ docker compose ps
 cd ces-ddr-platform
 export POSTGRES_DSN="postgresql://ces:change-me-local-only@localhost:5432/ces_ddr"
 docker compose up -d postgres
-migrate -path ces-backend-go/migrations -database "$POSTGRES_DSN" up
-psql "$POSTGRES_DSN" -c "\d users"
-migrate -path ces-backend-go/migrations -database "$POSTGRES_DSN" down 1
-migrate -path ces-backend-go/migrations -database "$POSTGRES_DSN" up
-```
-
-```bash
-cd ces-ddr-platform/ces-backend-python
+cd ces-backend
 source .venv/bin/activate
-export POSTGRES_DSN="postgresql://ces:change-me-local-only@localhost:5432/ces_ddr"
 alembic upgrade head
 psql "$POSTGRES_DSN" -c "\d users"
 alembic downgrade base
@@ -45,16 +37,8 @@ npm run dev
 ## Python Backend
 
 ```bash
-cd ces-backend-python
+cd ces-backend
 uv sync
 uvicorn app.main:app --reload
 pytest
-```
-
-## Go Backend
-
-```bash
-cd ces-backend-go
-go run main.go
-go test ./...
 ```
