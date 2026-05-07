@@ -7,12 +7,14 @@ from sqlalchemy.engine import Connection
 from sqlalchemy.ext.asyncio import AsyncEngine
 from sqlalchemy.pool import NullPool as SQLAlchemyNullPool
 
+from src.models.db import ddr, user
 from src.repository.base import Base
 from src.repository.database import async_db
 
 config = context.config
 config.set_main_option(name="sqlalchemy.url", value=str(async_db.set_async_db_uri))
 target_metadata = Base.metadata
+_models = (ddr, user)
 
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)

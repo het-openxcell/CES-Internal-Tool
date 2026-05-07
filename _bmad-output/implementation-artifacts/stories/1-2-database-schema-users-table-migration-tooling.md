@@ -48,6 +48,8 @@ so that authentication can be built on a schema the Python backend share identic
 - [x] [Review][Patch] Alembic DSN normalization misses `postgres://` URLs [ces-ddr-platform/ces-backend/alembic/env.py:15]
 - [x] [Review][Patch] Migration command guidance is checked complete but absent from current docs [README.md:21]
 - [x] [Review][Patch] Migration tests only inspect source fragments, not runtime upgrade/downgrade or live schema test coverage [ces-ddr-platform/ces-backend/tests/test_alembic_schema.py:31]
+- [x] [Review][Patch] Migration artifacts landed under removed split-backend paths [README.md:20]
+- [x] [Review][Patch] Alembic `if_not_exists=True` can silently accept a drifted `users` table [ces-ddr-platform/ces-backend-python/alembic/versions/001_initial_schema.py:23]
 
 ## Dev Notes
 
