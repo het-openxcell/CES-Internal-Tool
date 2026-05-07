@@ -2,6 +2,7 @@ from decimal import Decimal
 from typing import Any
 
 import pydantic
+from pydantic import ConfigDict
 
 from src.models.schemas.base import BaseSchemaModel
 
@@ -150,3 +151,52 @@ class PipelineRunInCreate(BaseSchemaModel):
 class PipelineRunInResponse(PipelineRunInCreate):
     id: str
     created_at: int
+
+
+class DDRExtractionSchemaModel(BaseSchemaModel):
+    model_config = ConfigDict(
+        from_attributes=True,
+        populate_by_name=True,
+        validate_assignment=True,
+        extra="forbid",
+    )
+
+
+class DDRExtractionTimeLog(DDRExtractionSchemaModel):
+    start_time: str
+    end_time: str
+    duration_hours: float
+    activity: str
+    depth_md: float | None = None
+    comment: str | None = None
+
+
+class DDRExtractionMudRecord(DDRExtractionSchemaModel):
+    depth_md: float
+    mud_weight: float
+    viscosity: float | None = None
+    ph: float | None = None
+    comment: str | None = None
+
+
+class DDRExtractionDeviationSurvey(DDRExtractionSchemaModel):
+    depth_md: float
+    inclination: float
+    azimuth: float
+    tvd: float | None = None
+
+
+class DDRExtractionBitRecord(DDRExtractionSchemaModel):
+    bit_number: str
+    bit_size: float
+    depth_in: float
+    depth_out: float
+    hours: float | None = None
+    comment: str | None = None
+
+
+class DDRExtractionPayload(DDRExtractionSchemaModel):
+    time_logs: list[DDRExtractionTimeLog]
+    mud_records: list[DDRExtractionMudRecord]
+    deviation_surveys: list[DDRExtractionDeviationSurvey]
+    bit_records: list[DDRExtractionBitRecord]

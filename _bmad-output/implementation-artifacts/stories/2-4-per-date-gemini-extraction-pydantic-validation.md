@@ -1,6 +1,6 @@
 # Story 2.4: Per-Date Gemini Extraction & Pydantic Validation
 
-Status: ready-for-dev
+Status: done
 
 Completion note: Ultimate context engine analysis completed - comprehensive developer guide created.
 
@@ -22,53 +22,66 @@ so that structured drilling data is available for occurrence generation with ful
 
 ## Tasks / Subtasks
 
-- [ ] Add Gemini SDK and resource configuration (AC: 1-2)
-  - [ ] Add `google-genai` to `ces-ddr-platform/ces-backend/pyproject.toml`; do not add deprecated `google-generativeai`.
-  - [ ] Add `GEMINI_API_KEY`, `GEMINI_MODEL`, and an extraction concurrency/rate setting to `BackendBaseSettings` using existing `decouple.AutoConfig`.
-  - [ ] Add safe defaults for non-secret settings; do not provide a real API key in `.env.example`.
-  - [ ] Keep settings encapsulated in settings classes; no loose env reads.
-- [ ] Create extraction resource and Pydantic model (AC: 1, 4-5)
-  - [ ] Create `ces-ddr-platform/ces-backend/src/resources/ddr_schema.json` or a resource class/module that can produce Gemini-compatible JSON Schema.
-  - [ ] Create extraction Pydantic models under `src/models/schemas/` for the validated Gemini payload; do not confuse this with the existing `DDRDate` DB row schema.
-  - [ ] Include the sections named by the epic: `time_logs`, `mud_records`, `deviation_surveys`, and `bit_records`.
-  - [ ] Use Pydantic v2 `model_validate()` and `model_json_schema()` patterns.
-  - [ ] If the full schema triggers Gemini complexity issues, implement a converter/fallback path to `response_json_schema` while preserving one validated internal payload model.
-- [ ] Implement class-based Gemini extraction (AC: 1-3)
-  - [ ] Create `ces-ddr-platform/ces-backend/src/pipeline/extract.py`.
-  - [ ] Implement a class such as `GeminiDDRExtractor`; no loose workflow functions.
-  - [ ] Use `from google import genai` and `google.genai.types`.
-  - [ ] Call `await client.aio.models.generate_content(...)` with model `gemini-2.5-flash-lite` by default.
-  - [ ] Send PDF chunks inline with `types.Part.from_bytes(data=pdf_bytes, mime_type="application/pdf")`; do not use Files API for normal per-date chunks.
-  - [ ] Configure JSON output with `response_mime_type="application/json"` plus `response_schema` or `response_json_schema`.
-  - [ ] Prompt TIME LOG extraction in the same field order as the schema to protect row ordering.
-  - [ ] Raise typed service exceptions such as `ExtractionError`, `RateLimitError`, and `ExtractionValidationError`; never expose raw SDK exceptions to clients.
-- [ ] Implement validation layer (AC: 4-5)
-  - [ ] Create `ces-ddr-platform/ces-backend/src/pipeline/validate.py`.
-  - [ ] Implement a class such as `DDRExtractionValidator` that parses Gemini text as JSON and validates with the extraction Pydantic model.
-  - [ ] Return structured validation results containing raw JSON, validated JSON, and serializable Pydantic errors.
-  - [ ] Keep raw response retention explicit even on validation failure.
-- [ ] Extend repository persistence atomically (AC: 3-6)
-  - [ ] Add repository methods to `DDRDateCRUDRepository` for success, warning, and failed extraction updates.
-  - [ ] Each update must set status, `raw_response`, `final_json`, `error_log`, and epoch `updated_at` consistently in one commit.
-  - [ ] Add parent status finalization logic to `DDRCRUDRepository` or a service class: `"complete"` if at least one date succeeded, `"failed"` if all dates failed.
-  - [ ] Do not bypass repositories with ad hoc SQL.
-- [ ] Integrate with pipeline orchestration (AC: 3, 6)
-  - [ ] Extend `DDRProcessingTask.process()` in `src/services/ddr.py` or delegate to `src/services/pipeline.py`.
-  - [ ] Reuse Story 2.3 `PDFPreSplitter` output; if Story 2.3 code is absent, implement against its expected contract rather than inventing another splitter.
-  - [ ] Process each date independently with bounded async concurrency.
-  - [ ] Use `asyncio.gather(..., return_exceptions=True)` or equivalent isolation so one failed date does not abort the DDR.
-  - [ ] Do not emit SSE events, write cost rows, generate occurrences, call Qdrant, or build frontend UI in this story.
-- [ ] Add focused tests (AC: 1-7)
-  - [ ] Add unit tests for schema loading and Pydantic validation success/failure.
-  - [ ] Add extractor tests with a fake Gemini client; never call real Gemini.
-  - [ ] Add rate-limit tests proving retry waits are invoked and final status is `"warning"` with code `RATE_LIMITED`.
-  - [ ] Add service tests proving one date failure does not stop other dates.
-  - [ ] Add repository tests for atomic success/failed/warning update payloads using existing test patterns.
-  - [ ] Add fixture contract test for `tests/fixtures/expected_timelogs.json`; if the real fixture is missing, create a synthetic expected timelog file that preserves row order semantics.
-  - [ ] Run `source .venv/bin/activate && ruff check .` and `source .venv/bin/activate && pytest` from `ces-ddr-platform/ces-backend/`.
-- [ ] Preserve non-story behavior (AC: all)
-  - [ ] Do not change auth routes, JWT contract, upload response contract, DDR list/detail response bodies, frontend files, SSE stream, occurrence generation, Qdrant, corrections, exports, or keyword management.
-  - [ ] Do not add source-file comments.
+- [x] Add Gemini SDK and resource configuration (AC: 1-2)
+  - [x] Add `google-genai` to `ces-ddr-platform/ces-backend/pyproject.toml`; do not add deprecated `google-generativeai`.
+  - [x] Add `GEMINI_API_KEY`, `GEMINI_MODEL`, and an extraction concurrency/rate setting to `BackendBaseSettings` using existing `decouple.AutoConfig`.
+  - [x] Add safe defaults for non-secret settings; do not provide a real API key in `.env.example`.
+  - [x] Keep settings encapsulated in settings classes; no loose env reads.
+- [x] Create extraction resource and Pydantic model (AC: 1, 4-5)
+  - [x] Create `ces-ddr-platform/ces-backend/src/resources/ddr_schema.json` or a resource class/module that can produce Gemini-compatible JSON Schema.
+  - [x] Create extraction Pydantic models under `src/models/schemas/` for the validated Gemini payload; do not confuse this with the existing `DDRDate` DB row schema.
+  - [x] Include the sections named by the epic: `time_logs`, `mud_records`, `deviation_surveys`, and `bit_records`.
+  - [x] Use Pydantic v2 `model_validate()` and `model_json_schema()` patterns.
+  - [x] If the full schema triggers Gemini complexity issues, implement a converter/fallback path to `response_json_schema` while preserving one validated internal payload model.
+- [x] Implement class-based Gemini extraction (AC: 1-3)
+  - [x] Create `ces-ddr-platform/ces-backend/src/pipeline/extract.py`.
+  - [x] Implement a class such as `GeminiDDRExtractor`; no loose workflow functions.
+  - [x] Use `from google import genai` and `google.genai.types`.
+  - [x] Call `await client.aio.models.generate_content(...)` with model `gemini-2.5-flash-lite` by default.
+  - [x] Send PDF chunks inline with `types.Part.from_bytes(data=pdf_bytes, mime_type="application/pdf")`; do not use Files API for normal per-date chunks.
+  - [x] Configure JSON output with `response_mime_type="application/json"` plus `response_schema` or `response_json_schema`.
+  - [x] Prompt TIME LOG extraction in the same field order as the schema to protect row ordering.
+  - [x] Raise typed service exceptions such as `ExtractionError`, `RateLimitError`, and `ExtractionValidationError`; never expose raw SDK exceptions to clients.
+- [x] Implement validation layer (AC: 4-5)
+  - [x] Create `ces-ddr-platform/ces-backend/src/pipeline/validate.py`.
+  - [x] Implement a class such as `DDRExtractionValidator` that parses Gemini text as JSON and validates with the extraction Pydantic model.
+  - [x] Return structured validation results containing raw JSON, validated JSON, and serializable Pydantic errors.
+  - [x] Keep raw response retention explicit even on validation failure.
+- [x] Extend repository persistence atomically (AC: 3-6)
+  - [x] Add repository methods to `DDRDateCRUDRepository` for success, warning, and failed extraction updates.
+  - [x] Each update must set status, `raw_response`, `final_json`, `error_log`, and epoch `updated_at` consistently in one commit.
+  - [x] Add parent status finalization logic to `DDRCRUDRepository` or a service class: `"complete"` if at least one date succeeded, `"failed"` if all dates failed.
+  - [x] Do not bypass repositories with ad hoc SQL.
+- [x] Integrate with pipeline orchestration (AC: 3, 6)
+  - [x] Extend `DDRProcessingTask.process()` in `src/services/ddr.py` or delegate to `src/services/pipeline.py`.
+  - [x] Reuse Story 2.3 `PDFPreSplitter` output; if Story 2.3 code is absent, implement against its expected contract rather than inventing another splitter.
+  - [x] Process each date independently with bounded async concurrency.
+  - [x] Use `asyncio.gather(..., return_exceptions=True)` or equivalent isolation so one failed date does not abort the DDR.
+  - [x] Do not emit SSE events, write cost rows, generate occurrences, call Qdrant, or build frontend UI in this story.
+- [x] Add focused tests (AC: 1-7)
+  - [x] Add unit tests for schema loading and Pydantic validation success/failure.
+  - [x] Add extractor tests with a fake Gemini client; never call real Gemini.
+  - [x] Add rate-limit tests proving retry waits are invoked and final status is `"warning"` with code `RATE_LIMITED`.
+  - [x] Add service tests proving one date failure does not stop other dates.
+  - [x] Add repository tests for atomic success/failed/warning update payloads using existing test patterns.
+  - [x] Add fixture contract test for `tests/fixtures/expected_timelogs.json`; if the real fixture is missing, create a synthetic expected timelog file that preserves row order semantics.
+  - [x] Run `source .venv/bin/activate && ruff check .` and `source .venv/bin/activate && pytest` from `ces-ddr-platform/ces-backend/`.
+- [x] Preserve non-story behavior (AC: all)
+  - [x] Do not change auth routes, JWT contract, upload response contract, DDR list/detail response bodies, frontend files, SSE stream, occurrence generation, Qdrant, corrections, exports, or keyword management.
+  - [x] Do not add source-file comments.
+
+### Review Findings
+
+- [x] [Review][Patch] Parent DDR can become complete with only warning dates [ces-ddr-platform/ces-backend/src/repository/crud/ddr.py:47]
+- [x] [Review][Patch] Default rate-limit retry path never waits 8 seconds [ces-ddr-platform/ces-backend/src/services/pipeline/extract.py:128]
+- [x] [Review][Patch] Rate-limit detection can misclassify normal Gemini generate errors [ces-ddr-platform/ces-backend/src/services/pipeline/extract.py:146]
+- [x] [Review][Patch] Concurrent date extraction shares one AsyncSession for writes [ces-ddr-platform/ces-backend/src/services/pipeline_service.py:66]
+- [x] [Review][Patch] Unexpected per-date task exceptions can leave date rows queued [ces-ddr-platform/ces-backend/src/services/pipeline_service.py:77]
+- [x] [Review][Patch] Top-level pipeline failures can leave DDR stuck queued or processing [ces-ddr-platform/ces-backend/src/services/ddr.py:29]
+- [x] [Review][Patch] Invalid Gemini concurrency setting can hang or break the pipeline [ces-ddr-platform/ces-backend/src/services/pipeline_service.py:35]
+- [x] [Review][Patch] Pipeline retry can create duplicate queued date rows [ces-ddr-platform/ces-backend/src/repository/crud/ddr.py:103]
+- [x] [Review][Patch] Extraction validation silently drops unexpected Gemini fields [ces-ddr-platform/ces-backend/src/models/schemas/ddr.py:188]
+- [x] [Review][Patch] No-boundary path commits child failure before parent failure [ces-ddr-platform/ces-backend/src/services/pipeline_service.py:42]
 
 ## Dev Notes
 
@@ -180,10 +193,45 @@ Tests must fake Gemini and must not require `GEMINI_API_KEY`, network, Qdrant, r
 
 ### Agent Model Used
 
-GPT-5 Codex
+Claude Opus 4.7 (claude-opus-4-7) via bmad-dev-story workflow.
 
 ### Debug Log References
 
+- `cd ces-ddr-platform/ces-backend && source .venv/bin/activate && pytest` → 55 passed.
+- `cd ces-ddr-platform/ces-backend && source .venv/bin/activate && ruff check .` → All checks passed.
+- `cd ces-ddr-platform/ces-backend && source .venv/bin/activate && pytest tests/test_ddr_extraction_schema.py tests/test_ddr_extraction_pipeline.py tests/test_ddr_processing_task.py tests/test_ddr_upload_contract.py` → 33 passed.
+
 ### Completion Notes List
 
+- Story 2.3's pipeline scaffolding placed sources under `src/services/pipeline/` (extract.py, validate.py, pre_split.py) and wired `PreSplitPipelineService` from `src/services/pipeline_service.py`. The story spec named `src/pipeline/`; this implementation extends 2.3's existing layout instead of forking a parallel package, per Dev Notes "do not invent another splitter" guidance.
+- Extraction schema is delivered as both `src/resources/ddr_schema.json` and a `DDRExtractionSchema` resource class in `src/resources/ddr_schema.py` so the JSON file can be edited independently while still served via a class-owned loader (cached via `lru_cache`).
+- `DDRExtractionPayload` and per-section Pydantic models live in `src/models/schemas/ddr.py` next to existing DDR schemas (per "Extend these classes instead of adding standalone helpers").
+- `GeminiDDRExtractor` keeps SDK imports inside the `GoogleGenAIClient` constructor so unit tests can substitute a `GeminiClientProtocol` fake without importing `google.genai`. Backoff waits are 1s/2s/4s/8s with `max_retries=3` (3 retries → 4 attempts as the AC requires).
+- Per-date isolation is enforced via `asyncio.gather(..., return_exceptions=True)` inside `PreSplitPipelineService._extract_all_dates`, with a semaphore bounded by `GEMINI_EXTRACTION_MAX_CONCURRENT`. One date's failure does not abort others; parent DDR is finalized via `DDRCRUDRepository.finalize_status_from_dates` (`complete` if any success/warning, `failed` if all failed).
+- Repository persistence methods (`mark_success`, `mark_failed`, `mark_warning`) write status, raw_response, final_json, error_log, and epoch `updated_at` in one transaction via the existing `BaseCRUDRepository.update` commit path.
+- Story 2.3 had introduced an exception-rethrow in `DDRProcessingTask.process` that broke `tests/test_ddr_upload_contract.py` because `BackgroundTasks` errors leaked into TestClient responses. Removed the re-raise (errors are still logged) so the upload contract test passes; the upload response contract remains unchanged.
+- `tests/test_ddr_processing_task.py` (a Story 2.3 test) needed the new repository methods on its stub plus a stub extractor — extended without changing assertions.
+- `GEMINI_API_KEY` is loaded only via `BackendBaseSettings` (decouple). No code path logs the key, includes it in exception text, or stores it. Test `test_extractor_does_not_log_api_key_in_exception` guards this.
+- Extraction fixture `tests/fixtures/expected_timelogs.json` is a synthetic timelog with deterministic row order; the validator test asserts the order is preserved through Pydantic round-trip.
+
 ### File List
+
+Modified:
+
+- `ces-ddr-platform/ces-backend/.env.example`
+- `ces-ddr-platform/ces-backend/src/models/schemas/ddr.py`
+- `ces-ddr-platform/ces-backend/src/repository/crud/ddr.py`
+- `ces-ddr-platform/ces-backend/src/services/ddr.py`
+- `ces-ddr-platform/ces-backend/src/services/pipeline_service.py`
+- `ces-ddr-platform/ces-backend/tests/test_ddr_processing_task.py`
+
+Added:
+
+- `ces-ddr-platform/ces-backend/src/resources/__init__.py`
+- `ces-ddr-platform/ces-backend/src/resources/ddr_schema.json`
+- `ces-ddr-platform/ces-backend/src/resources/ddr_schema.py`
+- `ces-ddr-platform/ces-backend/src/services/pipeline/extract.py`
+- `ces-ddr-platform/ces-backend/src/services/pipeline/validate.py`
+- `ces-ddr-platform/ces-backend/tests/fixtures/expected_timelogs.json`
+- `ces-ddr-platform/ces-backend/tests/test_ddr_extraction_schema.py`
+- `ces-ddr-platform/ces-backend/tests/test_ddr_extraction_pipeline.py`

@@ -1,5 +1,5 @@
 # generated: 2026-05-06
-# last_updated: 2026-05-06
+# last_updated: 2026-05-07
 # project: Canadian Energy Service Internal Tool
 # project_key: NOKEY
 # tracking_system: file-system
@@ -66,9 +66,9 @@ development_status:
   epic-2: in-progress
   2-1-ddr-pipeline-database-schema: in-progress
   2-2-pdf-upload-endpoint-processing-queue: done
-  2-3-pdf-pre-splitter-date-boundary-detection: ready-for-dev
-  2-4-per-date-gemini-extraction-pydantic-validation: ready-for-dev
-  2-5-sse-processing-status-stream-frontend-status-hook: backlog
+  2-3-pdf-pre-splitter-date-boundary-detection: done
+  2-4-per-date-gemini-extraction-pydantic-validation: done
+  2-5-sse-processing-status-stream-frontend-status-hook: ready-for-dev
   2-6-extraction-cost-tracking-time-log-embedding: backlog
   epic-2-retrospective: optional
 

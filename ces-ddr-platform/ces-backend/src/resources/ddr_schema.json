@@ -1,0 +1,70 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "DDRExtraction",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["time_logs", "mud_records", "deviation_surveys", "bit_records"],
+  "properties": {
+    "time_logs": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["start_time", "end_time", "duration_hours", "activity"],
+        "properties": {
+          "start_time": {"type": "string"},
+          "end_time": {"type": "string"},
+          "duration_hours": {"type": "number"},
+          "activity": {"type": "string"},
+          "depth_md": {"type": ["number", "null"]},
+          "comment": {"type": ["string", "null"]}
+        }
+      }
+    },
+    "mud_records": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["depth_md", "mud_weight"],
+        "properties": {
+          "depth_md": {"type": "number"},
+          "mud_weight": {"type": "number"},
+          "viscosity": {"type": ["number", "null"]},
+          "ph": {"type": ["number", "null"]},
+          "comment": {"type": ["string", "null"]}
+        }
+      }
+    },
+    "deviation_surveys": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["depth_md", "inclination", "azimuth"],
+        "properties": {
+          "depth_md": {"type": "number"},
+          "inclination": {"type": "number"},
+          "azimuth": {"type": "number"},
+          "tvd": {"type": ["number", "null"]}
+        }
+      }
+    },
+    "bit_records": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["bit_number", "bit_size", "depth_in", "depth_out"],
+        "properties": {
+          "bit_number": {"type": "string"},
+          "bit_size": {"type": "number"},
+          "depth_in": {"type": "number"},
+          "depth_out": {"type": "number"},
+          "hours": {"type": ["number", "null"]},
+          "comment": {"type": ["string", "null"]}
+        }
+      }
+    }
+  }
+}

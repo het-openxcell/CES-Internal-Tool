@@ -7,12 +7,14 @@ from src.config.manager import settings
 from src.utilities.exceptions import EntityDoesNotExist
 from src.utilities.exceptions.exceptions import (
     AuthorizationHeaderException,
+    BadRequestException,
     EntityAlreadyExists,
     InvalidCredentialsException,
     SecurityException,
     UserAlreadyExistsException,
     UserNotFoundException,
     authorization_header_exception_handler,
+    bad_request_exception_handler,
     entity_already_exists_exception_handler,
     entity_does_not_exist_exception_handler,
     general_exception_handler,
@@ -37,6 +39,7 @@ def initialize_backend_application() -> FastAPI:
     app.add_exception_handler(UserAlreadyExistsException, user_already_exists_exception_handler)
     app.add_exception_handler(InvalidCredentialsException, invalid_credentials_exception_handler)
     app.add_exception_handler(AuthorizationHeaderException, authorization_header_exception_handler)
+    app.add_exception_handler(BadRequestException, bad_request_exception_handler)
     app.add_exception_handler(SecurityException, security_exception_handler)
     app.add_exception_handler(EntityDoesNotExist, entity_does_not_exist_exception_handler)
     app.add_exception_handler(EntityAlreadyExists, entity_already_exists_exception_handler)

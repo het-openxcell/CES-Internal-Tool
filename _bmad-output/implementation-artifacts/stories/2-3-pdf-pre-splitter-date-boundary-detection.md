@@ -1,6 +1,6 @@
 # Story 2.3: PDF Pre-Splitter - Date Boundary Detection
 
-Status: ready-for-dev
+Status: done
 
 Completion note: Ultimate context engine analysis completed - comprehensive developer guide created.
 
@@ -20,48 +20,55 @@ so that each date's data can be independently extracted and validated.
 
 ## Tasks / Subtasks
 
-- [ ] Add PDF processing dependencies (AC: 1, 4)
-  - [ ] Add `pdfplumber` and `pypdf` to `ces-backend/pyproject.toml`.
-  - [ ] Do not add OCR, Docling, LlamaExtract, PyMuPDF, Celery, Redis, or Gemini extraction dependencies in this story.
-  - [ ] Keep existing FastAPI, SQLAlchemy, Alembic, pytest, and Ruff dependency ranges intact.
-- [ ] Create class-based pre-splitter module (AC: 1-2, 4)
-  - [ ] Create `ces-backend/src/pipeline/pre_split.py`.
-  - [ ] Implement a class such as `PDFPreSplitter`; no loose module-level workflow functions.
-  - [ ] Use `pdfplumber.open(...)` for native text extraction and page scanning.
-  - [ ] Use `pypdf.PdfReader` and `pypdf.PdfWriter` to build per-date PDF byte chunks in memory.
-  - [ ] Return a typed result that includes `date_chunks: dict[str, bytes]`, page mappings, warnings, and a raw text preview for error handling.
-  - [ ] Wrap sync PDF parsing/writing work with `asyncio.to_thread()` when called from async pipeline code.
-- [ ] Implement boundary detection (AC: 1)
-  - [ ] Detect Tour Sheet Serial values with a strict regex for `XXXXXX_YYYYMMDD_XA`, where the date group is exactly 8 digits.
-  - [ ] Normalize output date keys as `YYYYMMDD` strings, matching existing `ddr_dates.date VARCHAR(8)`.
-  - [ ] Scan every page from first to last and keep 1-based page numbers in warnings and tests.
-  - [ ] Preserve source page order inside each generated PDF chunk.
-  - [ ] Handle boundary pages that contain content for two dates by preserving both dates' relevant content. If page-level splitting cannot isolate text safely, overlapping the shared source page into both date chunks is acceptable and safer than dropping data.
-- [ ] Handle no-text and no-boundary failures (AC: 2-3)
-  - [ ] For pages where `extract_text()` returns empty or whitespace, record a warning with `page_number` and continue.
-  - [ ] If no serial boundary exists in the full PDF, create exactly one failed `ddr_dates` row with `status: "failed"` and `error_log.reason = "No date boundaries detected"`.
-  - [ ] Store `error_log.raw_page_content` as the first 500 characters of combined extracted text, or an empty string if no text exists.
-  - [ ] Set parent `ddrs.status` to `"failed"` for the no-boundary case.
-- [ ] Add pipeline orchestration service (AC: 3, 5)
-  - [ ] Extend `DDRProcessingTask` in `ces-backend/src/services/ddr.py` or delegate it to a class under `ces-backend/src/services/pipeline.py`.
-  - [ ] Read the uploaded PDF from the existing `ddrs.file_path`.
-  - [ ] On successful split, create one `DDRDate` row per detected date with `status: "queued"`, update parent DDR to `"processing"`, and leave Gemini extraction for Story 2.4.
-  - [ ] On no-boundary failure, create the failed `DDRDate` row and update parent DDR to `"failed"`.
-  - [ ] Keep DB writes transactional per processing outcome; do not partially create date rows and then leave the parent status unchanged.
-- [ ] Extend repository classes, not ad hoc persistence (AC: 3, 5)
-  - [ ] Add repository methods to `ces-backend/src/repository/crud/ddr.py` for bulk date row creation and failed boundary recording.
-  - [ ] Reuse `DDRDateCRUDRepository`, `DDRCRUDRepository.update_status`, and status constants in `src/models/schemas/ddr.py`.
-  - [ ] Keep all timestamps as epoch integers.
-  - [ ] Do not create SQL helpers outside repository classes.
-- [ ] Add focused tests (AC: 1-5)
-  - [ ] Add `ces-backend/tests/pipeline/test_pre_split.py` for regex detection, page grouping, no-text warning, no-boundary failure metadata, and in-memory PDF bytes output.
-  - [ ] Add service tests proving successful split creates queued `ddr_dates` rows and sets parent DDR to `"processing"`.
-  - [ ] Add service tests proving no-boundary split creates failed `ddr_dates` row and sets parent DDR to `"failed"`.
-  - [ ] If real 109-page and 229-page PDFs are not present in `tests/fixtures/`, add a skipped or clearly marked fixture contract test and synthetic PDFs that exercise the same boundary behavior.
-  - [ ] Do not require real Gemini, Qdrant, network calls, or `.env` secrets in tests.
-- [ ] Preserve non-story behavior (AC: all)
-  - [ ] Do not alter auth routes, JWT contract, upload validation contract, DDR list/detail response bodies, frontend files, Gemini extraction, Pydantic extraction schema, SSE stream, occurrence generation, Qdrant, corrections, exports, or keyword management.
-  - [ ] Do not add source-file comments.
+- [x] Add PDF processing dependencies (AC: 1, 4)
+  - [x] Add `pdfplumber` and `pypdf` to `ces-backend/pyproject.toml`.
+  - [x] Do not add OCR, Docling, LlamaExtract, PyMuPDF, Celery, Redis, or Gemini extraction dependencies in this story.
+  - [x] Keep existing FastAPI, SQLAlchemy, Alembic, pytest, and Ruff dependency ranges intact.
+- [x] Create class-based pre-splitter module (AC: 1-2, 4)
+  - [x] Create `ces-backend/src/services/pipeline/pre_split.py` (architecture's pipeline boundary, kept inside the existing services/pipeline package since Story 2.4 already established it there).
+  - [x] Implement a class such as `PDFPreSplitter`; no loose module-level workflow functions.
+  - [x] Use `pdfplumber.open(...)` for native text extraction and page scanning.
+  - [x] Use `pypdf.PdfReader` and `pypdf.PdfWriter` to build per-date PDF byte chunks in memory.
+  - [x] Return a typed result that includes `date_chunks: dict[str, bytes]`, page mappings, warnings, and a raw text preview for error handling.
+  - [x] Wrap sync PDF parsing/writing work with `asyncio.to_thread()` when called from async pipeline code.
+- [x] Implement boundary detection (AC: 1)
+  - [x] Detect Tour Sheet Serial values with a strict regex for `XXXXXX_YYYYMMDD_XA`, where the date group is exactly 8 digits.
+  - [x] Normalize output date keys as `YYYYMMDD` strings, matching existing `ddr_dates.date VARCHAR(8)`.
+  - [x] Scan every page from first to last and keep 1-based page numbers in warnings and tests.
+  - [x] Preserve source page order inside each generated PDF chunk.
+  - [x] Handle boundary pages that contain content for two dates by preserving both dates' relevant content. If page-level splitting cannot isolate text safely, overlapping the shared source page into both date chunks is acceptable and safer than dropping data.
+- [x] Handle no-text and no-boundary failures (AC: 2-3)
+  - [x] For pages where `extract_text()` returns empty or whitespace, record a warning with `page_number` and continue.
+  - [x] If no serial boundary exists in the full PDF, create exactly one failed `ddr_dates` row with `status: "failed"` and `error_log.reason = "No date boundaries detected"`.
+  - [x] Store `error_log.raw_page_content` as the first 500 characters of combined extracted text, or an empty string if no text exists.
+  - [x] Set parent `ddrs.status` to `"failed"` for the no-boundary case.
+- [x] Add pipeline orchestration service (AC: 3, 5)
+  - [x] Extend `DDRProcessingTask` in `ces-backend/src/services/ddr.py` to delegate to `PreSplitPipelineService` under `src/services/pipeline_service.py`.
+  - [x] Read the uploaded PDF from the existing `ddrs.file_path`.
+  - [x] On successful split, create one `DDRDate` row per detected date with `status: "queued"` and update parent DDR to `"processing"`.
+  - [x] On no-boundary failure, create the failed `DDRDate` row and update parent DDR to `"failed"`.
+  - [x] Keep DB writes transactional per processing outcome; do not partially create date rows and then leave the parent status unchanged.
+- [x] Extend repository classes, not ad hoc persistence (AC: 3, 5)
+  - [x] Add repository methods to `ces-backend/src/repository/crud/ddr.py` for bulk date row creation (`bulk_create_queued`) and failed boundary recording (`create_failed_boundary`).
+  - [x] Reuse `DDRDateCRUDRepository`, `DDRCRUDRepository.update_status`, and status constants in `src/models/schemas/ddr.py`.
+  - [x] Keep all timestamps as epoch integers.
+  - [x] Do not create SQL helpers outside repository classes.
+- [x] Add focused tests (AC: 1-5)
+  - [x] Add `ces-backend/tests/pipeline/test_pre_split.py` for regex detection, page grouping, no-text warning, no-boundary failure metadata, and in-memory PDF bytes output.
+  - [x] Add service tests proving successful split creates queued `ddr_dates` rows and sets parent DDR to `"processing"`.
+  - [x] Add service tests proving no-boundary split creates failed `ddr_dates` row and sets parent DDR to `"failed"`.
+  - [x] Synthetic PDFs (built with reportlab in tests) exercise primary serial detection, multi-date overflow, no-text page warning, and no-boundary failure. A fixture-presence test consumes any PDFs placed in `tests/fixtures/` once available.
+  - [x] Do not require real Gemini, Qdrant, network calls, or `.env` secrets in tests.
+- [x] Preserve non-story behavior (AC: all)
+  - [x] Do not alter auth routes, JWT contract, upload validation contract, DDR list/detail response bodies, frontend files, Gemini extraction, Pydantic extraction schema, SSE stream, occurrence generation, Qdrant, corrections, exports, or keyword management.
+  - [x] Do not add source-file comments.
+
+### Review Findings
+
+- [x] [Review][Patch] Pre-split success path called Gemini extraction, violating Story 2.3 scope [ces-ddr-platform/ces-backend/src/services/pipeline_service.py:56]
+- [x] [Review][Patch] Empty-text pages were captured but not logged as warnings with page number [ces-ddr-platform/ces-backend/src/services/pipeline/pre_split.py:65]
+- [x] [Review][Patch] File-like PDF sources could be consumed before chunk creation [ces-ddr-platform/ces-backend/src/services/pipeline/pre_split.py:35]
+- [x] [Review][Patch] Split outcome writes were not transactional across date rows and parent DDR status [ces-ddr-platform/ces-backend/src/services/pipeline_service.py:42]
 
 ## Dev Notes
 
@@ -205,6 +212,32 @@ GPT-5
 
 ### Debug Log References
 
+- `ruff check .` - clean
+- `pytest` - 55 passed (8 new pre-split, 2 new pipeline-service, plus existing suites)
+
 ### Completion Notes List
 
+- `PDFPreSplitter` lives at `src/services/pipeline/pre_split.py`. The architecture-suggested `src/pipeline/` boundary was already established under `src/services/pipeline/` by Story 2.4 work-in-progress, so the splitter co-locates with `extract.py`/`validate.py` to avoid creating a parallel package.
+- Boundary detection: strict regex `\b\d{6}_(\d{8})_\d[A-Z]\b`. On a page that introduces a new serial, the prior `active_date` is also attached only when its `YYYYMMDD` string appears verbatim in the page text (textual evidence of spillover). This satisfies both the Tour 3 multi-date overflow requirement and the "do not over-attach" expectation for clean transitions.
+- Pre-splitter wraps the synchronous `pdfplumber` and `pypdf` calls in `asyncio.to_thread` via `split_async` so background-task callers never block the event loop.
+- Repository extensions (`bulk_create_queued`, `create_failed_boundary`) live on `DDRDateCRUDRepository`; a placeholder date `"00000000"` is used for the no-boundary failed row to satisfy the `VARCHAR(8) NOT NULL` schema while still recording the failure semantically.
+- `PreSplitPipelineService` is the orchestrator; `DDRProcessingTask.process()` opens a fresh async session via the existing `async_db.async_session_factory` and delegates. Story 2.3 now stops after pre-split and queued date creation by default; extraction remains opt-in for Story 2.4 paths.
+- Review patch tightened split outcome persistence so `ddr_dates` rows and parent `ddrs.status` commit in the same transaction, added required warning logs for empty text pages, and normalized file-like PDF sources before both text extraction and chunk writing.
+- Synthetic PDFs in tests are built with `reportlab` (added as a dev dependency) so pdfplumber/pypdf can extract real text without external fixtures. A fixture-presence test scans `tests/fixtures/` and asserts boundary detection for any real PDFs that get added later.
+
 ### File List
+
+- ces-ddr-platform/ces-backend/pyproject.toml (modified - added pdfplumber, pypdf; reportlab dev dep)
+- ces-ddr-platform/ces-backend/src/services/pipeline/__init__.py (existing - re-exports include PDFPreSplitter)
+- ces-ddr-platform/ces-backend/src/services/pipeline/pre_split.py (new - PDFPreSplitter, PreSplitResult, PreSplitWarning)
+- ces-ddr-platform/ces-backend/src/services/pipeline_service.py (new - PreSplitPipelineService orchestrator)
+- ces-ddr-platform/ces-backend/src/services/ddr.py (modified - DDRProcessingTask delegates to PreSplitPipelineService with fresh async session)
+- ces-ddr-platform/ces-backend/src/repository/crud/ddr.py (modified - bulk_create_queued, create_failed_boundary on DDRDateCRUDRepository)
+- ces-ddr-platform/ces-backend/tests/pipeline/__init__.py (new)
+- ces-ddr-platform/ces-backend/tests/pipeline/test_pre_split.py (new - 8 tests covering regex, grouping, overflow, no-text warning, no-boundary failure, async path, chunk validity, fixture-presence)
+- ces-ddr-platform/ces-backend/tests/test_ddr_processing_task.py (new - PreSplitPipelineService success/failure orchestration)
+
+## Change Log
+
+- 2026-05-07: Implemented PDFPreSplitter, PreSplitPipelineService orchestration, repository extensions, and synthetic-PDF test suite. Status moved to review.
+- 2026-05-07: Code review patches applied. Status moved to done.
