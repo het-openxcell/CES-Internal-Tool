@@ -7,6 +7,7 @@ import (
 )
 
 func TestHealthReturnsOkStatus(t *testing.T) {
+	t.Setenv("JWT_SECRET", "test-jwt-secret")
 	router := NewRouter()
 	response := httptest.NewRecorder()
 	request := httptest.NewRequest(http.MethodGet, "/health", nil)

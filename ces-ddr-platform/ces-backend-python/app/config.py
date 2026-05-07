@@ -18,5 +18,7 @@ class AppSettings(BackendBaseSettings):
             default="postgresql://ces:change-me-local-only@localhost:5432/ces_ddr",
         )
     )
+    postgres_password: str = Field(default_factory=lambda: config("POSTGRES_PASSWORD", default=""))
     qdrant_host: str = Field(default_factory=lambda: config("QDRANT_HOST", default="localhost"))
     qdrant_port: int = Field(default_factory=lambda: config("QDRANT_PORT", default=6333, cast=int))
+    jwt_secret: str = Field(default_factory=lambda: config("JWT_SECRET", default=""))
