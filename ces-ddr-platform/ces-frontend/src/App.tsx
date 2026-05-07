@@ -1,31 +1,20 @@
-import { Button } from "@/components/ui/button";
+import { BrowserRouter, Route, Routes } from "react-router";
+
+import ProtectedRoute from "@/components/ProtectedRoute";
+import LoginPage from "@/pages/LoginPage";
+import { APP_ROUTES } from "@/routes";
 
 export default function App() {
   return (
-    <main className="app-shell">
-      <section className="workspace">
-        <div className="workspace-header">
-          <div>
-            <p className="eyebrow">Canadian Energy Services</p>
-            <h1>DDR Operations Console</h1>
-          </div>
-          <Button>Health Ready</Button>
-        </div>
-        <div className="status-grid">
-          <article>
-            <span>Platform</span>
-            <strong>Local scaffold</strong>
-          </article>
-          <article>
-            <span>Scope</span>
-            <strong>Extraction and reporting foundation</strong>
-          </article>
-          <article>
-            <span>Mode</span>
-            <strong>Internal operations</strong>
-          </article>
-        </div>
-      </section>
-    </main>
+    <BrowserRouter>
+      <Routes>
+        <Route path="/login" element={<LoginPage />} />
+        <Route element={<ProtectedRoute />}>
+          {APP_ROUTES.filter((route) => route.protected).map(({ path, Component }) => (
+            <Route key={path} path={path} element={<Component />} />
+          ))}
+        </Route>
+      </Routes>
+    </BrowserRouter>
   );
 }

@@ -34,6 +34,7 @@ func NewRouterWithDependencies(dependencies RouterDependencies) *gin.Engine {
 	}
 
 	jwtManager := authcore.NewJWTManager(dependencies.Config.JWTSecret, 8*time.Hour)
+	router.Use(CORSMiddleware{AllowedOrigin: dependencies.Config.CORSAllowedOrigin}.Middleware())
 	router.Use(authcore.RequestLogger{
 		Service:          "ces-backend-go",
 		Writer:           dependencies.LogWriter,
@@ -52,4 +53,25 @@ func NewRouterWithDependencies(dependencies RouterDependencies) *gin.Engine {
 		JWTManager:       jwtManager,
 	}.Register(router)
 	return router
+}
+
+type CORSMiddleware struct {
+	AllowedOrigin string
+}
+
+func (middleware CORSMiddleware) Middleware() gin.HandlerFunc {
+	return func(context *gin.Context) {
+		origin := context.GetHeader("Origin")
+		if origin == middleware.AllowedOrigin {
+			context.Header("Access-Control-Allow-Origin", origin)
+			context.Header("Vary", "Origin")
+			context.Header("Access-Control-Allow-Methods", "GET,POST,PUT,PATCH,DELETE,OPTIONS")
+			context.Header("Access-Control-Allow-Headers", "Authorization,Content-Type")
+		}
+		if context.Request.Method == http.MethodOptions {
+			context.AbortWithStatus(http.StatusNoContent)
+			return
+		}
+		context.Next()
+	}
 }

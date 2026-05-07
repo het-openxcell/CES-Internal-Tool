@@ -22,6 +22,7 @@
 - When ever want to run any file or test, activate the UV virtualenv: `source .venv/bin/activate`
 - I never want to see any file comments
 - ❗ **Async correctness** — always wrap sync SDK calls (boto3, Twilio, Qdrant, etc.) in `asyncio.to_thread()`; never block the async event loop
+- All date time should be in epoch time
 
 ## Principles
 - Keep code **modular, clean, and maintainable**

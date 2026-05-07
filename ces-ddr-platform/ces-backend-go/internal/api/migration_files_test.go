@@ -29,12 +29,27 @@ func TestGoMigrationFilesCreateCanonicalUsersSchema(t *testing.T) {
 		}
 	}
 
-	if upSQL != baselineSQL {
-		t.Fatalf("baseline schema must match go up migration")
-	}
-
 	if !strings.Contains(downSQL, "DROP TABLE IF EXISTS users;") {
 		t.Fatalf("down migration must drop users idempotently")
+	}
+
+	epochMigration := readMigrationFile(t, root, "migrations", "002_datetime_epoch.up.sql")
+	for _, fragment := range []string{
+		"ALTER COLUMN created_at TYPE BIGINT USING EXTRACT(EPOCH FROM created_at)::BIGINT",
+		"ALTER COLUMN updated_at TYPE BIGINT USING EXTRACT(EPOCH FROM updated_at)::BIGINT",
+	} {
+		if !strings.Contains(epochMigration, fragment) {
+			t.Fatalf("epoch migration missing %q", fragment)
+		}
+	}
+
+	for _, fragment := range []string{
+		"created_at BIGINT NOT NULL DEFAULT EXTRACT(EPOCH FROM now())::BIGINT,",
+		"updated_at BIGINT NOT NULL DEFAULT EXTRACT(EPOCH FROM now())::BIGINT",
+	} {
+		if !strings.Contains(baselineSQL, fragment) {
+			t.Fatalf("baseline schema missing %q", fragment)
+		}
 	}
 }
 

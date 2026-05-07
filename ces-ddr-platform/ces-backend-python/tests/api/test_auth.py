@@ -1,6 +1,7 @@
 import asyncio
 import json
 import logging
+import time
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
@@ -81,8 +82,25 @@ def test_login_returns_signed_jwt() -> None:
     assert set(body.keys()) == {"token", "expires_at"}
     claims = JWTManager("test-jwt-secret", timedelta(hours=8)).validate(body["token"])
     assert claims["user_id"] == "11111111-1111-1111-1111-111111111111"
-    expires_at = datetime.fromisoformat(body["expires_at"].replace("Z", "+00:00"))
-    assert timedelta(hours=7, minutes=59) <= expires_at - datetime.now(UTC) <= timedelta(hours=8, minutes=1)
+    assert isinstance(body["expires_at"], int)
+    assert int(time.time()) + 7 * 60 * 60 + 59 * 60 <= body["expires_at"] <= int(time.time()) + 8 * 60 * 60 + 60
+
+
+def test_cors_preflight_allows_configured_frontend_origin() -> None:
+    client = TestClient(AppFactory(settings=AppSettings(jwt_secret="test-jwt-secret")).create())
+
+    response = client.options(
+        "/auth/login",
+        headers={
+            "Origin": "http://localhost:5173",
+            "Access-Control-Request-Method": "POST",
+            "Access-Control-Request-Headers": "content-type",
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.headers["access-control-allow-origin"] == "http://localhost:5173"
+    assert "Content-Type" in response.headers["access-control-allow-headers"]
 
 
 def test_login_wrong_username_and_password_return_same_unauthorized_body() -> None:

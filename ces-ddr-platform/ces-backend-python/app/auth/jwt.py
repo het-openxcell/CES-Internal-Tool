@@ -19,10 +19,10 @@ class JWTManager:
     def from_settings(cls, settings: AppSettings) -> "JWTManager":
         return cls(settings.jwt_secret, timedelta(hours=8))
 
-    def generate(self, user_id: str) -> tuple[str, datetime]:
+    def generate(self, user_id: str) -> tuple[str, int]:
         expires_at = datetime.now(UTC) + self.lifetime
         token = jwt.encode({"user_id": user_id, "exp": expires_at}, self.secret, algorithm=self.ALGORITHM)
-        return token, expires_at
+        return token, int(expires_at.timestamp())
 
     def validate(self, token: str) -> dict[str, object]:
         try:

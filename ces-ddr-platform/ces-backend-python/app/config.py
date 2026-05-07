@@ -22,3 +22,4 @@ class AppSettings(BackendBaseSettings):
     qdrant_host: str = Field(default_factory=lambda: config("QDRANT_HOST", default="localhost"))
     qdrant_port: int = Field(default_factory=lambda: config("QDRANT_PORT", default=6333, cast=int))
     jwt_secret: str = Field(default_factory=lambda: config("JWT_SECRET", default=""))
+    cors_allowed_origin: str = Field(default_factory=lambda: config("CORS_ALLOWED_ORIGIN", default="http://localhost:5173"))

@@ -1,5 +1,4 @@
 from dataclasses import dataclass
-from datetime import datetime
 
 
 @dataclass(frozen=True)
@@ -7,5 +6,5 @@ class User:
     id: str
     username: str
     password_hash: str
-    created_at: datetime | None = None
-    updated_at: datetime | None = None
+    created_at: int | None = None
+    updated_at: int | None = None

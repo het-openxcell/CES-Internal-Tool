@@ -22,8 +22,8 @@ func (logger RequestLogger) Middleware() gin.HandlerFunc {
 		requestID := uuid.NewString()
 		context.Set("request_id", requestID)
 		context.Next()
-		logger.write(map[string]string{
-			"timestamp":  time.Now().UTC().Format(time.RFC3339Nano),
+		logger.write(map[string]any{
+			"timestamp":  time.Now().UTC().Unix(),
 			"level":      "info",
 			"service":    logger.Service,
 			"request_id": requestID,
@@ -32,9 +32,11 @@ func (logger RequestLogger) Middleware() gin.HandlerFunc {
 	}
 }
 
-func (logger RequestLogger) write(entry map[string]string) {
+func (logger RequestLogger) write(entry map[string]any) {
 	for key, value := range entry {
-		entry[key] = logger.sanitize(value)
+		if text, ok := value.(string); ok {
+			entry[key] = logger.sanitize(text)
+		}
 	}
 	body, err := json.Marshal(entry)
 	if err != nil || logger.Writer == nil {

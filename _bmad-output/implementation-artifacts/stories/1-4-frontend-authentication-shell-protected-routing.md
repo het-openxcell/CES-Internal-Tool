@@ -1,6 +1,6 @@
 # Story 1.4: Frontend Authentication Shell & Protected Routing
 
-Status: ready-for-dev
+Status: review
 
 Completion note: Ultimate context engine analysis completed - comprehensive developer guide created.
 
@@ -22,49 +22,49 @@ so that unauthenticated users are redirected to login and authenticated users ca
 
 ## Tasks / Subtasks
 
-- [ ] Add routing dependency and test dependencies (AC: 1, 6)
-  - [ ] Add `react-router` using current stable v7 line; use Declarative Mode APIs compatible with existing Vite SPA.
-  - [ ] Add Vitest, React Testing Library, `@testing-library/jest-dom`, `@testing-library/user-event`, and jsdom.
-  - [ ] Add `test` script and Vite/Vitest config needed for React component tests.
-- [ ] Add auth token helper module (AC: 1, 2, 4)
-  - [ ] Create `ces-frontend/src/lib/auth.ts`.
-  - [ ] Encapsulate token storage, retrieval, clearing, and lightweight expiry checks in exported helper methods.
-  - [ ] Store only JWT token; do not store username, password, roles, or decoded user profile.
-  - [ ] Treat missing, malformed, or expired token as unauthenticated and clear it.
-- [ ] Add typed API client (AC: 2, 4, 5, 7)
-  - [ ] Create `ces-frontend/src/lib/api.ts`.
-  - [ ] Read base URL from `import.meta.env.VITE_API_URL`; keep auth requests pointed at backend `/auth/login` and do not hardcode backend host elsewhere.
-  - [ ] Implement typed `login(credentials)` for `POST /auth/login`.
-  - [ ] Implement shared request method that injects bearer token from `auth.ts`.
-  - [ ] On any HTTP 401 response, clear token and redirect to `/login`.
-  - [ ] Parse backend error shape without leaking raw response internals into UI.
-- [ ] Build login page (AC: 2, 3)
-  - [ ] Create `ces-frontend/src/pages/LoginPage.tsx`.
-  - [ ] Use existing `Button` primitive from `src/components/ui/button.tsx`; add a small local input pattern or shadcn-style `Input` primitive only if needed.
-  - [ ] Keep design quiet, desktop-first, CES-branded, and consistent with existing `styles.css` tokens.
-  - [ ] On success, store token through `auth.ts` and navigate to `/`.
-  - [ ] On invalid credentials, show exact inline text `Invalid username or password`, clear password, retain username, and keep focus behavior usable.
-- [ ] Add protected app shell and placeholder pages (AC: 1, 6)
-  - [ ] Create `ces-frontend/src/components/ProtectedRoute.tsx`.
-  - [ ] Update `App.tsx` to declare all required routes.
-  - [ ] Preserve existing DDR Operations Console content as `/` dashboard placeholder instead of deleting the scaffold.
-  - [ ] Add placeholder page components for `/reports/:id`, `/history`, `/query`, `/monitor`, and `/settings/keywords` under `src/pages/`.
-  - [ ] Keep placeholders functional and minimal; do not implement upload, table, query, monitor, export, or keyword editing features in this story.
-- [ ] Add auth hook only if it removes duplication (AC: 1-4)
-  - [ ] Prefer small `useAuth` in `src/hooks/useAuth.ts` if LoginPage and ProtectedRoute otherwise duplicate storage/navigation behavior.
-  - [ ] Keep state local with React `useState` and `useEffect`; do not add Redux, Zustand, React Query, or external state library.
-- [ ] Add tests (AC: 1-7)
-  - [ ] Test unauthenticated protected route redirects to `/login`.
-  - [ ] Test valid login stores token and navigates to `/`.
-  - [ ] Test invalid login shows exact inline error, clears password, and retains username.
-  - [ ] Test API client injects `Authorization: Bearer <token>`.
-  - [ ] Test API client clears token and redirects to `/login` on 401.
-  - [ ] Test all required routes are declared and protected except `/login`.
-  - [ ] Test `VITE_API_URL` usage without hardcoded backend URL in `api.ts`.
-- [ ] Preserve scope boundaries (AC: all)
-  - [ ] Do not add backend auth implementation, seeded credentials, RBAC, refresh tokens, password reset, user management, SSR, React Router Framework Mode, or business feature screens.
-  - [ ] Do not modify `src/components/ui/` primitives unless a primitive is missing and needed for auth UI.
-  - [ ] Do not read or print real `.env` values.
+- [x] Add routing dependency and test dependencies (AC: 1, 6)
+  - [x] Add `react-router` using current stable v7 line; use Declarative Mode APIs compatible with existing Vite SPA.
+  - [x] Add Vitest, React Testing Library, `@testing-library/jest-dom`, `@testing-library/user-event`, and jsdom.
+  - [x] Add `test` script and Vite/Vitest config needed for React component tests.
+- [x] Add auth token helper module (AC: 1, 2, 4)
+  - [x] Create `ces-frontend/src/lib/auth.ts`.
+  - [x] Encapsulate token storage, retrieval, clearing, and lightweight expiry checks in exported helper methods.
+  - [x] Store only JWT token; do not store username, password, roles, or decoded user profile.
+  - [x] Treat missing, malformed, or expired token as unauthenticated and clear it.
+- [x] Add typed API client (AC: 2, 4, 5, 7)
+  - [x] Create `ces-frontend/src/lib/api.ts`.
+  - [x] Read base URL from `import.meta.env.VITE_API_URL`; keep auth requests pointed at backend `/auth/login` and do not hardcode backend host elsewhere.
+  - [x] Implement typed `login(credentials)` for `POST /auth/login`.
+  - [x] Implement shared request method that injects bearer token from `auth.ts`.
+  - [x] On any HTTP 401 response, clear token and redirect to `/login`.
+  - [x] Parse backend error shape without leaking raw response internals into UI.
+- [x] Build login page (AC: 2, 3)
+  - [x] Create `ces-frontend/src/pages/LoginPage.tsx`.
+  - [x] Use existing `Button` primitive from `src/components/ui/button.tsx`; add a small local input pattern or shadcn-style `Input` primitive only if needed.
+  - [x] Keep design quiet, desktop-first, CES-branded, and consistent with existing `styles.css` tokens.
+  - [x] On success, store token through `auth.ts` and navigate to `/`.
+  - [x] On invalid credentials, show exact inline text `Invalid username or password`, clear password, retain username, and keep focus behavior usable.
+- [x] Add protected app shell and placeholder pages (AC: 1, 6)
+  - [x] Create `ces-frontend/src/components/ProtectedRoute.tsx`.
+  - [x] Update `App.tsx` to declare all required routes.
+  - [x] Preserve existing DDR Operations Console content as `/` dashboard placeholder instead of deleting the scaffold.
+  - [x] Add placeholder page components for `/reports/:id`, `/history`, `/query`, `/monitor`, and `/settings/keywords` under `src/pages/`.
+  - [x] Keep placeholders functional and minimal; do not implement upload, table, query, monitor, export, or keyword editing features in this story.
+- [x] Add auth hook only if it removes duplication (AC: 1-4)
+  - [x] Prefer small `useAuth` in `src/hooks/useAuth.ts` if LoginPage and ProtectedRoute otherwise duplicate storage/navigation behavior.
+  - [x] Keep state local with React `useState` and `useEffect`; do not add Redux, Zustand, React Query, or external state library.
+- [x] Add tests (AC: 1-7)
+  - [x] Test unauthenticated protected route redirects to `/login`.
+  - [x] Test valid login stores token and navigates to `/`.
+  - [x] Test invalid login shows exact inline error, clears password, and retains username.
+  - [x] Test API client injects `Authorization: Bearer <token>`.
+  - [x] Test API client clears token and redirects to `/login` on 401.
+  - [x] Test all required routes are declared and protected except `/login`.
+  - [x] Test `VITE_API_URL` usage without hardcoded backend URL in `api.ts`.
+- [x] Preserve scope boundaries (AC: all)
+  - [x] Do not add backend auth implementation, seeded credentials, RBAC, refresh tokens, password reset, user management, SSR, React Router Framework Mode, or business feature screens.
+  - [x] Do not modify `src/components/ui/` primitives unless a primitive is missing and needed for auth UI.
+  - [x] Do not read or print real `.env` values.
 
 ## Dev Notes
 
@@ -253,6 +253,49 @@ GPT-5
 
 ### Debug Log References
 
+- `npm run test` failed red phase because `auth.ts`, `api.ts`, and route metadata did not exist.
+- `npm run test` passed after implementation: 3 files, 11 tests.
+- `npm run build` passed after implementation.
+- `rg "fetch\\(" src --glob '!src/lib/api.ts'` returned no production raw fetch usage.
+- `rg "localStorage" src --glob '!src/lib/auth.ts' --glob '!src/**/*.test.ts' --glob '!src/**/*.test.tsx' --glob '!src/test/setup.ts'` returned no production direct localStorage usage.
+
 ### Completion Notes List
 
+- Added React Router v7 declarative routing with protected route grouping and all required routes.
+- Added JWT-only auth token helper with malformed and expired token cleanup.
+- Added typed API client for `/auth/login`, bearer injection, `VITE_API_URL` base URL usage, and 401 token clearing plus login redirect.
+- Added quiet CES-branded login page and minimal placeholder pages while preserving DDR Operations Console at `/`.
+- Added Vitest and React Testing Library coverage for auth helper, API client behavior, login flow, route protection, route declaration, and API base URL requirements.
+- No auth hook added because `LoginPage` and `ProtectedRoute` did not duplicate enough stateful behavior to justify one.
+
 ### File List
+
+- `.gitignore`
+- `_bmad-output/implementation-artifacts/sprint-status.yaml`
+- `_bmad-output/implementation-artifacts/stories/1-4-frontend-authentication-shell-protected-routing.md`
+- `ces-ddr-platform/ces-frontend/package.json`
+- `ces-ddr-platform/ces-frontend/package-lock.json`
+- `ces-ddr-platform/ces-frontend/vite.config.ts`
+- `ces-ddr-platform/ces-frontend/src/App.tsx`
+- `ces-ddr-platform/ces-frontend/src/App.test.tsx`
+- `ces-ddr-platform/ces-frontend/src/components/ProtectedRoute.tsx`
+- `ces-ddr-platform/ces-frontend/src/lib/api.ts`
+- `ces-ddr-platform/ces-frontend/src/lib/api.test.ts`
+- `ces-ddr-platform/ces-frontend/src/lib/auth.ts`
+- `ces-ddr-platform/ces-frontend/src/lib/auth.test.ts`
+- `ces-ddr-platform/ces-frontend/src/pages/DashboardPage.tsx`
+- `ces-ddr-platform/ces-frontend/src/pages/HistoryPage.tsx`
+- `ces-ddr-platform/ces-frontend/src/pages/KeywordsPage.tsx`
+- `ces-ddr-platform/ces-frontend/src/pages/LoginPage.tsx`
+- `ces-ddr-platform/ces-frontend/src/pages/MonitorPage.tsx`
+- `ces-ddr-platform/ces-frontend/src/pages/PlaceholderPage.tsx`
+- `ces-ddr-platform/ces-frontend/src/pages/QueryPage.tsx`
+- `ces-ddr-platform/ces-frontend/src/pages/ReportsPage.tsx`
+- `ces-ddr-platform/ces-frontend/src/routes.ts`
+- `ces-ddr-platform/ces-frontend/src/styles.css`
+- `ces-ddr-platform/ces-frontend/src/test/setup.ts`
+- `ces-ddr-platform/ces-frontend/src/test/test-utils.ts`
+
+### Change Log
+
+- 2026-05-07: Implemented frontend authentication shell, protected routing, typed API client, login UI, placeholder routes, and test harness for Story 1.4.

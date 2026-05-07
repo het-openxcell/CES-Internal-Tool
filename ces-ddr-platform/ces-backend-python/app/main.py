@@ -1,4 +1,5 @@
 from fastapi import FastAPI
+from starlette.middleware.cors import CORSMiddleware
 
 from app.api.auth import AuthRouter
 from app.api.health import HealthRouter
@@ -29,6 +30,12 @@ class AppFactory:
             service="ces-backend-python",
             jwt_secret=self.settings.jwt_secret,
             postgres_password=self.settings.postgres_password,
+        )
+        app.add_middleware(
+            CORSMiddleware,
+            allow_origins=[self.settings.cors_allowed_origin],
+            allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+            allow_headers=["Authorization", "Content-Type"],
         )
         app.include_router(HealthRouter().router)
         app.include_router(AuthRouter(user_repository=user_repository, jwt_manager=jwt_manager).router)

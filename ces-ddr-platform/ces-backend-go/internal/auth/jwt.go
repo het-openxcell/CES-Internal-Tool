@@ -27,7 +27,7 @@ func NewJWTManager(secret string, lifetime time.Duration) JWTManager {
 	return JWTManager{secret: secret, lifetime: lifetime}
 }
 
-func (manager JWTManager) Generate(userID string) (string, time.Time, error) {
+func (manager JWTManager) Generate(userID string) (string, int64, error) {
 	expiresAt := time.Now().UTC().Add(manager.lifetime)
 	claims := Claims{
 		UserID: userID,
@@ -37,7 +37,7 @@ func (manager JWTManager) Generate(userID string) (string, time.Time, error) {
 	}
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 	signed, err := token.SignedString([]byte(manager.secret))
-	return signed, expiresAt, err
+	return signed, expiresAt.Unix(), err
 }
 
 func (manager JWTManager) Validate(tokenValue string) (*Claims, error) {

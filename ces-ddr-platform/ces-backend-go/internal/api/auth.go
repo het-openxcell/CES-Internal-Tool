@@ -2,7 +2,6 @@ package api
 
 import (
 	"net/http"
-	"time"
 
 	authcore "ces-backend-go/internal/auth"
 
@@ -22,7 +21,7 @@ type LoginRequest struct {
 
 type LoginResponse struct {
 	Token     string `json:"token"`
-	ExpiresAt string `json:"expires_at"`
+	ExpiresAt int64  `json:"expires_at"`
 }
 
 func (handler AuthHandler) Register(router *gin.Engine) {
@@ -59,5 +58,5 @@ func (handler AuthHandler) Login(context *gin.Context) {
 		return
 	}
 
-	context.JSON(http.StatusOK, LoginResponse{Token: token, ExpiresAt: expiresAt.UTC().Format(time.RFC3339)})
+	context.JSON(http.StatusOK, LoginResponse{Token: token, ExpiresAt: expiresAt})
 }

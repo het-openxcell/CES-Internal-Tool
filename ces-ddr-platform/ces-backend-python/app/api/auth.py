@@ -1,5 +1,3 @@
-from datetime import UTC
-
 from fastapi import APIRouter
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
@@ -33,5 +31,5 @@ class AuthRouter:
         token, expires_at = self.jwt_manager.generate(user.id)
         return JSONResponse(
             status_code=200,
-            content={"token": token, "expires_at": expires_at.astimezone(UTC).isoformat().replace("+00:00", "Z")},
+            content={"token": token, "expires_at": expires_at},
         )

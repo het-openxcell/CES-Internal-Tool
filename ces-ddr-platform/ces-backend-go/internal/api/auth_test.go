@@ -55,20 +55,51 @@ func TestLoginReturnsSignedJWT(t *testing.T) {
 		t.Fatalf("expected status %d, got %d with %s", http.StatusOK, response.Code, response.Body.String())
 	}
 
-	var body map[string]string
+	var body struct {
+		Token     string `json:"token"`
+		ExpiresAt int64  `json:"expires_at"`
+	}
 	if err := json.Unmarshal(response.Body.Bytes(), &body); err != nil {
 		t.Fatal(err)
 	}
-	if body["token"] == "" || body["expires_at"] == "" {
-		t.Fatalf("expected token and expires_at, got %v", body)
+	if body.Token == "" || body.ExpiresAt == 0 {
+		t.Fatalf("expected token and expires_at, got %+v", body)
 	}
 
-	claims, err := authcore.NewJWTManager("test-jwt-secret", 8*time.Hour).Validate(body["token"])
+	claims, err := authcore.NewJWTManager("test-jwt-secret", 8*time.Hour).Validate(body.Token)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if claims.UserID != "11111111-1111-1111-1111-111111111111" {
 		t.Fatalf("expected user_id claim, got %s", claims.UserID)
+	}
+	if body.ExpiresAt < time.Now().UTC().Add(7*time.Hour+59*time.Minute).Unix() || body.ExpiresAt > time.Now().UTC().Add(8*time.Hour+time.Minute).Unix() {
+		t.Fatalf("expected epoch expires_at roughly 8 hours ahead, got %d", body.ExpiresAt)
+	}
+}
+
+func TestCORSPreflightAllowsConfiguredFrontendOrigin(t *testing.T) {
+	router := NewRouterWithDependencies(RouterDependencies{
+		Config:    config.Config{JWTSecret: "test-jwt-secret", CORSAllowedOrigin: "http://localhost:5173"},
+		UserStore: fakeUserStore{},
+		LogWriter: bytes.NewBuffer(nil),
+	})
+	response := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodOptions, "/auth/login", nil)
+	request.Header.Set("Origin", "http://localhost:5173")
+	request.Header.Set("Access-Control-Request-Method", "POST")
+	request.Header.Set("Access-Control-Request-Headers", "content-type")
+
+	router.ServeHTTP(response, request)
+
+	if response.Code != http.StatusNoContent {
+		t.Fatalf("expected preflight status %d, got %d", http.StatusNoContent, response.Code)
+	}
+	if response.Header().Get("Access-Control-Allow-Origin") != "http://localhost:5173" {
+		t.Fatalf("expected CORS origin header, got %s", response.Header().Get("Access-Control-Allow-Origin"))
+	}
+	if !strings.Contains(response.Header().Get("Access-Control-Allow-Headers"), "Content-Type") {
+		t.Fatalf("expected content-type CORS header, got %s", response.Header().Get("Access-Control-Allow-Headers"))
 	}
 }
 
