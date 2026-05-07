@@ -17,6 +17,15 @@ describe("App routing and login", () => {
     expect(window.location.pathname).toBe("/login");
   });
 
+  it("redirects unknown unauthenticated routes to login", async () => {
+    window.history.pushState({}, "", "/unknown");
+
+    render(<App />);
+
+    expect(await screen.findByLabelText("Username")).toBeInTheDocument();
+    expect(window.location.pathname).toBe("/login");
+  });
+
   it("stores token and navigates to dashboard after valid login", async () => {
     const token = TestJwtFactory.tokenWithExpiration(Math.floor(Date.now() / 1000) + 3600);
     vi.stubGlobal(

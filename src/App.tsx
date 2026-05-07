@@ -1,4 +1,4 @@
-import { BrowserRouter, Route, Routes } from "react-router";
+import { BrowserRouter, Navigate, Route, Routes } from "react-router";
 
 import ProtectedRoute from "@/components/ProtectedRoute";
 import LoginPage from "@/pages/LoginPage";
@@ -13,6 +13,7 @@ export default function App() {
           {APP_ROUTES.filter((route) => route.protected).map(({ path, Component }) => (
             <Route key={path} path={path} element={<Component />} />
           ))}
+          <Route path="*" element={<Navigate replace to="/" />} />
         </Route>
       </Routes>
     </BrowserRouter>
