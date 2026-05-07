@@ -45,10 +45,17 @@ approved_changes:
     status: done
     date: 2026-05-07
     proposal: _bmad-output/planning-artifacts/sprint-change-proposal-2026-05-07.md
+  backend_structure_alignment:
+    status: approved
+    date: 2026-05-07
+    proposal: _bmad-output/planning-artifacts/sprint-change-proposal-2026-05-07.md
+    notes:
+      - Use the project src backend structure adapted to CES rules.
+      - Use SQLAlchemy async ORM, repository/service modules, session dependencies, pytest, and Ruff.
 
 development_status:
   # ── Epic 1: Platform Foundation & Authenticated Access ──
-  epic-1: in-progress
+  epic-1: done
   1-1-project-scaffold-development-infrastructure: done
   1-2-database-schema-users-table-migration-tooling: done
   1-3-authentication-api-login-jwt-middleware: done

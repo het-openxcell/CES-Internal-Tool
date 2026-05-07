@@ -12,6 +12,10 @@ inputDocuments:
 
 This document provides the complete epic and story breakdown for the CES DDR Intelligence Platform, decomposing the requirements from the PRD, Architecture, and UX Design Specification into implementable stories.
 
+## Current Backend Standard
+
+Stories and epics from 2026-05-07 forward use the Python FastAPI project backend standard: `src/` package layout, `decouple + BackendBaseSettings`, async SQLAlchemy repository pattern, Alembic in `src/repository/migrations`, `pytest`, and `ruff`. Older dual-backend or root `app/` wording is superseded.
+
 ## Requirements Inventory
 
 ### Functional Requirements
@@ -105,7 +109,7 @@ This document provides the complete epic and story breakdown for the CES DDR Int
 - ARCH-6: Gemini 429 handling: exponential backoff (1s→2s→4s→8s), max 3 retries, then mark date as `warning` with code `RATE_LIMITED`.
 - ARCH-7: Frontend routing via React Router v6. Routes: `/login`, `/`, `/reports/:id`, `/history`, `/query`, `/monitor`, `/settings/keywords`. Auth guard `<ProtectedRoute>` redirects to `/login` if no valid token.
 - ARCH-8: All frontend API calls through `src/lib/api.ts` — never raw fetch in components. 401 response → clear token + redirect to `/login`.
-- ARCH-9: Keyword store is `ces-backend/app/resources/keywords.json` — single source of truth read by the Python backend. `PUT /keywords` writes file + triggers in-memory reload without restart.
+- ARCH-9: Keyword store is `ces-backend/src/resources/keywords.json` or equivalent backend resource module — single source of truth read by the Python backend. `PUT /keywords` writes file + triggers in-memory reload without restart.
 - ARCH-10: Correction context injection cap — last 20 corrections, summarized format: `"Field '{field}': '{original}' corrected to '{corrected}' ({count} times). Reason: {most_recent_reason}"`.
 - ARCH-11: Embedding model `text-embedding-004` (Google AI, same API key). Called from `search/qdrant` post-extraction. Qdrant collection: `ddr_time_logs`.
 - ARCH-12: PDF storage — `pdfs` Docker volume at `/app/uploads`. Path stored in `ddrs.file_path`.
@@ -203,7 +207,7 @@ This document provides the complete epic and story breakdown for the CES DDR Int
 ## Epic List
 
 ### Epic 1: Platform Foundation & Authenticated Access
-Users can securely log in and access the platform. Both backend projects initialized, DB schema migrated, Docker Compose running, frontend scaffold live with protected routing.
+Users can securely log in and access the platform. Python FastAPI backend initialized with the project `src/` structure, DB schema migrated, Docker Compose running, frontend scaffold live with protected routing.
 **FRs covered:** FR34, FR35
 **Arch covered:** ARCH-1, ARCH-2, ARCH-3, ARCH-7, ARCH-8, ARCH-14, ARCH-15, ARCH-17
 
@@ -269,16 +273,16 @@ So that development can begin on a stable, reproducible foundation.
 **And** `<html class="light">` is set at root (dark mode disabled)
 
 **Given** the Python backend scaffold exists
-**When** `uvicorn app.main:app --reload` is run in `ces-backend/`
-**Then** server starts and `GET /health` returns `{ "status": "ok" }` with HTTP 200
-**And** `app/config.py` uses Pydantic Settings — all config loaded from env vars, no `os.Getenv()` in business logic
+**When** `source .venv/bin/activate && uvicorn src.main:backend_app --reload` is run in `ces-backend/`
+**Then** server starts and `GET /api/health` returns `{ "status": "ok" }` with HTTP 200
+**And** `src/config/settings/base.py` uses `decouple + BackendBaseSettings`
+**And** SQLAlchemy async session dependencies are available through `src/api/dependencies`
+**And** repository classes live under `src/repository/crud`
+**And** no alternate backend files or direct DB query helper modules are required
+**And** `source .venv/bin/activate && ruff check src tests` passes
+**And** `source .venv/bin/activate && pytest` passes
 
-**Given** the Python backend scaffold exists
-**When** `go run main.go` is run in `ces-backend/`
-**Then** FastAPI server starts and `GET /health` returns `{ "status": "ok" }` with HTTP 200
-**And** `internal/config/config.go` contains `Config` struct — all config from env vars
-
-**Given** `.env.example` files exist in repo root, `ces-frontend/`, `ces-backend/`, `ces-backend/`
+**Given** `.env.example` files exist in repo root, `ces-frontend/`, and `ces-backend/`
 **When** the `.gitignore` is reviewed
 **Then** `.env` files are gitignored at all levels
 **And** `GEMINI_API_KEY`, `JWT_SECRET`, `POSTGRES_PASSWORD` never appear in any committed file
@@ -291,20 +295,15 @@ So that authentication can be built on a schema the Python backend share identic
 
 **Acceptance Criteria:**
 
-**Given** Python backend migrations directory `ces-backend/migrations/` exists
-**When** `Alembic` runs `001_initial_schema.up.sql`
-**Then** `users` table is created with: `id UUID PRIMARY KEY DEFAULT gen_random_uuid()`, `username VARCHAR(255) UNIQUE NOT NULL`, `password_hash TEXT NOT NULL`, `created_at TIMESTAMPTZ NOT NULL DEFAULT now()`, `updated_at TIMESTAMPTZ NOT NULL DEFAULT now()`
-**And** migration is idempotent — running again produces no error
-**And** `001_initial_schema.down.sql` drops the `users` table cleanly
+**Given** Python backend Alembic is configured under `ces-backend/src/repository/migrations/`
+**When** migration files are created manually and `alembic upgrade head` is run
+**Then** `users` table is created with: `id UUID PRIMARY KEY DEFAULT gen_random_uuid()`, `username VARCHAR(255) UNIQUE NOT NULL`, `password_hash TEXT NOT NULL`, `created_at BIGINT NOT NULL`, `updated_at BIGINT NOT NULL`
+**And** SQLAlchemy model `src/models/db/user.py` maps the same table
+**And** Alembic remains the only migration authority
 
-**Given** Python backend Alembic is configured in `ces-backend/alembic/`
-**When** `alembic upgrade head` runs `001_initial_schema.py`
-**Then** `users` table schema matches Go migration output exactly (same columns, types, constraints)
-**And** `Alembic migrations` documents the canonical schema
-
-**Given** both migrations have run
+**Given** migrations have run
 **When** a developer inspects the DB
-**Then** `\d users` shows identical structure regardless of which migration tool ran
+**Then** `\d users` shows structure matching SQLAlchemy ORM model and migration files
 
 ### Story 1.3: Authentication API — Login & JWT Middleware
 
@@ -315,17 +314,17 @@ So that I can access all platform features without re-authenticating for 8 hours
 **Acceptance Criteria:**
 
 **Given** a user exists in the `users` table with bcrypt-hashed password
-**When** `POST /auth/login` is called with valid `{ "username": "...", "password": "..." }`
-**Then** HTTP 200 is returned with `{ "token": "<JWT>", "expires_at": "<ISO8601 8hr from now>" }`
-**And** JWT is HS256-signed using `JWT_SECRET` from environment — never hardcoded
+**When** `POST /api/auth/login` is called with valid `{ "username": "...", "password": "..." }`
+**Then** HTTP 200 is returned with `{ "token": "<JWT>", "expires_at": <epoch_seconds> }`
+**And** JWT is HS256-signed using `JWT_SECRET_KEY` from environment — never hardcoded
 **And** JWT payload contains `user_id` and `exp` claims
 
-**Given** `POST /auth/login` is called with wrong credentials
+**Given** `POST /api/auth/login` is called with wrong credentials
 **When** username doesn't exist or password doesn't match bcrypt hash
 **Then** HTTP 401 is returned with `{ "error": "Invalid credentials", "code": "UNAUTHORIZED", "details": {} }`
 **And** response time is identical for both failure cases (no timing oracle)
 
-**Given** any endpoint except `POST /auth/login` is called without `Authorization: Bearer <token>`
+**Given** any protected endpoint except `POST /api/auth/login` is called without `Authorization: Bearer <token>`
 **When** the JWT middleware processes the request
 **Then** HTTP 401 is returned with `{ "error": "Authentication required", "code": "UNAUTHORIZED", "details": {} }`
 
@@ -339,10 +338,10 @@ So that I can access all platform features without re-authenticating for 8 hours
 **And** `Authorization` header value, `JWT_SECRET`, and `POSTGRES_PASSWORD` never appear in any log line
 **And** `request_id` (UUID) is generated per request and present on all log lines for that request
 
-**Given** both Python backend implement the login endpoint
-**When** the same credentials are sent to each
-**Then** both return tokens validated by the same JWT middleware logic
-**And** Go implementation is canonical; Python behavior matches exactly
+**Given** the Python backend implements the login endpoint
+**When** a seeded SQL user logs in through `/api/auth/login`
+**Then** the API returns a valid JWT and epoch expiry
+**And** backend tests, Ruff, and an HTTP login smoke test pass before story completion
 
 ### Story 1.4: Frontend Authentication Shell & Protected Routing
 
@@ -416,7 +415,7 @@ So that all extraction pipeline data has a durable, structured home before any p
 
 **Given** `pdfs` Docker volume declared in `docker-compose.yml`
 **When** Docker Compose runs
-**Then** volume is mounted at `/app/uploads` in both backend containers
+**Then** volume is mounted at `/app/uploads` in the backend container
 
 ### Story 2.2: PDF Upload Endpoint & Processing Queue
 
@@ -432,7 +431,7 @@ So that extraction starts without waiting and I get acknowledgement within 1 sec
 **And** a `ddrs` row is created with `status: "queued"` and `file_path` set
 **And** a `processing_queue` row is inserted for this DDR
 **And** HTTP 201 is returned within 1 second with `{ "id": "<uuid>", "status": "queued" }` (NFR-P5)
-**And** background pipeline task is dispatched (Python: `BackgroundTasks`; Go: goroutine) — does not block response
+**And** background pipeline task is dispatched using FastAPI/asyncio background processing — does not block response
 
 **Given** a non-PDF file is uploaded
 **When** the upload endpoint validates the file
@@ -453,7 +452,7 @@ So that extraction starts without waiting and I get acknowledgement within 1 sec
 **Then** HTTP 404 is returned with `{ "error": "DDR not found", "code": "NOT_FOUND", "details": {} }`
 
 **Given** OpenAPI spec auto-generation is active
-**When** `GET /docs` (Python) or `GET /swagger/index.html` (Go) is accessed
+**When** `GET /docs` is accessed
 **Then** `/auth/login`, `/ddrs`, `/ddrs/upload`, `/ddrs/:id` endpoints are documented
 
 ### Story 2.3: PDF Pre-Splitter — Date Boundary Detection
@@ -499,10 +498,10 @@ So that structured drilling data is available for occurrence generation with ful
 **Acceptance Criteria:**
 
 **Given** a date chunk (pdf_bytes) is ready for extraction
-**When** `pipeline/extract` calls Gemini 2.5 Flash-Lite with `responseSchema` from `ces-backend/app/resources/ddr_schema.json`
+**When** pipeline extraction service calls Gemini 2.5 Flash-Lite with `responseSchema` from `ces-backend/src/resources/ddr_schema.json` or equivalent resource module
 **Then** response is structured JSON matching the DDRDate schema (time_logs, mud_records, deviation_surveys, bit_records)
 **And** `GEMINI_API_KEY` is loaded from environment only — never appears in logs or error messages (NFR-S2)
-**And** Python raises typed `ExtractionError` from `app/exceptions.py` — no raw exception strings to client
+**And** backend raises typed extraction errors from `src/utilities/exceptions/` or service-specific exceptions — no raw exception strings to client
 
 **Given** Gemini API returns HTTP 429 (rate limit)
 **When** `pipeline/extract` handles the error
@@ -608,7 +607,7 @@ So that occurrence generation has a schema to write to and the keyword engine ha
 **And** indexes `idx_occurrences_ddr_id`, `idx_occurrences_type`, `idx_occurrences_date` are created
 **And** Alembic is the sole migration source for this schema
 
-**Given** `ces-backend/app/resources/keywords.json` is created
+**Given** `ces-backend/src/resources/keywords.json` or equivalent backend resource module is created
 **When** file structure is reviewed
 **Then** file contains `{ "<keyword>": "<type_name>", ... }` — at least one entry per occurrence type covering all 15–17 parent types
 **And** the Python backend load it at startup via `keywords/loader`
@@ -622,7 +621,7 @@ So that extracted problem-line text is mapped to one of the 15–17 standard occ
 
 **Acceptance Criteria:**
 
-**Given** `ces-backend/app/resources/keywords.json` is loaded at backend startup
+**Given** `ces-backend/src/resources/keywords.json` or equivalent backend resource module is loaded at backend startup
 **When** `occurrence/classify` processes a problem-line text string
 **Then** keyword matching is case-insensitive substring match — "backreamed to free" matches keyword "backreamed"
 **And** first matching keyword's mapped type is assigned (first-match wins; keyword order in file is authoritative)
@@ -935,7 +934,7 @@ So that I have a client-ready deliverable that is auditable and opens cleanly in
 **When** the query finds no row
 **Then** HTTP 404 is returned with `{ "error": "DDR not found", "code": "NOT_FOUND", "details": {} }`
 
-**Given** both Go (openpyxl) and Python (openpyxl) backends implement the export
+**Given** the Python backend implements the export with `openpyxl`
 **When** the same DDR is exported from each
 **Then** both produce `.xlsx` files with identical column structure, header styling, and sheet names
 
@@ -1041,7 +1040,7 @@ So that natural language queries return relevant results even when Qdrant is una
 
 **Acceptance Criteria:**
 
-**Given** `search/bm25` module is implemented using `rank-bm25` (Python) / BM25 implementation (Go)
+**Given** search service is implemented using Python `rank-bm25`
 **When** `POST /occurrences/query` is called with `{ "query": "lost circulation events on ARC Resources" }`
 **Then** BM25 ranks time log rows whose `details` text scores highest against the query
 **And** results include: `ddr_id`, `date`, `time_from`, `time_to`, `code`, `details`, matched occurrence if any
@@ -1225,12 +1224,12 @@ So that I can fix systematic misclassification immediately after spotting a patt
 **Acceptance Criteria:**
 
 **Given** `GET /keywords` is called with a valid JWT
-**When** `ces-backend/app/resources/keywords.json` exists
+**When** `ces-backend/src/resources/keywords.json` or equivalent backend resource module exists
 **Then** HTTP 200 returns the full keyword map: `{ "<keyword>": "<type>", ... }` (FR32)
 
 **Given** `PUT /keywords` is called with body `{ "<keyword>": "<type>", ... }`
 **When** the new keyword map is valid JSON
-**Then** `ces-backend/app/resources/keywords.json` is overwritten with new content (ARCH-9)
+**Then** `ces-backend/src/resources/keywords.json` or equivalent backend resource module is overwritten with new content (ARCH-9)
 **And** in-memory keyword map on the Python backend reloads immediately — no restart required
 **And** HTTP 200 returns the updated keyword map
 **And** subsequent `occurrence/classify` calls use new mappings

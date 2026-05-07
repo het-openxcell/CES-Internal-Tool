@@ -18,6 +18,10 @@ date: '2026-05-06'
 
 _This document builds collaboratively through step-by-step discovery. Sections are appended as we work through each architectural decision together._
 
+## Current Backend Standard
+
+The backend standard from 2026-05-07 forward is Python FastAPI using the project `src/` structure, `decouple + BackendBaseSettings`, async SQLAlchemy repositories, Alembic under `src/repository/migrations`, `pytest`, and `ruff`. This supersedes older dual-backend or root `app/` references in historical notes.
+
 ## Project Context Analysis
 
 ### Requirements Overview
@@ -47,7 +51,7 @@ _This document builds collaboratively through step-by-step discovery. Sections a
 - **Complexity level:** High
 - **Primary domain:** Full-stack web + AI data pipeline + search
 - **Daily data volume:** 10–15 DDRs/day × ~30 dates = 300–450 Gemini API calls/day; ~500 status records/day; all raw responses retained indefinitely
-- **Estimated architectural components:** Frontend SPA, Backend API (×2 — Python), PDF Pre-splitter, AI Extraction Pipeline, Occurrence Engine, Correction Store, BM25 Search, Qdrant Vector Search, Processing Queue, Excel Export Layer, Keyword Management, PostgreSQL, Auth Layer
+- **Estimated architectural components:** Frontend SPA, Backend API, PDF Pre-splitter, AI Extraction Pipeline, Occurrence Engine, Correction Store, BM25 Search, Qdrant Vector Search, Processing Queue, Excel Export Layer, Keyword Management, PostgreSQL, Auth Layer
 
 ### Technical Constraints & Dependencies
 
@@ -71,13 +75,11 @@ _This document builds collaboratively through step-by-step discovery. Sections a
 7. **Correction context injection** — summarized correction store injected into future occurrence generation prompts; must be capped to avoid prompt bloat
 8. **Excel compatibility** — exports must work in Excel 2016+ and LibreOffice Calc through the Python `openpyxl` implementation
 
-## Starter Template Evaluation
+## Backend Structure Decision
 
 ### Primary Technology Domain
 
-Full-stack web application + AI data pipeline. Pre-decided stack from PRD — no starter
-template selection required. Documenting initialization commands and project structure
-decisions for implementation.
+Full-stack web application + AI data pipeline. Backend implementation uses the project `src/` structure as the canonical structure, adapted to CES rules.
 
 ### Stack Summary (All Decisions Locked)
 
@@ -86,16 +88,17 @@ decisions for implementation.
 | Frontend | React + Vite + TypeScript + Tailwind CSS | PRD locked |
 | UI components | shadcn/ui (Radix UI primitives) | UX spec locked |
 | Data table | TanStack Table v8 | UX spec locked |
-| Python backend | FastAPI + uvicorn | PRD locked |
-| Python backend | Go + FastAPI | PRD + user confirmed |
+| Backend | Python 3.12+ FastAPI + uvicorn | PRD locked |
+| Backend structure | Project `src/` backend structure adapted to CES rules | User confirmed |
+| Database layer | SQLAlchemy 2 async ORM + asyncpg | Project standard |
 | AI extraction | google-genai SDK + Gemini 2.5 Flash-Lite | Research locked |
 | PDF processing | pdfplumber + pypdf | Research locked |
 | Schema validation | Pydantic v2 | Research locked |
 | Primary DB | PostgreSQL (JSONB) | PRD locked |
 | Vector search | Qdrant (Docker self-hosted) | PRD + user confirmed |
-| Python Excel export | openpyxl | PRD locked |
-| Python Excel export | openpyxl | PRD locked |
+| Excel export | openpyxl | PRD locked |
 | Auth | JWT + static credentials V1 | PRD locked |
+| Backend quality gate | pytest + Ruff | User confirmed |
 
 ### Initialization Commands
 
@@ -111,26 +114,22 @@ npm install sonner
 npm install lucide-react
 ```
 
-**Python backend:**
+**Backend:**
 ```bash
 mkdir ces-backend && cd ces-backend
-python -m venv venv && source venv/bin/activate
-pip install fastapi uvicorn[standard] pydantic
-pip install "google-genai[aiohttp]" pdfplumber pypdf openpyxl
-pip install psycopg[binary] asyncpg qdrant-client rank-bm25
-pip install python-jose[cryptography] passlib[bcrypt]
+uv sync
+source .venv/bin/activate
+ruff check src tests
+pytest
+uvicorn src.main:backend_app --reload
 ```
 
-**Python backend:**
+**Core backend dependencies:**
 ```bash
-mkdir ces-backend && cd ces-backend
-go mod init github.com/ces/ddr-platform
-go get github.com/gin-gonic/gin
-go get github.com/lib/pq
-go get github.com/qdrant/go-client
-go get github.com/xuri/openpyxl/v2
-go get github.com/golang-jwt/jwt/v5
-go get github.com/google/generative-ai-go/genai
+pip install fastapi uvicorn[standard] pydantic-settings sqlalchemy asyncpg
+pip install "google-genai[aiohttp]" pdfplumber pypdf openpyxl
+pip install qdrant-client rank-bm25
+pip install python-jose[cryptography] passlib[bcrypt]
 ```
 
 **Infrastructure (Docker Compose):**
@@ -173,21 +172,31 @@ ces-ddr-platform/
 │   │   ├── lib/
 │   │   └── types/
 ├── ces-backend/
-│   ├── app/
+│   ├── src/
 │   │   ├── api/
-│   │   ├── pipeline/
-│   │   ├── occurrence/
-│   │   ├── search/
-│   │   ├── export/
-│   │   └── models/
+│   │   │   ├── dependencies/
+│   │   │   └── routes/
+│   │   ├── config/
+│   │   │   └── settings/
+│   │   ├── models/
+│   │   │   ├── db/
+│   │   │   └── schemas/
+│   │   ├── repository/
+│   │   │   ├── crud/
+│   │   │   └── migrations/
+│   │   ├── securities/
+│   │   ├── services/
+│   │   ├── external/
+│   │   └── utilities/
+│   ├── tests/
+│   └── pyproject.toml
 └── docker-compose.yml
 ```
 
 ### Architectural Decisions Established
 
 **Language & Runtime:**
-TypeScript (strict mode) on frontend. Python 3.12+ and Go 1.22+ on backends.
-Both backends target identical JSON API contract — no language-specific response shapes.
+TypeScript strict mode on frontend. Python 3.12+ on backend. Python FastAPI backend is canonical.
 
 **Styling Solution:**
 Tailwind CSS v3 + shadcn/ui. CES design tokens in `tailwind.config.js`:
@@ -195,16 +204,14 @@ Tailwind CSS v3 + shadcn/ui. CES design tokens in `tailwind.config.js`:
 Dark mode disabled at root (`<html class="light">`).
 
 **Build Tooling:**
-Vite for frontend. uvicorn for Python dev server. `go build` + `air` for Go hot-reload.
+Vite for frontend. uvicorn for backend dev server. `uv sync` manages backend dependencies.
 
 **Testing Framework:**
-Vitest + React Testing Library for frontend. pytest for Python. Go standard `testing` package.
-Shared test coverage test suite in `ces-backend/tests/fixtures/` — same fixtures, the Python backend must pass.
+Vitest + React Testing Library for frontend. pytest + Ruff for backend. Backend work is not complete until `ruff check src tests` and `pytest` pass.
 
 **Code Organization:**
 Frontend: feature-based component folders.
-Backends: pipeline stages as discrete packages/modules — pre_split, extract, validate, store
-are separate units with clean interfaces.
+Backend: project `src/` structure. Route dependencies validate request/session, service classes own business workflows, repository classes own persistence, SQLAlchemy ORM models own database mapping, and Pydantic schemas own request/response shapes.
 
 **Development Experience:**
 Docker Compose brings up PostgreSQL + Qdrant locally.
@@ -218,7 +225,7 @@ Frontend proxies API calls via Vite `server.proxy` — no CORS issues in dev.
 ### Decision Priority Analysis
 
 **Critical Decisions (Block Implementation):**
-- DB migration strategy — Alembic (Go) + Alembic (Python)
+- DB migration strategy — Alembic only, stored under `src/repository/migrations`
 - Processing status transport — SSE
 - API error format — standardized shape
 - Frontend routing — React Router v6
@@ -243,37 +250,36 @@ Frontend proxies API calls via Vite `server.proxy` — no CORS issues in dev.
 - No TTL on raw responses — audit trail requirement
 
 **Migration Strategy:**
-- Python backend: `Alembic` — migrations in `ces-backend/migrations/*.sql`
-- Python backend: Alembic — migrations in `ces-backend/alembic/versions/`
-- Both migration sets must produce identical final DB schema
-- Shared baseline: `Alembic migrations` documents the canonical schema as reference
-- Migration order: Python backend runs migrations first (primary); Python backend Alembic env configured to match
+- Alembic is the sole migration authority.
+- Migration files live under `ces-backend/src/repository/migrations/`.
+- Developers create migration files manually when schema changes are needed.
+- SQLAlchemy ORM models under `src/models/db/` define runtime mappings.
+- All timestamp fields use epoch integer columns.
 
 **Vector Storage:** Qdrant (Docker self-hosted)
 - Collection: `ddr_time_logs` — embeddings of time log `details` text
 - Metadata stored per vector: `ddr_id`, `date`, `time_from`, `time_to`, `code`
-- Graceful degradation: if Qdrant unavailable, NL query falls back to BM25 (rank-bm25 / Go BM25 impl)
+- Graceful degradation: if Qdrant unavailable, NL query falls back to Python BM25 (`rank-bm25`)
 
-**Keyword Store:** `ces-backend/app/resources/keywords.json` — single source of truth read by the Python backend at startup; reload without redeploy via API endpoint (FR32)
+**Keyword Store:** `ces-backend/src/resources/keywords.json` or equivalent backend resource module — single source of truth read by the Python backend at startup; reload without redeploy via API endpoint (FR32)
 
 ---
 
 ### Authentication & Security
 
 **Method:** JWT (HS256) + static credentials stored in DB (bcrypt-hashed passwords)
-- Login: POST `/auth/login` → returns `{ token, expires_at }`
+- Login: POST `/api/auth/login` → returns `{ token, expires_at }`
 - Token expiry: 8 hours (working day; no silent session extension)
 - No refresh tokens for V1 — re-login on expiry
-- All routes except `/auth/login` require `Authorization: Bearer <token>` header
+- All protected routes except `/api/auth/login` require `Authorization: Bearer <token>` header
 - Frontend stores token in `localStorage` (internal tool; acceptable for V1)
 
-**Go:** `github.com/golang-jwt/jwt/v5` + `golang.org/x/crypto/bcrypt`
-**Python:** `python-jose[cryptography]` + `passlib[bcrypt]`
+**Python:** `python-jose[cryptography]` + bcrypt/passlib-compatible password hashing
 
 **API Key Security:**
 - `GEMINI_API_KEY` loaded from environment variable only
 - Never logged — all logging middleware must scrub `Authorization` headers and env vars
-- Both backends: structured log sanitization applied at middleware layer before any log write
+- Backend structured log sanitization applied at middleware layer before any log write
 
 **Network Security:**
 - No public endpoints except through intended entry point (Nginx/Caddy reverse proxy)
@@ -288,7 +294,7 @@ Frontend proxies API calls via Vite `server.proxy` — no CORS issues in dev.
 
 **URL conventions:**
 ```
-POST   /auth/login
+POST   /api/auth/login
 GET    /ddrs
 POST   /ddrs/upload
 GET    /ddrs/:id
@@ -317,7 +323,6 @@ GET    /export/timelogs/:well_id
 - Events: `{ event: "date_failed", data: { date, error, raw_response_id } }`
 - Events: `{ event: "processing_complete", data: { total_dates, failed_dates, total_occurrences } }`
 - Frontend: `EventSource` API, falls back to polling if SSE connection drops
-- Go: manual `text/event-stream` response via FastAPI
 - Python: `fastapi.responses.StreamingResponse` with `text/event-stream`
 
 **Standard Error Response (the Python backend, identical):**
@@ -344,8 +349,7 @@ KEYWORD_UPDATE_FAILED — keyword store write error
 
 **API Documentation:** OpenAPI spec auto-generated
 - Python: FastAPI generates `/docs` + `/openapi.json` automatically
-- Go: `FastAPI OpenAPI` annotations → `gin-swagger` middleware
-- Both specs must be kept in sync as test coverage validation
+- `pytest` contract tests validate documented response shapes
 
 ---
 
@@ -383,16 +387,15 @@ KEYWORD_UPDATE_FAILED — keyword store write error
 ```
 nginx (reverse proxy + SSL termination)
 ces-frontend (Vite build served by Nginx static)
-ces-backend-[python|go] (active backend after selection)
+ces-backend (Python FastAPI)
 postgres:16-alpine
 qdrant:latest
 ```
 
 **Deployment approach:**
 - Single `docker-compose.prod.yml` — all services on one host
-- Nginx handles SSL (Let's Encrypt), proxies `/api/*` to active backend, serves frontend static build
-- Both backend containers present in compose file during Python-only phase; only one active behind Nginx proxy at a time
-- Backend selection: change Nginx `proxy_pass` target + redeploy — no frontend changes required
+- Nginx handles SSL (Let's Encrypt), proxies `/api/*` to Python backend, serves frontend static build
+- One backend container is maintained forward
 
 **Environment configuration:**
 ```
@@ -464,13 +467,12 @@ JWT_SECRET=
 
 **API Naming:**
 - Endpoints: plural nouns, lowercase, hyphens for multi-word — `/ddrs`, `/ddr-dates`, `/occurrences`
-- Route params: `:id` (Go FastAPI) / `{id}` (Python FastAPI) — both produce same URL shape
+- Route params: FastAPI path params use `{id}` and produce the documented URL shape
 - Query params: `snake_case` — `?well_name=`, `?date_from=`, `?occurrence_type=`
 - Request headers: standard casing — `Authorization`, `Content-Type`
 
 **JSON Field Naming (API request/response bodies — the Python backend):**
 - All fields: `snake_case` — `ddr_id`, `well_name`, `tour_serial`, `raw_response`
-- Go structs: must use `json:"snake_case_name"` tags on every exported field — no exceptions
 - Python: Pydantic model fields defined in `snake_case` (default serialization)
 - Dates: ISO 8601 string — `"2024-10-31"` for DDR dates, `"2024-10-31T14:30:00Z"` for timestamps
 - Times (HH:MM from DDR): string, preserved exactly as extracted — `"14:30"`
@@ -482,7 +484,6 @@ JWT_SECRET=
 - Frontend hooks: `camelCase` with `use` prefix — `useOccurrences.ts`, `useProcessingStatus.ts`
 - Frontend pages: `PascalCase` — `ReportsPage.tsx`, `MonitorPage.tsx`
 - Frontend API client functions: `camelCase` verbs — `fetchOccurrences`, `patchOccurrence`, `uploadDDR`
-- Go: exported = `PascalCase`, unexported = `camelCase`; package names lowercase single-word
 - Python: functions/variables = `snake_case`, classes = `PascalCase`, modules = `snake_case`
 
 ---
@@ -491,26 +492,23 @@ JWT_SECRET=
 
 **Test Location:**
 - Frontend: co-located `*.test.tsx` files next to component — `OccurrenceTable.test.tsx`
-- Python: `tests/` directory at project root, mirroring `app/` structure — `tests/pipeline/test_extract.py`
-- Go: co-located `*_test.go` files in same package — `extract_test.go` next to `extract.go`
+- Python: `tests/` directory at backend root, covering `src/` behavior — `tests/test_auth_contract.py`
 - Shared test coverage fixtures: `ces-backend/tests/fixtures/` — the Python backend must reference same files
 
-**Backend Package/Module Organization (identical logical structure in both):**
+**Backend Package/Module Organization:**
 ```
-pipeline/       — pre_split, extract, validate, store
-occurrence/     — classify, infer_mmd, density_join, dedup
-search/         — bm25, qdrant, query_handler
-export/         — excel_report, excel_master, csv_timelogs
-corrections/    — store, context_builder
-keywords/       — loader, updater
-auth/           — jwt, middleware
+src/api/              — routes and dependencies
+src/services/         — pipeline, occurrence, search, export, corrections, keywords workflows
+src/repository/crud/  — SQLAlchemy repository classes
+src/models/db/        — SQLAlchemy ORM mappings
+src/models/schemas/   — Pydantic request/response schemas
+src/securities/       — JWT and password logic
 ```
 
 **Configuration:**
 - All config from environment variables — no config files in codebase
-- Config loaded once at startup into a config struct/object — never `os.Getenv()` scattered in business logic
-- Go: `internal/config/config.go` with `Config` struct
-- Python: `app/config.py` with Pydantic `Settings` class (pydantic-settings)
+- Config loaded through `decouple + BackendBaseSettings`; never `os.getenv`, `os.environ.get`, or scattered env reads
+- Backend settings live under `src/config/settings/`
 
 ---
 
@@ -585,9 +583,8 @@ Per-date status:  "success" | "warning" | "failed"
 - API base URL from `VITE_API_URL` env var — never hardcoded
 
 **Keyword Reload Pattern:**
-- Both backends load `ces-backend/app/resources/keywords.json` into memory at startup
+- Backend loads `ces-backend/src/resources/keywords.json` or equivalent resource module into memory at startup
 - `PUT /keywords` writes new content to file + triggers in-memory reload
-- Go: reload on each request from file (file is small, ~250 keywords — acceptable)
 - Python: reload on each request from file — same approach
 
 ---
@@ -598,8 +595,7 @@ Per-date status:  "success" | "warning" | "failed"
 - Pipeline errors: caught at stage boundary, logged with `request_id` + raw Gemini response, stored in DB, never crash the process
 - API handler errors: translate to standard error response + HTTP status — no raw error strings to client
 - Gemini API errors: retry with backoff at pipeline layer; if exhausted, mark date `failed` with `RATE_LIMITED` or `EXTRACTION_FAILED`
-- Go: errors wrapped with context — `fmt.Errorf("extract.ProcessDate: %w", err)` — no bare `return err`
-- Python: domain exceptions in `app/exceptions.py` — `ExtractionError`, `ValidationError`, `RateLimitError`
+- Python: domain exceptions in `src/utilities/exceptions/` or service-specific exceptions — `ExtractionError`, `ValidationError`, `RateLimitError`
 - Frontend: component-level `error` state (`string | null`); inline error display adjacent to failed component
 
 **Loading State Pattern (Frontend):**
@@ -619,40 +615,33 @@ const { data, isLoading, error } = useOccurrences(ddrId)
 # Never mix sync and async in route handlers
 ```
 
-**Context Threading (Go):**
-```go
-// context.Context always first parameter for DB or external API calls
-func ProcessDate(ctx context.Context, date string, pdfBytes []byte) (*DDRDate, error)
-func StoreRawResponse(ctx context.Context, sessionID string, raw []byte) error
-```
-
 **Logging Pattern (the Python backend):**
 ```json
 { "timestamp": "ISO8601", "level": "info|warn|error", "service": "ces-backend",
   "request_id": "uuid", "message": "...", "ddr_id": "uuid", "date": "20241031" }
 ```
-- `request_id` generated at request entry (middleware), passed via context (Go) / request state (Python)
+- `request_id` generated at request entry and threaded through backend request state/log context
 - Log levels: `info` = normal flow; `warn` = degraded but handled; `error` = requires investigation
 - Never log: `GEMINI_API_KEY`, `JWT_SECRET`, `POSTGRES_PASSWORD`, `Authorization` header value
 
 **Correction Context Injection Cap:**
 - Max corrections injected per Gemini prompt: last 20 corrections, summarized — never full history
 - Summary format: `"Field '{field}': '{original}' corrected to '{corrected}' ({count} times). Reason: {most_recent_reason}"`
-- Both backends must apply same cap and same summary format
+- Backend must apply this cap and summary format
 
 ---
 
 ### Enforcement Guidelines
 
 **All AI Agents MUST:**
-- Use `snake_case` for all JSON field names (Go: enforce via struct tags)
+- Use `snake_case` for all JSON field names
 - Use UUID v4 for all primary keys — never serial/autoincrement integers
 - Return the standard error shape `{ error, code, details }` for all non-2xx responses
 - Use exact status strings: `queued/processing/complete/failed` (DDR), `success/warning/failed` (date)
 - Thread `request_id` through all log lines for a given request
 - Never log API keys, JWT secrets, or Authorization header values
 - Load all config from environment variables via the central config struct
-- All Python route handlers: `async def`; all Go DB/external calls: accept `context.Context` first param
+- All Python route handlers: `async def`
 - Route all frontend API calls through `src/lib/api.ts`
 
 **Anti-Patterns to Reject:**
@@ -723,7 +712,7 @@ ces-ddr-platform/
 │       └── frontend-test.yml
 │
 ├── ces-backend/
-│   ├── app/resources/
+│   ├── src/resources/
 │   │   ├── keywords.json
 │   │   └── ddr_schema.json
 │   └── tests/fixtures/
@@ -797,24 +786,18 @@ ces-ddr-platform/
 │   ├── .env.example
 │   ├── alembic.ini
 │   │
-│   ├── alembic/
-│   │   ├── env.py
-│   │   └── versions/
-│   │       ├── 001_initial_schema.py
-│   │       └── 002_add_corrections.py
-│   │
-│   ├── app/
+│   ├── src/
 │   │   ├── main.py
-│   │   ├── config.py                        # Pydantic Settings
-│   │   ├── exceptions.py
-│   │   ├── dependencies.py
-│   │   │
 │   │   ├── api/
-│   │   │   ├── auth.py
-│   │   │   ├── ddrs.py
-│   │   │   ├── occurrences.py
-│   │   │   ├── corrections.py
-│   │   │   ├── keywords.py
+│   │   ├── config/
+│   │   ├── models/
+│   │   ├── repository/
+│   │   │   ├── crud/
+│   │   │   └── migrations/
+│   │   ├── securities/
+│   │   ├── services/
+│   │   ├── external/
+│   │   └── utilities/
 │   │   │   ├── pipeline.py                  # queue, cost, SSE stream
 │   │   │   ├── search.py
 │   │   │   ├── export.py
@@ -976,15 +959,15 @@ ces-ddr-platform/
 
 **API Boundaries:**
 - All requests enter via Nginx reverse proxy — no direct port exposure except Nginx 443
-- `/api/*` proxied to active backend — frontend never knows Go vs Python
-- `/auth/login` only unauthenticated endpoint; all others require Bearer JWT
+- `/api/*` proxied to Python backend
+- `/api/auth/login` only unauthenticated endpoint; all protected routes require Bearer JWT
 - Gemini API called only from `pipeline/extract` — nowhere else
 - Qdrant called only from `search/qdrant` — nowhere else
 
 **Component Boundaries:**
-- `api/` handlers: parse request, call domain package, serialize response — zero business logic
-- Domain packages (`pipeline/`, `occurrence/`, `search/`, `export/`, `corrections/`, `keywords/`): pure logic, no HTTP awareness
-- `db/queries/`: all SQL in one place — domain packages call query functions, never raw SQL inline
+- `src/api/` handlers: parse request, call service classes, serialize response — zero business logic
+- `src/services/`: pure workflow logic, no HTTP awareness
+- `src/repository/crud/`: persistence access through SQLAlchemy repository classes
 - Frontend `components/`: never call API directly — always via hooks
 - Frontend `hooks/`: all data fetching lives here — never in page or domain components
 
@@ -993,7 +976,7 @@ ces-ddr-platform/
 - Validated extraction: `ddr_dates.final_json` (JSONB)
 - Occurrences: relational rows in `occurrences` — derived from `final_json` at generation time
 - Corrections: `corrections` table — append-only, never update/delete
-- Keywords: `ces-backend/app/resources/keywords.json` — in-memory at runtime, file is source of truth
+- Keywords: `ces-backend/src/resources/keywords.json` or equivalent resource module — in-memory at runtime, file is source of truth
 
 ---
 
@@ -1007,7 +990,7 @@ ces-ddr-platform/
 
 2. EXTRACTION (background, per-date parallel)
    pre_split(pdf_path) → dict[date → pdf_bytes]
-   For each chunk (semaphore-bounded async/goroutines):
+   For each chunk (semaphore-bounded async task):
      → extract(pdf_bytes, ddr_schema.json, corrections_context)
      → Gemini 2.5 Flash-Lite responseSchema
      → validate() → DDRDate struct/model
@@ -1047,7 +1030,6 @@ ces-ddr-platform/
 - Frontend static served by Nginx from `/app/dist`
 
 **SSE:**
-- Go: FastAPI writes `text/event-stream` chunks from in-process channel
 - Python: FastAPI `StreamingResponse` with async generator reading asyncio queue
 - Frontend: `EventSource` + 3s polling fallback on connection drop
 
@@ -1055,9 +1037,9 @@ ces-ddr-platform/
 
 ### Coherence Validation ✅
 
-All technology choices compatible. FastAPI + asyncio + google-genai[aiohttp] fully async. Go + FastAPI + pgx + openpyxl idiomatic. PostgreSQL 16 JSONB handled natively by both asyncpg and pgx. JWT (HS256) interoperable between python-jose and golang-jwt.
+All technology choices compatible. FastAPI + asyncio + google-genai[aiohttp] fully async. PostgreSQL 16 JSONB handled by SQLAlchemy async + asyncpg. JWT (HS256) handled by python-jose.
 
-Pattern consistency confirmed: snake_case JSON enforced via Go struct tags + Pydantic defaults. UUID v4 PKs identical format across both. SSE payload structure explicitly defined. Error response shape standardized. Python-only backend rule resolves all Python-only ambiguity.
+Pattern consistency confirmed: snake_case JSON via Pydantic models, UUID v4 primary keys, SSE payload structure explicitly defined, error response shape standardized, and Python-only backend rule resolves backend ambiguity.
 
 ### Requirements Coverage Validation ✅
 
@@ -1130,7 +1112,7 @@ FastAPI `BackgroundTasks` sufficient at 10–15 DDRs/day. `POST /ddrs/upload` re
 **First Implementation Priority:**
 ```bash
 docker-compose up -d
-migrate -path ces-backend/migrations -database $POSTGRES_DSN up
+cd ces-ddr-platform/ces-backend && alembic upgrade head
 npm create vite@latest ces-frontend -- --template react-ts
 # Then: pipeline/pre_split — core PoC validation first
 ```
