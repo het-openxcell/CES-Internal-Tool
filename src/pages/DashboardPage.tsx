@@ -3,6 +3,7 @@ import { Link, useNavigate } from "react-router";
 
 import DDRUploadPanel from "@/components/DDRUploadPanel";
 import { Button } from "@/components/ui/button";
+import { EmptyState } from "@/components/ui/empty-state";
 import { apiClient, type DDRDetail } from "@/lib/api";
 import { cn } from "@/lib/utils";
 
@@ -42,7 +43,7 @@ export default function DashboardPage() {
     ready:
       ddrs.length === 0
         ? "No DDRs uploaded"
-        : `${ddrs.length} DDR${ddrs.length === 1 ? "" : "s"} loaded `,
+        : `${ddrs.length} DDR${ddrs.length === 1 ? "" : "s"}`,
   }[loadState];
   const recentEyebrow = {
     loading: "Backend request pending",
@@ -69,6 +70,13 @@ export default function DashboardPage() {
 
   return (
     <section className="grid gap-7 animate-fade-in-up">
+      <div className="flex items-center justify-between gap-6 pb-6 border-b border-border-default max-[760px]:flex-col max-[760px]:items-start">
+        <div>
+          <p className="m-0 mb-1 text-ces-red text-[11px] font-bold tracking-[0.06em] uppercase">Canadian Energy Services</p>
+          <h1 className="m-0 text-[28px] leading-tight font-bold text-text-primary tracking-tight">DDR Processing</h1>
+        </div>
+      </div>
+
       <div className="grid grid-cols-3 gap-4 max-[760px]:grid-cols-1" aria-label="DDR queue summary">
         <article className="relative min-h-[108px] p-5 pb-4 border border-border-default rounded-xl bg-white overflow-hidden transition-all duration-300 ease-out-quart hover:-translate-y-[3px] hover:shadow-[0_1px_2px_rgba(0,0,0,0.04),0_8px_24px_rgba(0,0,0,0.06)] animate-fade-in-up" style={{ animationDelay: "0.05s" }}>
           <span className="block mb-3 text-text-muted text-[13px]">Active DDRs</span>
@@ -99,16 +107,18 @@ export default function DashboardPage() {
           {loadState === "loading" ? <p className="text-text-muted">Loading DDRs...</p> : null}
           {loadState === "error" ? <p className="m-0 px-3 py-2.5 rounded-lg text-error-text bg-error-bg text-[13px] font-semibold">Unable to load DDRs</p> : null}
           {loadState === "ready" && ddrs.length === 0 ? (
-            <div className="grid place-items-center gap-3.5 py-10 px-6 border-[1.5px] border-dashed border-border-input rounded-xl text-center" style={{ background: "radial-gradient(ellipse 80% 50% at 50% 100%, rgba(196,18,48,0.04) 0%, transparent 60%), #F9FAFB" }}>
-              <svg className="w-12 h-12 text-text-muted opacity-50" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-                <polyline points="14 2 14 8 20 8" />
-                <line x1="12" y1="18" x2="12" y2="12" />
-                <line x1="9" y1="15" x2="15" y2="15" />
-              </svg>
-              <strong className="text-text-secondary text-[15px] font-semibold">No DDRs uploaded yet</strong>
-              <p className="m-0 max-w-[320px] leading-relaxed text-text-muted">Start with a field DDR PDF and track extraction status from the report page.</p>
-            </div>
+            <EmptyState
+              icon={
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                  <polyline points="14 2 14 8 20 8" />
+                  <line x1="12" y1="18" x2="12" y2="12" />
+                  <line x1="9" y1="15" x2="15" y2="15" />
+                </svg>
+              }
+              title="No DDRs uploaded yet"
+              description="Start with a field DDR PDF and track extraction status from the report page."
+            />
           ) : null}
 
           {ddrs.length > 0 ? (
