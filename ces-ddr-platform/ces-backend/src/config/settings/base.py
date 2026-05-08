@@ -77,7 +77,7 @@ class BackendBaseSettings(BaseSettings):
     PERFORMANCE_THRESHOLD_MS: float = config("PERFORMANCE_THRESHOLD_MS", default=1000.0, cast=float)
     UPLOAD_DIR: str = config(
         "UPLOAD_DIR",
-        default="/home/het/Desktop/Canadian%20Energy%20Service%20Internal%20Tool/extras/uploads/",
+        default="/app/uploads",
         cast=str,
     )
 

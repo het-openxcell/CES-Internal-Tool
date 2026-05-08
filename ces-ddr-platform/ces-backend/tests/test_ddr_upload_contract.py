@@ -198,6 +198,11 @@ def test_upload_route_accepts_pdf_and_returns_queued(tmp_path, monkeypatch) -> N
     repository = StubQueuedDDRRepository()
     previous_upload_dir = settings.UPLOAD_DIR
     monkeypatch.setattr(settings, "UPLOAD_DIR", str(tmp_path))
+
+    async def noop_dispatch(self: Any, ddr_id: str) -> None:
+        pass
+
+    monkeypatch.setattr(DDRUploadService, "dispatch_background", noop_dispatch)
     backend_app.dependency_overrides[jwt_authentication] = override_auth
     backend_app.dependency_overrides[ddr_dependency("/api/ddrs/upload", "ddr_repository")] = lambda: repository
     backend_app.dependency_overrides[
