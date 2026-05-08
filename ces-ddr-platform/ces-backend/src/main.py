@@ -3,6 +3,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from src.api.endpoints import router as api_endpoint_router
+from src.config.events import execute_backend_server_event_handler, terminate_backend_server_event_handler
 from src.config.manager import settings
 from src.utilities.exceptions import EntityDoesNotExist
 from src.utilities.exceptions.exceptions import (
@@ -46,6 +47,8 @@ def initialize_backend_application() -> FastAPI:
     app.add_exception_handler(Exception, general_exception_handler)
 
     app.include_router(router=api_endpoint_router, prefix=settings.API_PREFIX)
+    app.router.add_event_handler("startup", execute_backend_server_event_handler(app))
+    app.router.add_event_handler("shutdown", terminate_backend_server_event_handler(app))
 
     return app
 

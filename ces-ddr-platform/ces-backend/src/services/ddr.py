@@ -6,8 +6,9 @@ from typing import Any, Callable
 from fastapi import UploadFile
 
 from src.config.manager import settings
-from src.repository.crud.ddr import DDRCRUDRepository, DDRDateCRUDRepository
+from src.repository.crud.ddr import DDRCRUDRepository, DDRDateCRUDRepository, ProcessingQueueCRUDRepository
 from src.services.pipeline_service import PreSplitPipelineService
+from src.services.processing_status import ProcessingStatusStreamService
 from src.utilities.exceptions import BadRequestException
 from src.utilities.logging.logger import logger
 
@@ -22,20 +23,29 @@ class DDRProcessingTask:
         self,
         session_factory: Callable[[], Any] | None = None,
         pipeline_service_factory: Callable[[Any], PreSplitPipelineService] | None = None,
+        status_stream_service: ProcessingStatusStreamService | None = None,
     ) -> None:
         self._session_factory = session_factory
+        self.status_stream_service = status_stream_service
         self.pipeline_service_factory = pipeline_service_factory or self._default_pipeline_service_factory
 
     async def process(self, ddr_id: str) -> None:
         session_factory = self._session_factory or self._default_session_factory()
         async with session_factory() as session:
+            processing_finished = False
             try:
                 service = self.pipeline_service_factory(session)
+                if self.status_stream_service is not None:
+                    service.status_stream_service = self.status_stream_service
                 await service.run(ddr_id)
+                processing_finished = True
             except Exception as exc:
                 await session.rollback()
                 await self._mark_failed(session, ddr_id)
+                processing_finished = True
                 logger.error(f"DDR pre-split failed for {ddr_id}: {exc}")
+            if processing_finished:
+                await ProcessingQueueCRUDRepository(async_session=session).delete_by_ddr_id(ddr_id)
 
     async def _mark_failed(self, session: Any, ddr_id: str) -> None:
         try:

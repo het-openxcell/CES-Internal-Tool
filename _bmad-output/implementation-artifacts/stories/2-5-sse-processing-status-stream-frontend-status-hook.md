@@ -1,6 +1,6 @@
 # Story 2.5: SSE Processing Status Stream & Frontend Status Hook
 
-Status: ready-for-dev
+Status: done
 
 Completion note: Ultimate context engine analysis completed - comprehensive developer guide created.
 
@@ -25,64 +25,74 @@ so that I can see exactly which dates succeeded or failed without refreshing or 
 
 ## Tasks / Subtasks
 
-- [ ] Add backend SSE event contracts and schemas (AC: 1-4)
-  - [ ] Add Pydantic response/event payload models under `ces-ddr-platform/ces-backend/src/models/schemas/ddr.py`.
-  - [ ] Keep exact event names: `date_complete`, `date_failed`, `processing_complete`.
-  - [ ] Keep exact DDR status strings `queued | processing | complete | failed` and date status strings `queued | success | warning | failed`.
-- [ ] Implement class-owned processing status stream service (AC: 1-4)
-  - [ ] Create a service such as `ProcessingStatusStreamService` under `src/services/`.
-  - [ ] Use `fastapi.responses.StreamingResponse` with an async generator and `media_type="text/event-stream"`.
-  - [ ] Format SSE frames as `event: <name>\ndata: <json>\n\n`.
-  - [ ] Include `Cache-Control: no-cache` and avoid buffering headers where practical.
-  - [ ] Check client disconnects from the request object and release any per-client queue/subscription.
-  - [ ] Do not create loose module-level mutable globals; encapsulate connection state in a service/manager attached through app state or dependency wiring.
-- [ ] Add authenticated stream route (AC: 1)
-  - [ ] Extend `ces-ddr-platform/ces-backend/src/api/routes/v1/ddr.py` with `GET /{ddr_id}/status/stream`.
-  - [ ] Reuse `jwt_authentication`; unauthenticated stream requests must return existing auth errors.
-  - [ ] Return 404 with `{ "error": "DDR not found", "code": "NOT_FOUND", "details": {} }` for unknown DDR ids.
-  - [ ] Do not break existing `POST /api/ddrs/upload`, `GET /api/ddrs`, or `GET /api/ddrs/{ddr_id}` contracts.
-- [ ] Emit events from the existing pipeline path (AC: 2-4)
-  - [ ] Wire event publishing into `PreSplitPipelineService._process_one_date()` after repository writes complete.
-  - [ ] Emit success for `mark_success`, failed for `mark_failed`, and treat warnings as completed date state while keeping warning count for final payload.
-  - [ ] Emit `processing_complete` after `DDRCRUDRepository.finalize_status_from_dates()` computes parent status.
-  - [ ] Do not fork a second pipeline or bypass `DDRDateCRUDRepository` / `DDRCRUDRepository`.
-  - [ ] Verify Story 2.4 extraction is actually enabled in `DDRProcessingTask` or equivalent; current code has `extract_after_split=False` by default, so a pure SSE route without extraction events is incomplete.
-- [ ] Add durable resume on startup (AC: 5)
-  - [ ] Add a startup service using `src/config/events.py` and existing async DB session factory.
-  - [ ] Query queued/processing DDRs and processing_queue rows through repository classes.
-  - [ ] Dispatch the same `DDRProcessingTask.process(ddr_id)` path for resumable items.
-  - [ ] Avoid duplicate concurrent processing for the same DDR within one process.
-  - [ ] Leave queue deletion/completion behavior explicit; do not let completed queue rows cause endless reprocessing.
-- [ ] Extend frontend API typing and EventSource URL support (AC: 6-7)
-  - [ ] Add typed DDR detail/status types in `ces-ddr-platform/ces-frontend/src/lib/api.ts` or a local types module.
-  - [ ] Add an API client method for `GET /ddrs/{id}` polling.
-  - [ ] Add a safe way to build an authenticated SSE URL. Native `EventSource` cannot set custom `Authorization` headers, so either pass a token query parameter only if backend validates it safely, or use same-origin cookie/auth approach if already available. Do not pretend `EventSource` can send bearer headers.
-  - [ ] Keep all normal fetch calls through `apiClient`; do not raw-fetch in components.
-- [ ] Create `useProcessingStatus` hook (AC: 6-7)
-  - [ ] Place it at `ces-ddr-platform/ces-frontend/src/hooks/useProcessingStatus.ts`.
-  - [ ] Use `useEffect` cleanup to close `EventSource` and clear polling intervals on unmount/id change.
-  - [ ] Use functional state updates for event-driven counts to avoid stale closures.
-  - [ ] Use `addEventListener` for the three custom event names.
-  - [ ] On SSE error before completion, close the stream and start 3-second polling through `apiClient`.
-  - [ ] Expose state needed by pages: connection mode, DDR status, per-date rows, success/warning/failed counts, total dates, current processed count, final summary, and error state.
-- [ ] Replace ReportsPage placeholder with upload/status UI (AC: 8-10)
-  - [ ] Update `ces-ddr-platform/ces-frontend/src/pages/ReportsPage.tsx`.
-  - [ ] Preserve protected routing and existing route path `/reports/:id`.
-  - [ ] Show processing copy as `Processing date N of M...`.
-  - [ ] Show success/warning/failed counts in compact, scannable status UI.
-  - [ ] Provide a visible completion notification/status. If no toast system exists yet, implement a small page-local notification component instead of adding a large dependency.
-  - [ ] Keep the user able to navigate away during processing; the hook must clean up and polling must not leak.
-- [ ] Add focused tests (AC: 1-10)
-  - [ ] Backend tests for auth required, 404, `text/event-stream`, event frame formatting, and final stream close.
-  - [ ] Backend service tests proving events publish only after repository writes and warning/failure counts are correct.
-  - [ ] Backend startup/resume tests using fake repositories/session factory; no real Gemini, Qdrant, or network.
-  - [ ] Frontend tests for hook EventSource listeners, cleanup, fallback polling every 3 seconds, and final close.
-  - [ ] Frontend tests for ReportsPage processing copy, counts, upload progress replacement, and completion failure notification.
-  - [ ] Run backend `source .venv/bin/activate && ruff check . && pytest` from `ces-ddr-platform/ces-backend/`.
-  - [ ] Run frontend `npm test -- --runInBand` if supported or `npm test`, then `npm run build`, from `ces-ddr-platform/ces-frontend/`.
-- [ ] Preserve non-story behavior (AC: all)
-  - [ ] Do not change login/JWT contracts, existing upload/list/detail response bodies, Gemini extraction schema, PDF pre-split logic, occurrence generation, Qdrant, corrections, exports, or keyword management except where directly needed for status visibility.
-  - [ ] Do not add source-file comments.
+- [x] Add backend SSE event contracts and schemas (AC: 1-4)
+  - [x] Add Pydantic response/event payload models under `ces-ddr-platform/ces-backend/src/models/schemas/ddr.py`.
+  - [x] Keep exact event names: `date_complete`, `date_failed`, `processing_complete`.
+  - [x] Keep exact DDR status strings `queued | processing | complete | failed` and date status strings `queued | success | warning | failed`.
+- [x] Implement class-owned processing status stream service (AC: 1-4)
+  - [x] Create a service such as `ProcessingStatusStreamService` under `src/services/`.
+  - [x] Use `fastapi.responses.StreamingResponse` with an async generator and `media_type="text/event-stream"`.
+  - [x] Format SSE frames as `event: <name>\ndata: <json>\n\n`.
+  - [x] Include `Cache-Control: no-cache` and avoid buffering headers where practical.
+  - [x] Check client disconnects from the request object and release any per-client queue/subscription.
+  - [x] Do not create loose module-level mutable globals; encapsulate connection state in a service/manager attached through app state or dependency wiring.
+- [x] Add authenticated stream route (AC: 1)
+  - [x] Extend `ces-ddr-platform/ces-backend/src/api/routes/v1/ddr.py` with `GET /{ddr_id}/status/stream`.
+  - [x] Reuse `jwt_authentication`; unauthenticated stream requests must return existing auth errors.
+  - [x] Return 404 with `{ "error": "DDR not found", "code": "NOT_FOUND", "details": {} }` for unknown DDR ids.
+  - [x] Do not break existing `POST /api/ddrs/upload`, `GET /api/ddrs`, or `GET /api/ddrs/{ddr_id}` contracts.
+- [x] Emit events from the existing pipeline path (AC: 2-4)
+  - [x] Wire event publishing into `PreSplitPipelineService._process_one_date()` after repository writes complete.
+  - [x] Emit success for `mark_success`, failed for `mark_failed`, and treat warnings as completed date state while keeping warning count for final payload.
+  - [x] Emit `processing_complete` after `DDRCRUDRepository.finalize_status_from_dates()` computes parent status.
+  - [x] Do not fork a second pipeline or bypass `DDRDateCRUDRepository` / `DDRCRUDRepository`.
+  - [x] Verify Story 2.4 extraction is actually enabled in `DDRProcessingTask` or equivalent; current code has `extract_after_split=True` by default in `PreSplitPipelineService` and `DDRProcessingTask` does not override it.
+- [x] Add durable resume on startup (AC: 5)
+  - [x] Add a startup service using `src/config/events.py` and existing async DB session factory.
+  - [x] Query queued/processing DDRs and processing_queue rows through repository classes.
+  - [x] Dispatch the same `DDRProcessingTask.process(ddr_id)` path for resumable items.
+  - [x] Avoid duplicate concurrent processing for the same DDR within one process.
+  - [x] Leave queue deletion/completion behavior explicit; do not let completed queue rows cause endless reprocessing.
+- [x] Extend frontend API typing and EventSource URL support (AC: 6-7)
+  - [x] Add typed DDR detail/status types in `ces-ddr-platform/ces-frontend/src/lib/api.ts` or a local types module.
+  - [x] Add an API client method for `GET /ddrs/{id}` polling.
+  - [x] Add a safe way to build an authenticated SSE URL. Native `EventSource` cannot set custom `Authorization` headers, so either pass a token query parameter only if backend validates it safely, or use same-origin cookie/auth approach if already available. Do not pretend `EventSource` can send bearer headers.
+  - [x] Keep all normal fetch calls through `apiClient`; do not raw-fetch in components.
+- [x] Create `useProcessingStatus` hook (AC: 6-7)
+  - [x] Place it at `ces-ddr-platform/ces-frontend/src/hooks/useProcessingStatus.ts`.
+  - [x] Use `useEffect` cleanup to close `EventSource` and clear polling intervals on unmount/id change.
+  - [x] Use functional state updates for event-driven counts to avoid stale closures.
+  - [x] Use `addEventListener` for the three custom event names.
+  - [x] On SSE error before completion, close the stream and start 3-second polling through `apiClient`.
+  - [x] Expose state needed by pages: connection mode, DDR status, per-date rows, success/warning/failed counts, total dates, current processed count, final summary, and error state.
+- [x] Replace ReportsPage placeholder with upload/status UI (AC: 8-10)
+  - [x] Update `ces-ddr-platform/ces-frontend/src/pages/ReportsPage.tsx`.
+  - [x] Preserve protected routing and existing route path `/reports/:id`.
+  - [x] Show processing copy as `Processing date N of M...`.
+  - [x] Show success/warning/failed counts in compact, scannable status UI.
+  - [x] Provide a visible completion notification/status. If no toast system exists yet, implement a small page-local notification component instead of adding a large dependency.
+  - [x] Keep the user able to navigate away during processing; the hook must clean up and polling must not leak.
+- [x] Add focused tests (AC: 1-10)
+  - [x] Backend tests for auth required, 404, `text/event-stream`, event frame formatting, and final stream close.
+  - [x] Backend service tests proving events publish only after repository writes and warning/failure counts are correct.
+  - [x] Backend startup/resume tests using fake repositories/session factory; no real Gemini, Qdrant, or network.
+  - [x] Frontend tests for hook EventSource listeners, cleanup, fallback polling every 3 seconds, and final close.
+  - [x] Frontend tests for ReportsPage processing copy, counts, upload progress replacement, and completion failure notification.
+  - [x] Run backend `source .venv/bin/activate && ruff check . && pytest` from `ces-ddr-platform/ces-backend/`.
+  - [x] Run frontend `npm test -- --runInBand` if supported or `npm test`, then `npm run build`, from `ces-ddr-platform/ces-frontend/`.
+- [x] Preserve non-story behavior (AC: all)
+  - [x] Do not change login/JWT contracts, existing upload/list/detail response bodies, Gemini extraction schema, PDF pre-split logic, occurrence generation, Qdrant, corrections, exports, or keyword management except where directly needed for status visibility.
+  - [x] Do not add source-file comments.
+
+### Review Findings
+
+- [x] [Review][Patch] Startup resume can reprocess completed DDRs [ces-ddr-platform/ces-backend/src/services/processing_resume.py:42]
+- [x] [Review][Patch] SSE stream can miss events between snapshot and subscription [ces-ddr-platform/ces-backend/src/api/routes/v1/ddr.py:63]
+- [x] [Review][Patch] Polling fallback cannot rebuild per-date status or accurate completion counts [ces-ddr-platform/ces-frontend/src/hooks/useProcessingStatus.ts:77]
+- [x] [Review][Patch] Query-token auth is enabled for every protected endpoint [ces-ddr-platform/ces-backend/src/securities/authorizations/jwt_authentication.py:19]
+- [x] [Review][Patch] Report hook keeps stale rows and summary when DDR id changes [ces-ddr-platform/ces-frontend/src/hooks/useProcessingStatus.ts:57]
+- [x] [Review][Patch] Successful completion has no visible completion notification [ces-ddr-platform/ces-frontend/src/pages/ReportsPage.tsx:15]
+- [x] [Review][Patch] Source comment remains in dashboard source [ces-ddr-platform/ces-frontend/src/pages/DashboardPage.tsx:73]
 
 ## Dev Notes
 
@@ -213,9 +223,42 @@ Tests must not require real Gemini, Qdrant, uploaded PDFs, network calls, or rea
 ## Dev Agent Record
 
 ### Agent Model Used
+GPT-5
 
 ### Debug Log References
+- `source .venv/bin/activate && pytest tests/test_ddr_status_stream.py tests/test_ddr_processing_resume.py`
+- `source .venv/bin/activate && ruff check . && GEMINI_MODEL=gemini-2.5-flash-lite pytest`
+- `npm test -- src/lib/api.test.ts src/hooks/useProcessingStatus.test.tsx src/pages/ReportsPage.test.tsx`
+- `npm test && npm run build`
 
 ### Completion Notes List
+- Added class-owned SSE status stream service with exact `date_complete`, `date_failed`, and `processing_complete` event frames, client disconnect cleanup, app-state service wiring, and authenticated route support.
+- Published status events from the existing pre-split/extraction pipeline after repository writes and after parent DDR finalization, with warning/failure counts and fallback raw-response id behavior.
+- Added startup resume service that discovers queued/processing DDR work from `processing_queue` and DDR status, then dispatches through `DDRProcessingTask.process()` without duplicate in-process dispatch.
+- Added frontend DDR types, shared API polling method, authenticated EventSource URL builder, reusable `useProcessingStatus` hook with SSE cleanup and 3-second polling fallback, and Reports page status/upload/completion UI.
+- Added focused backend and frontend tests for stream contracts, route behavior, resume dispatch, hook lifecycle/fallback, Reports status UI, upload progress replacement, and completion notification.
 
 ### File List
+- `ces-ddr-platform/ces-backend/src/api/routes/v1/ddr.py`
+- `ces-ddr-platform/ces-backend/src/config/events.py`
+- `ces-ddr-platform/ces-backend/src/config/settings/base.py`
+- `ces-ddr-platform/ces-backend/src/main.py`
+- `ces-ddr-platform/ces-backend/src/models/schemas/ddr.py`
+- `ces-ddr-platform/ces-backend/src/repository/crud/ddr.py`
+- `ces-ddr-platform/ces-backend/src/securities/authorizations/jwt_authentication.py`
+- `ces-ddr-platform/ces-backend/src/services/ddr.py`
+- `ces-ddr-platform/ces-backend/src/services/pipeline_service.py`
+- `ces-ddr-platform/ces-backend/src/services/processing_resume.py`
+- `ces-ddr-platform/ces-backend/src/services/processing_status.py`
+- `ces-ddr-platform/ces-backend/tests/test_ddr_processing_resume.py`
+- `ces-ddr-platform/ces-backend/tests/test_ddr_status_stream.py`
+- `ces-ddr-platform/ces-frontend/src/hooks/useProcessingStatus.test.tsx`
+- `ces-ddr-platform/ces-frontend/src/hooks/useProcessingStatus.ts`
+- `ces-ddr-platform/ces-frontend/src/lib/api.test.ts`
+- `ces-ddr-platform/ces-frontend/src/lib/api.ts`
+- `ces-ddr-platform/ces-frontend/src/pages/ReportsPage.test.tsx`
+- `ces-ddr-platform/ces-frontend/src/pages/ReportsPage.tsx`
+- `ces-ddr-platform/ces-frontend/src/styles.css`
+
+### Change Log
+- 2026-05-07: Implemented SSE processing status stream, startup resume, frontend processing hook, Reports status/upload UI, and focused validation coverage.

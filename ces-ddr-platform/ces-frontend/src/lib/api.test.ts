@@ -18,7 +18,7 @@ describe("apiClient", () => {
     await apiClient.login({ username: "operator", password: "secret" });
 
     expect(fetch).toHaveBeenCalledWith(
-      "http://localhost:8000/auth/login",
+      "http://localhost:8000/api/auth/login",
       expect.objectContaining({
         method: "POST",
         body: JSON.stringify({ username: "operator", password: "secret" }),
@@ -34,7 +34,7 @@ describe("apiClient", () => {
     await apiClient.request("/reports/1");
 
     expect(fetch).toHaveBeenCalledWith(
-      "http://localhost:8000/reports/1",
+      "http://localhost:8000/api/reports/1",
       expect.objectContaining({
         headers: expect.objectContaining({
           Authorization: `Bearer ${token}`,
@@ -63,5 +63,26 @@ describe("apiClient", () => {
     expect(apiSource).toContain("import.meta.env.VITE_API_URL");
     expect(apiSource).not.toMatch(/https?:\/\//);
     expect(apiSource).not.toContain("localhost");
+  });
+
+  it("builds authenticated SSE URL with encoded access token", () => {
+    const token = TestJwtFactory.tokenWithExpiration(Math.floor(Date.now() / 1000) + 3600);
+    authToken.store(token);
+
+    expect(apiClient.ddrStatusStreamUrl("ddr 1")).toBe(
+      `http://localhost:8000/api/ddrs/ddr%201/status/stream?access_token=${encodeURIComponent(token)}`,
+    );
+  });
+
+  it("fetches DDR detail through shared request handling", async () => {
+    vi.mocked(fetch).mockResolvedValue(
+      new Response(JSON.stringify({ id: "ddr-1", file_path: "/tmp/a.pdf", status: "processing", created_at: 1 }), {
+        status: 200,
+      }),
+    );
+
+    await expect(apiClient.getDDR("ddr-1")).resolves.toMatchObject({ id: "ddr-1", status: "processing" });
+
+    expect(fetch).toHaveBeenCalledWith("http://localhost:8000/api/ddrs/ddr-1", expect.any(Object));
   });
 });

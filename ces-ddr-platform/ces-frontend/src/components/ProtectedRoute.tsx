@@ -1,5 +1,6 @@
 import { Navigate, Outlet, useLocation } from "react-router";
 
+import AppShell from "@/components/AppShell";
 import { authToken } from "@/lib/auth";
 
 export default function ProtectedRoute() {
@@ -10,8 +11,8 @@ export default function ProtectedRoute() {
   }
 
   return (
-    <main className="app-shell">
+    <AppShell>
       <Outlet />
-    </main>
+    </AppShell>
   );
 }

@@ -33,6 +33,31 @@ class CustomHTTPBearer(HTTPBearer):
 security = CustomHTTPBearer()
 
 
+class StreamQueryTokenAuthentication:
+    async def __call__(self, request: Request) -> User:
+        token = request.query_params.get("access_token")
+        if token is None:
+            raise AuthorizationHeaderException("sign_in_required")
+
+        try:
+            token_data = jwt_generator.retrieve_details_from_token(token)
+            user_id = token_data.get("user_id")
+            current_user = await get_current_user(user_id=user_id)
+            if not current_user:
+                raise AuthorizationHeaderException(detail='sign_in_required')
+
+            request.state.user = current_user
+            request.state.token_data = token_data
+            return current_user
+        except SecurityException as security_error:
+            raise AuthorizationHeaderException(detail=str(security_error))
+        except Exception:
+            raise AuthorizationHeaderException(detail='sign_in_required')
+
+
+stream_query_token_authentication = StreamQueryTokenAuthentication()
+
+
 class CustomOAuth2PasswordBearer(OAuth2PasswordBearer):
     def __init__(self, token_url: str, param_name: str = "Authorization"):
         super().__init__(token_url)

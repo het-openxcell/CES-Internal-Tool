@@ -30,9 +30,10 @@ describe("App routing and login", () => {
     const token = TestJwtFactory.tokenWithExpiration(Math.floor(Date.now() / 1000) + 3600);
     vi.stubGlobal(
       "fetch",
-      vi.fn().mockResolvedValue(
-        new Response(JSON.stringify({ token, expires_at: 1778158800 }), { status: 200 }),
-      ),
+      vi
+        .fn()
+        .mockResolvedValueOnce(new Response(JSON.stringify({ token, expires_at: 1778158800 }), { status: 200 }))
+        .mockResolvedValue(new Response(JSON.stringify([]), { status: 200 })),
     );
     window.history.pushState({}, "", "/login");
 
@@ -44,7 +45,7 @@ describe("App routing and login", () => {
 
     await waitFor(() => expect(window.location.pathname).toBe("/"));
     expect(authToken.get()).toBe(token);
-    expect(screen.getByRole("heading", { name: "DDR Operations Console" })).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByRole("heading", { name: "DDR Processing" })).toBeInTheDocument());
   });
 
   it("shows safe invalid-credential copy, clears password, and keeps username", async () => {
