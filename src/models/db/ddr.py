@@ -1,8 +1,12 @@
 from decimal import Decimal
+from typing import TYPE_CHECKING
 
 import sqlalchemy
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
+
+if TYPE_CHECKING:
+    from src.models.db.occurrence import Occurrence
 
 from src.repository.table import Base
 
@@ -27,6 +31,7 @@ class DDR(Base):
 
     dates: Mapped[list["DDRDate"]] = relationship(back_populates="ddr")
     queue_entries: Mapped[list["ProcessingQueue"]] = relationship(back_populates="ddr")
+    occurrences: Mapped[list["Occurrence"]] = relationship(back_populates="ddr")
 
 
 class DDRDate(Base):
@@ -49,6 +54,7 @@ class DDRDate(Base):
 
     ddr: Mapped[DDR] = relationship(back_populates="dates")
     pipeline_runs: Mapped[list["PipelineRun"]] = relationship(back_populates="ddr_date")
+    occurrences: Mapped[list["Occurrence"]] = relationship(back_populates="ddr_date")
 
 
 class ProcessingQueue(Base):
