@@ -94,10 +94,6 @@ class DDRListItemResponse(BaseSchemaModel):
         return DDRStatus.validate(value)
 
 
-class DDRDetailResponse(DDRListItemResponse):
-    pass
-
-
 class DDRDateBase(BaseSchemaModel):
     ddr_id: str
     date: str
@@ -125,10 +121,40 @@ class DDRDateStatusUpdate(BaseSchemaModel):
         return DDRDateStatus.validate(value)
 
 
+class DDRDateCompleteEvent(BaseSchemaModel):
+    date: str
+    status: str
+    occurrences_count: int = 0
+
+    @pydantic.field_validator("status")
+    @classmethod
+    def validate_status(cls, value: str) -> str:
+        if value not in (DDRDateStatus.SUCCESS, DDRDateStatus.WARNING):
+            raise ValueError("Invalid completed DDR date status")
+        return value
+
+
+class DDRDateFailedEvent(BaseSchemaModel):
+    date: str
+    error: str
+    raw_response_id: str
+
+
+class DDRProcessingCompleteEvent(BaseSchemaModel):
+    total_dates: int
+    failed_dates: int
+    warning_dates: int
+    total_occurrences: int = 0
+
+
 class DDRDateInResponse(DDRDateBase):
     id: str
     created_at: int
     updated_at: int
+
+
+class DDRDetailResponse(DDRListItemResponse):
+    dates: list[DDRDateInResponse] = pydantic.Field(default_factory=list)
 
 
 class ProcessingQueueInCreate(BaseSchemaModel):

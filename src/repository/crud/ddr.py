@@ -237,6 +237,29 @@ class ProcessingQueueCRUDRepository(BaseCRUDRepository[ProcessingQueue]):
         query = await self.async_session.execute(statement=stmt)
         return query.scalar_one_or_none()
 
+    async def read_all_ordered(self) -> typing.Sequence[ProcessingQueue]:
+        stmt = sqlalchemy.select(ProcessingQueue).order_by(
+            ProcessingQueue.position.asc(),
+            ProcessingQueue.created_at.asc(),
+        )
+        query = await self.async_session.execute(statement=stmt)
+        return query.scalars().all()
+
+    async def read_active_ordered(self) -> typing.Sequence[ProcessingQueue]:
+        stmt = (
+            sqlalchemy.select(ProcessingQueue)
+            .join(DDR, DDR.id == ProcessingQueue.ddr_id)
+            .where(DDR.status.in_((DDRStatus.QUEUED, DDRStatus.PROCESSING)))
+            .order_by(ProcessingQueue.position.asc(), ProcessingQueue.created_at.asc())
+        )
+        query = await self.async_session.execute(statement=stmt)
+        return query.scalars().all()
+
+    async def delete_by_ddr_id(self, ddr_id: str) -> None:
+        stmt = sqlalchemy.delete(ProcessingQueue).where(ProcessingQueue.ddr_id == ddr_id)
+        await self.async_session.execute(stmt)
+        await self.async_session.commit()
+
 
 class PipelineRunCRUDRepository(BaseCRUDRepository[PipelineRun]):
     model = PipelineRun

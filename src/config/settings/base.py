@@ -70,11 +70,15 @@ class BackendBaseSettings(BaseSettings):
 
     LOGGING_LEVEL: int = logging.INFO
     LOGGERS: tuple[str, str] = ("uvicorn.asgi", "uvicorn.access")
-    
+
     LOG_LEVEL: str = config("LOG_LEVEL", default="INFO", cast=str)
 
     PERFORMANCE_THRESHOLD_MS: float = config("PERFORMANCE_THRESHOLD_MS", default=1000.0, cast=float)
-    UPLOAD_DIR: str = config("UPLOAD_DIR", default="/home/het/Desktop/Canadian%20Energy%20Service%20Internal%20Tool/extras/uploads/", cast=str)
+    UPLOAD_DIR: str = config(
+        "UPLOAD_DIR",
+        default="/home/het/Desktop/Canadian%20Energy%20Service%20Internal%20Tool/extras/uploads/",
+        cast=str,
+    )
 
     ASYNC_LOGGING: bool = config("ASYNC_LOGGING", default=True, cast=bool)
     BACKTRACE_ENABLED: bool = config("BACKTRACE_ENABLED", default=True, cast=bool)

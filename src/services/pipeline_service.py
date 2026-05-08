@@ -10,6 +10,7 @@ from src.services.pipeline.extract import (
 )
 from src.services.pipeline.pre_split import PDFPreSplitter, PreSplitResult
 from src.services.pipeline.validate import DDRExtractionValidator
+from src.services.processing_status import ProcessingStatusStreamService
 
 
 class PreSplitPipelineService:
@@ -26,6 +27,7 @@ class PreSplitPipelineService:
         validator: DDRExtractionValidator | None = None,
         max_concurrent: int | None = None,
         extract_after_split: bool = True,
+        status_stream_service: ProcessingStatusStreamService | None = None,
     ) -> None:
         self.ddr_repository = ddr_repository
         self.ddr_date_repository = ddr_date_repository
@@ -35,6 +37,7 @@ class PreSplitPipelineService:
         self.validator = validator or DDRExtractionValidator()
         self.max_concurrent = max(1, max_concurrent or settings.GEMINI_EXTRACTION_MAX_CONCURRENT)
         self.extract_after_split = extract_after_split
+        self.status_stream_service = status_stream_service
         self._write_lock = asyncio.Lock()
 
     async def run(self, ddr_id: str) -> PreSplitResult:
@@ -43,7 +46,7 @@ class PreSplitPipelineService:
         result = await self.pre_splitter.split_async(pdf_bytes)
 
         if not result.has_boundaries:
-            await self.ddr_date_repository.create_failed_boundary(
+            failed_row = await self.ddr_date_repository.create_failed_boundary(
                 ddr_id=ddr_id,
                 date=self.no_boundary_placeholder_date,
                 reason=self.no_boundary_reason,
@@ -52,6 +55,8 @@ class PreSplitPipelineService:
             )
             await self.ddr_repository.update_status(ddr, DDRStatus.FAILED, commit=False)
             await self._commit_outcome()
+            await self._publish_date_failed(failed_row)
+            await self._publish_processing_complete(ddr_id)
             return result
 
         ordered_dates = sorted(result.date_chunks.keys())
@@ -68,6 +73,7 @@ class PreSplitPipelineService:
         date_to_row = {row.date: row for row in rows if row.status == DDRDateStatus.QUEUED}
         if not date_to_row:
             await self.ddr_repository.finalize_status_from_dates(ddr, [])
+            await self._publish_processing_complete(ddr_id)
             return
 
         extractor = self.extractor or GeminiDDRExtractor()
@@ -91,6 +97,7 @@ class PreSplitPipelineService:
                 final_statuses.append(outcome)
 
         await self.ddr_repository.finalize_status_from_dates(ddr, final_statuses)
+        await self._publish_processing_complete(ddr_id)
 
     async def _process_one_date(
         self,
@@ -103,17 +110,19 @@ class PreSplitPipelineService:
             extraction = await extractor.extract(date=date, pdf_bytes=chunk_bytes)
         except RateLimitError:
             async with self._write_lock:
-                await self.ddr_date_repository.mark_warning(
+                updated_row = await self.ddr_date_repository.mark_warning(
                     row,
                     error_log={"code": "RATE_LIMITED"},
                 )
+                await self._publish_date_complete(updated_row)
             return DDRDateStatus.WARNING
         except ExtractionError as exc:
             async with self._write_lock:
-                await self.ddr_date_repository.mark_failed(
+                updated_row = await self.ddr_date_repository.mark_failed(
                     row,
                     error_log={"code": "EXTRACTION_FAILED", "detail": str(exc.detail)},
                 )
+                await self._publish_date_failed(updated_row)
             return DDRDateStatus.FAILED
 
         raw_response = {"text": extraction.text}
@@ -121,27 +130,82 @@ class PreSplitPipelineService:
             validation = self.validator.validate(extraction.text)
             if validation.is_valid:
                 async with self._write_lock:
-                    await self.ddr_date_repository.mark_success(
+                    updated_row = await self.ddr_date_repository.mark_success(
                         row,
                         raw_response=raw_response,
                         final_json=validation.final_json,
                     )
+                    await self._publish_date_complete(updated_row)
                 return DDRDateStatus.SUCCESS
 
             async with self._write_lock:
-                await self.ddr_date_repository.mark_failed(
+                updated_row = await self.ddr_date_repository.mark_failed(
                     row,
                     error_log={"code": "VALIDATION_FAILED", "errors": validation.errors},
                     raw_response=raw_response,
                 )
+                await self._publish_date_failed(updated_row)
         except Exception as exc:
             async with self._write_lock:
-                await self.ddr_date_repository.mark_failed(
+                updated_row = await self.ddr_date_repository.mark_failed(
                     row,
                     error_log={"code": "PROCESSING_FAILED", "detail": str(exc)},
                     raw_response=raw_response,
                 )
+                await self._publish_date_failed(updated_row)
         return DDRDateStatus.FAILED
+
+    async def _publish_date_complete(self, row: Any) -> None:
+        if self.status_stream_service is None:
+            return
+        await self.status_stream_service.publish_date_complete(
+            row.ddr_id,
+            date=row.date,
+            status=row.status,
+            occurrences_count=0,
+        )
+
+    async def _publish_date_failed(self, row: Any) -> None:
+        if self.status_stream_service is None:
+            return
+        await self.status_stream_service.publish_date_failed(
+            row.ddr_id,
+            date=row.date,
+            error=self._error_message(row),
+            raw_response_id=self._raw_response_id(row),
+        )
+
+    async def _publish_processing_complete(self, ddr_id: str) -> None:
+        if self.status_stream_service is None:
+            return
+        rows = await self.ddr_date_repository.read_dates_by_ddr_id(ddr_id)
+        await self.status_stream_service.publish_processing_complete(
+            ddr_id,
+            total_dates=len(rows),
+            failed_dates=sum(1 for row in rows if row.status == DDRDateStatus.FAILED),
+            warning_dates=sum(1 for row in rows if row.status == DDRDateStatus.WARNING),
+            total_occurrences=0,
+        )
+
+    def _error_message(self, row: Any) -> str:
+        error_log = getattr(row, "error_log", None)
+        if isinstance(error_log, dict):
+            for key in ("detail", "reason", "error"):
+                if error_log.get(key):
+                    return str(error_log[key])
+            if error_log.get("errors"):
+                return str(error_log["errors"])
+            if error_log.get("code"):
+                return str(error_log["code"])
+        return "processing_failed"
+
+    def _raw_response_id(self, row: Any) -> str:
+        raw_response = getattr(row, "raw_response", None)
+        if isinstance(raw_response, dict):
+            for key in ("id", "raw_response_id", "response_id"):
+                if raw_response.get(key):
+                    return str(raw_response[key])
+        return str(row.id)
 
     async def _default_pdf_loader(self, file_path: str) -> bytes:
         return await asyncio.to_thread(self._read_file_bytes, file_path)
