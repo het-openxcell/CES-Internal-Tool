@@ -69,7 +69,7 @@ development_status:
   2-3-pdf-pre-splitter-date-boundary-detection: done
   2-4-per-date-gemini-extraction-pydantic-validation: done
   2-5-sse-processing-status-stream-frontend-status-hook: done
-  2-6-extraction-cost-tracking-time-log-embedding: ready-for-dev
+  2-6-extraction-cost-tracking-time-log-embedding: done
   epic-2-retrospective: optional
 
   # ── Epic 3: Occurrence Table & Generation ──

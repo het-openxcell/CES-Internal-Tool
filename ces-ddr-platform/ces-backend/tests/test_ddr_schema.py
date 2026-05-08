@@ -151,6 +151,12 @@ def test_migrations_include_users_baseline_and_ddr_schema() -> None:
     assert "uq_processing_queue_position" in ddr_text
 
 
+def test_startup_does_not_create_tables_outside_alembic() -> None:
+    events_text = Path("src/repository/events.py").read_text()
+
+    assert "Base.metadata.create_all" not in events_text
+
+
 class FakeMigrationOperations:
     def __init__(self) -> None:
         self.tables = []

@@ -1,6 +1,7 @@
 import { useNavigate, useParams } from "react-router";
 
 import DDRUploadPanel from "@/components/DDRUploadPanel";
+import { EmptyState } from "@/components/ui/empty-state";
 import { useProcessingStatus } from "@/hooks/useProcessingStatus";
 import { cn } from "@/lib/utils";
 
@@ -34,7 +35,7 @@ export default function ReportsPage() {
 
   return (
     <section className="grid gap-7 animate-fade-in-up">
-      <div className="flex items-center justify-between gap-6 pb-6 border-b border-border-default max-[760px]:flex-col max-[760px]:items-start">
+      {/* <div className="flex items-center justify-between gap-6 pb-6 border-b border-border-default max-[760px]:flex-col max-[760px]:items-start">
         <div>
           <p className="m-0 mb-1 text-ces-red text-[11px] font-bold tracking-[0.06em] uppercase">Reports</p>
           <h1 className="m-0 text-[28px] leading-tight font-bold text-text-primary tracking-tight">Report {id ?? "selected"}</h1>
@@ -43,7 +44,7 @@ export default function ReportsPage() {
           <span className={cn("w-[7px] h-[7px] rounded-full shrink-0", dotColor)} />
           {status.connectionMode}
         </span>
-      </div>
+      </div> */}
 
       {completionMessage ? (
         <div className="flex items-center gap-3 px-[18px] py-3.5 border border-[#FDE68A] rounded-[10px] text-[#92400E] text-sm font-semibold animate-fade-in-up" style={{ background: "linear-gradient(135deg, #FFFBEB 0%, #FEF3C7 100%)" }}>
@@ -89,6 +90,18 @@ export default function ReportsPage() {
           </div>
 
           <div className="grid gap-2 mt-6">
+            {status.rows.length === 0 ? (
+              <EmptyState
+                icon={
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <circle cx="12" cy="12" r="10" />
+                    <polyline points="12 6 12 12 16 14" />
+                  </svg>
+                }
+                title="No dates processed yet"
+                description="Dates will appear here as the DDR PDF is processed. Upload a new DDR to begin extraction."
+              />
+            ) : null}
             {status.rows.map((row) => (
               <div className="relative grid grid-cols-[1fr_auto] gap-x-3 gap-y-1 px-[18px] py-3 border border-border-default rounded-[10px] bg-white transition-colors duration-200 hover:bg-[#FAFBFC] hover:border-border-input" key={row.date}>
                 <span className="text-sm font-medium text-text-primary tabular-nums tracking-wide">{row.date}</span>

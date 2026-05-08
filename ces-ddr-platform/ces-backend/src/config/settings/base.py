@@ -2,6 +2,7 @@ import logging
 import pathlib
 
 import decouple
+from pydantic import SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 ROOT_DIR: pathlib.Path = pathlib.Path(__file__).parent.parent.parent.parent.resolve()
@@ -95,6 +96,26 @@ class BackendBaseSettings(BaseSettings):
     GEMINI_MODEL: str = config("GEMINI_MODEL", cast=str, default="gemini-2.5-flash-lite")
     GEMINI_EXTRACTION_MAX_CONCURRENT: int = config("GEMINI_EXTRACTION_MAX_CONCURRENT", cast=int, default=3)
     GEMINI_EXTRACTION_MAX_RETRIES: int = config("GEMINI_EXTRACTION_MAX_RETRIES", cast=int, default=3)
+    GEMINI_FLASH_LITE_INPUT_COST_PER_1M_TOKENS: str = config(
+        "GEMINI_FLASH_LITE_INPUT_COST_PER_1M_TOKENS",
+        cast=str,
+        default="0.10",
+    )
+    GEMINI_FLASH_LITE_OUTPUT_COST_PER_1M_TOKENS: str = config(
+        "GEMINI_FLASH_LITE_OUTPUT_COST_PER_1M_TOKENS",
+        cast=str,
+        default="0.40",
+    )
+    GEMINI_EMBEDDING_MODEL: str = config("GEMINI_EMBEDDING_MODEL", cast=str, default="gemini-embedding-2")
+    GEMINI_EMBEDDING_DIMENSION: int = config("GEMINI_EMBEDDING_DIMENSION", cast=int, default=3072)
+
+    QDRANT_URL: str = config("QDRANT_URL", cast=str, default="http://localhost:6333")
+    QDRANT_API_KEY: SecretStr | None = config("QDRANT_API_KEY", cast=str, default=None)
+    QDRANT_COLLECTION_DDR_TIME_LOGS: str = config(
+        "QDRANT_COLLECTION_DDR_TIME_LOGS",
+        cast=str,
+        default="ddr_time_logs",
+    )
 
     @property
     def set_backend_app_attributes(self) -> dict[str, str | bool | None]:

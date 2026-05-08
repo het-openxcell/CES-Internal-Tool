@@ -1,8 +1,12 @@
 import asyncio
+from types import SimpleNamespace
 from typing import Any, Awaitable, Callable
 
 from src.config.manager import settings
 from src.models.schemas.ddr import DDRDateStatus, DDRStatus
+from src.repository.crud.ddr import PipelineRunCRUDRepository
+from src.services.pipeline.cost import ExtractionCostService
+from src.services.pipeline.embedding import TimeLogEmbeddingService
 from src.services.pipeline.extract import (
     ExtractionError,
     GeminiDDRExtractor,
@@ -28,6 +32,8 @@ class PreSplitPipelineService:
         max_concurrent: int | None = None,
         extract_after_split: bool = True,
         status_stream_service: ProcessingStatusStreamService | None = None,
+        cost_service: ExtractionCostService | None = None,
+        embedding_service: TimeLogEmbeddingService | None = None,
     ) -> None:
         self.ddr_repository = ddr_repository
         self.ddr_date_repository = ddr_date_repository
@@ -38,6 +44,8 @@ class PreSplitPipelineService:
         self.max_concurrent = max(1, max_concurrent or settings.GEMINI_EXTRACTION_MAX_CONCURRENT)
         self.extract_after_split = extract_after_split
         self.status_stream_service = status_stream_service
+        self.cost_service = cost_service
+        self.embedding_service = embedding_service
         self._write_lock = asyncio.Lock()
 
     async def run(self, ddr_id: str) -> PreSplitResult:
@@ -130,12 +138,29 @@ class PreSplitPipelineService:
             validation = self.validator.validate(extraction.text)
             if validation.is_valid:
                 async with self._write_lock:
+                    cost_service = self._resolve_cost_service()
                     updated_row = await self.ddr_date_repository.mark_success(
                         row,
                         raw_response=raw_response,
                         final_json=validation.final_json,
+                        commit=False,
                     )
-                    await self._publish_date_complete(updated_row)
+                    await cost_service.record_extraction_run(
+                        ddr_date_id=updated_row.id,
+                        input_tokens=extraction.input_tokens,
+                        output_tokens=extraction.output_tokens,
+                        commit=False,
+                    )
+                    snapshot = SimpleNamespace(
+                        id=updated_row.id,
+                        ddr_id=updated_row.ddr_id,
+                        date=updated_row.date,
+                        status=updated_row.status,
+                        final_json=updated_row.final_json,
+                    )
+                    await self._commit_outcome()
+                    await self._publish_date_complete(snapshot)
+                await self._resolve_embedding_service().embed_successful_date(snapshot)
                 return DDRDateStatus.SUCCESS
 
             async with self._write_lock:
@@ -221,6 +246,20 @@ class PreSplitPipelineService:
         }
         for session in sessions.values():
             await session.commit()
+
+    def _resolve_cost_service(self) -> ExtractionCostService:
+        if self.cost_service is None:
+            self.cost_service = ExtractionCostService(
+                pipeline_run_repository=PipelineRunCRUDRepository(
+                    async_session=self.ddr_date_repository.async_session,
+                )
+            )
+        return self.cost_service
+
+    def _resolve_embedding_service(self) -> TimeLogEmbeddingService:
+        if self.embedding_service is None:
+            self.embedding_service = TimeLogEmbeddingService()
+        return self.embedding_service
 
     @staticmethod
     def _read_file_bytes(file_path: str) -> bytes:

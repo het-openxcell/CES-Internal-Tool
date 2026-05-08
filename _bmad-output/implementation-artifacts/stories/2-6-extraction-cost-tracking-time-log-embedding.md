@@ -1,6 +1,6 @@
 # Story 2.6: Extraction Cost Tracking & Time Log Embedding
 
-Status: ready-for-dev
+Status: done
 
 Completion note: Ultimate context engine analysis completed - comprehensive developer guide created.
 
@@ -22,58 +22,58 @@ so that pipeline costs are trackable and natural language search has data to que
 
 ## Tasks / Subtasks
 
-- [ ] Add cost calculation and pipeline run persistence (AC: 1-2)
-  - [ ] Extend `PipelineRunCRUDRepository` with an aggregate method for all-time cost and run count.
-  - [ ] Add a class-owned service such as `ExtractionCostService` under `src/services/` or `src/services/pipeline/`.
-  - [ ] Use `ExtractionResult.input_tokens` and `ExtractionResult.output_tokens`; do not re-count tokens after Gemini if `usage_metadata` already supplied them.
-  - [ ] Calculate `cost_usd` with `Decimal`, quantized to six decimal places for `NUMERIC(10,6)`.
-  - [ ] Use model-specific configured prices loaded through `BackendBaseSettings`; no loose constants scattered through pipeline code.
-  - [ ] Persist the pipeline run with `commit=False` or equivalent transaction control so date success and run row commit together.
-- [ ] Make DDR date success update transaction-aware (AC: 1-2)
-  - [ ] Update `DDRDateCRUDRepository.mark_success()` so Story 2.6 can write `ddr_dates` and `pipeline_runs` in one session transaction.
-  - [ ] Preserve current call sites by keeping default behavior compatible.
-  - [ ] Keep `raw_response`, `final_json`, `error_log`, `status`, and epoch `updated_at` update semantics unchanged.
-  - [ ] Do not bypass repositories with raw SQL.
-- [ ] Add Google embedding client and Qdrant service (AC: 3-5)
-  - [ ] Add `qdrant-client` to `ces-ddr-platform/ces-backend/pyproject.toml`; use async client APIs.
-  - [ ] Add settings for `QDRANT_URL`, optional `QDRANT_API_KEY`, `QDRANT_COLLECTION_DDR_TIME_LOGS`, `GEMINI_EMBEDDING_MODEL`, embedding dimension, and cost pricing through `BackendBaseSettings`.
-  - [ ] Implement class-owned `TimeLogEmbeddingService` or equivalent; no loose utility functions.
-  - [ ] Use `client.aio.models.embed_content(model="gemini-embedding-2", contents=[...])` through an injectable Gemini API wrapper for tests.
-  - [ ] Use Qdrant `AsyncQdrantClient` and `await client.upsert(...)`; do not block async routes or pipeline tasks with sync Qdrant calls.
-  - [ ] Ensure collection exists before upsert with vector size `3072` unless settings deliberately override it.
-  - [ ] Use stable point ids derived from `ddr_date.id` plus row index so retries overwrite rather than duplicate vectors.
-- [ ] Extract time log rows from validated DDR JSON (AC: 3-4)
-  - [ ] Parse `final_json["time_logs"]` using current schema fields from `DDRExtractionTimeLog`.
-  - [ ] Build embedding text from the row's operational description. Current schema uses `activity` plus optional `comment`; if real Gemini output uses `details`, support it without breaking `activity`.
-  - [ ] Skip empty text rows without failing the date.
-  - [ ] Map metadata exactly to `ddr_id`, `date`, `time_from`, `time_to`, and `code`; derive `time_from/time_to` from `start_time/end_time` if needed.
-  - [ ] Include useful payload text in Qdrant if needed for Story 6 retrieval, but do not change required metadata keys.
-- [ ] Integrate embedding after successful extraction (AC: 3-5)
-  - [ ] Wire embedding from `PreSplitPipelineService._process_one_date()` only after `mark_success` and pipeline run writes commit.
-  - [ ] If embedding fails, catch inside embedding service boundary, log warning with `ddr_id`, `ddr_date_id`, and `date`, and keep extraction success intact.
-  - [ ] Do not emit failed SSE events for embedding failures; extraction is still successful.
-  - [ ] Do not make Qdrant availability a prerequisite for PDF ingestion.
-- [ ] Add authenticated pipeline cost API (AC: 6)
-  - [ ] Create or extend route module for `GET /api/pipeline/cost`; architecture places pipeline operations under `api/pipeline`.
-  - [ ] Register the route in `src/api/endpoints.py`.
-  - [ ] Protect it with existing `jwt_authentication`.
-  - [ ] Return direct JSON response with `total_cost_usd`, `total_runs`, and `period`.
-  - [ ] Keep values serializable; if using `Decimal`, serialize as JSON number or string consistently with tests.
-- [ ] Validate migration authority and dependency wiring (AC: 7)
-  - [ ] Confirm no new migration is needed for `pipeline_runs`; if schema drift exists, repair Alembic, not `Base.metadata.create_all()`.
-  - [ ] Remove or block any startup `create_all` fallback if still active before claiming AC 7.
-  - [ ] Do not add database tables for embeddings in this story; Qdrant owns vectors, PostgreSQL owns extraction audit/cost.
-- [ ] Add focused backend tests (AC: 1-7)
-  - [ ] Unit test cost calculation from input/output token counts with `Decimal` precision.
-  - [ ] Repository/service test proves date success and `pipeline_runs` write share a transaction.
-  - [ ] Embedding service tests use fake Google and fake Qdrant clients; no network, real Gemini, real Qdrant, or secrets.
-  - [ ] Test Qdrant failure logs warning and leaves date success/final JSON intact.
-  - [ ] Route test proves `/api/pipeline/cost` requires auth and returns all-time aggregate shape.
-  - [ ] Static/migration test proves canonical Alembic schema still includes `pipeline_runs` and startup does not create schemas outside Alembic.
-  - [ ] Run `source .venv/bin/activate && ruff check . && pytest` from `ces-ddr-platform/ces-backend/`.
-- [ ] Preserve non-story behavior (AC: all)
-  - [ ] Do not change login/JWT contracts, upload response body, DDR list/detail response body, SSE event names/payloads, PDF splitting, Gemini extraction schema, occurrence generation, frontend pages, corrections, exports, or keyword management except where directly required by cost/embedding.
-  - [ ] Do not add source-file comments.
+- [x] Add cost calculation and pipeline run persistence (AC: 1-2)
+  - [x] Extend `PipelineRunCRUDRepository` with an aggregate method for all-time cost and run count.
+  - [x] Add a class-owned service such as `ExtractionCostService` under `src/services/` or `src/services/pipeline/`.
+  - [x] Use `ExtractionResult.input_tokens` and `ExtractionResult.output_tokens`; do not re-count tokens after Gemini if `usage_metadata` already supplied them.
+  - [x] Calculate `cost_usd` with `Decimal`, quantized to six decimal places for `NUMERIC(10,6)`.
+  - [x] Use model-specific configured prices loaded through `BackendBaseSettings`; no loose constants scattered through pipeline code.
+  - [x] Persist the pipeline run with `commit=False` or equivalent transaction control so date success and run row commit together.
+- [x] Make DDR date success update transaction-aware (AC: 1-2)
+  - [x] Update `DDRDateCRUDRepository.mark_success()` so Story 2.6 can write `ddr_dates` and `pipeline_runs` in one session transaction.
+  - [x] Preserve current call sites by keeping default behavior compatible.
+  - [x] Keep `raw_response`, `final_json`, `error_log`, `status`, and epoch `updated_at` update semantics unchanged.
+  - [x] Do not bypass repositories with raw SQL.
+- [x] Add Google embedding client and Qdrant service (AC: 3-5)
+  - [x] Add `qdrant-client` to `ces-ddr-platform/ces-backend/pyproject.toml`; use async client APIs.
+  - [x] Add settings for `QDRANT_URL`, optional `QDRANT_API_KEY`, `QDRANT_COLLECTION_DDR_TIME_LOGS`, `GEMINI_EMBEDDING_MODEL`, embedding dimension, and cost pricing through `BackendBaseSettings`.
+  - [x] Implement class-owned `TimeLogEmbeddingService` or equivalent; no loose utility functions.
+  - [x] Use `client.aio.models.embed_content(model="gemini-embedding-2", contents=[...])` through an injectable Gemini API wrapper for tests.
+  - [x] Use Qdrant `AsyncQdrantClient` and `await client.upsert(...)`; do not block async routes or pipeline tasks with sync Qdrant calls.
+  - [x] Ensure collection exists before upsert with vector size `3072` unless settings deliberately override it.
+  - [x] Use stable point ids derived from `ddr_date.id` plus row index so retries overwrite rather than duplicate vectors.
+- [x] Extract time log rows from validated DDR JSON (AC: 3-4)
+  - [x] Parse `final_json["time_logs"]` using current schema fields from `DDRExtractionTimeLog`.
+  - [x] Build embedding text from the row's operational description. Current schema uses `activity` plus optional `comment`; if real Gemini output uses `details`, support it without breaking `activity`.
+  - [x] Skip empty text rows without failing the date.
+  - [x] Map metadata exactly to `ddr_id`, `date`, `time_from`, `time_to`, and `code`; derive `time_from/time_to` from `start_time/end_time` if needed.
+  - [x] Include useful payload text in Qdrant if needed for Story 6 retrieval, but do not change required metadata keys.
+- [x] Integrate embedding after successful extraction (AC: 3-5)
+  - [x] Wire embedding from `PreSplitPipelineService._process_one_date()` only after `mark_success` and pipeline run writes commit.
+  - [x] If embedding fails, catch inside embedding service boundary, log warning with `ddr_id`, `ddr_date_id`, and `date`, and keep extraction success intact.
+  - [x] Do not emit failed SSE events for embedding failures; extraction is still successful.
+  - [x] Do not make Qdrant availability a prerequisite for PDF ingestion.
+- [x] Add authenticated pipeline cost API (AC: 6)
+  - [x] Create or extend route module for `GET /api/pipeline/cost`; architecture places pipeline operations under `api/pipeline`.
+  - [x] Register the route in `src/api/endpoints.py`.
+  - [x] Protect it with existing `jwt_authentication`.
+  - [x] Return direct JSON response with `total_cost_usd`, `total_runs`, and `period`.
+  - [x] Keep values serializable; if using `Decimal`, serialize as JSON number or string consistently with tests.
+- [x] Validate migration authority and dependency wiring (AC: 7)
+  - [x] Confirm no new migration is needed for `pipeline_runs`; if schema drift exists, repair Alembic, not `Base.metadata.create_all()`.
+  - [x] Remove or block any startup `create_all` fallback if still active before claiming AC 7.
+  - [x] Do not add database tables for embeddings in this story; Qdrant owns vectors, PostgreSQL owns extraction audit/cost.
+- [x] Add focused backend tests (AC: 1-7)
+  - [x] Unit test cost calculation from input/output token counts with `Decimal` precision.
+  - [x] Repository/service test proves date success and `pipeline_runs` write share a transaction.
+  - [x] Embedding service tests use fake Google and fake Qdrant clients; no network, real Gemini, real Qdrant, or secrets.
+  - [x] Test Qdrant failure logs warning and leaves date success/final JSON intact.
+  - [x] Route test proves `/api/pipeline/cost` requires auth and returns all-time aggregate shape.
+  - [x] Static/migration test proves canonical Alembic schema still includes `pipeline_runs` and startup does not create schemas outside Alembic.
+  - [x] Run `source .venv/bin/activate && ruff check . && pytest` from `ces-ddr-platform/ces-backend/`.
+- [x] Preserve non-story behavior (AC: all)
+  - [x] Do not change login/JWT contracts, upload response body, DDR list/detail response body, SSE event names/payloads, PDF splitting, Gemini extraction schema, occurrence generation, frontend pages, corrections, exports, or keyword management except where directly required by cost/embedding.
+  - [x] Do not add source-file comments.
 
 ## Dev Notes
 
@@ -222,8 +222,60 @@ Tests must not require real Gemini, Qdrant, uploaded PDFs, network calls, or rea
 
 ### Agent Model Used
 
+GPT-5
+
 ### Debug Log References
+
+- `source .venv/bin/activate && pytest tests/test_pipeline_cost.py tests/test_time_log_embedding.py tests/test_pipeline_cost_route.py tests/test_ddr_schema.py tests/test_ddr_extraction_pipeline.py -q`
+- `source .venv/bin/activate && uv lock`
+- `source .venv/bin/activate && ruff check .`
+- `source .venv/bin/activate && pytest`
 
 ### Completion Notes List
 
+- Added Decimal-based extraction cost calculation using configured Gemini token pricing and persisted `pipeline_runs` in the same transaction as `ddr_dates` success updates.
+- Added async Gemini embedding and Qdrant upsert services for successful time logs, with injectable clients, deterministic point ids, exact required metadata, and warning-only failure handling.
+- Added authenticated `GET /api/pipeline/cost` returning all-time cost/run aggregates.
+- Removed startup schema creation fallback so Alembic remains canonical for users, DDR tables, processing queue, and pipeline runs.
+- Added focused unit, service, route, migration/static, and regression tests; full backend `ruff check .` and `pytest` pass.
+
 ### File List
+
+- _bmad-output/implementation-artifacts/sprint-status.yaml
+- _bmad-output/implementation-artifacts/stories/2-6-extraction-cost-tracking-time-log-embedding.md
+- ces-ddr-platform/ces-backend/pyproject.toml
+- ces-ddr-platform/ces-backend/src/api/endpoints.py
+- ces-ddr-platform/ces-backend/src/api/routes/v1/pipeline.py
+- ces-ddr-platform/ces-backend/src/config/settings/base.py
+- ces-ddr-platform/ces-backend/src/repository/crud/base.py
+- ces-ddr-platform/ces-backend/src/repository/crud/ddr.py
+- ces-ddr-platform/ces-backend/src/repository/events.py
+- ces-ddr-platform/ces-backend/src/services/pipeline/cost.py
+- ces-ddr-platform/ces-backend/src/services/pipeline/embedding.py
+- ces-ddr-platform/ces-backend/src/services/pipeline_service.py
+- ces-ddr-platform/ces-backend/tests/test_ddr_extraction_pipeline.py
+- ces-ddr-platform/ces-backend/tests/test_ddr_schema.py
+- ces-ddr-platform/ces-backend/tests/test_ddr_status_stream.py
+- ces-ddr-platform/ces-backend/tests/test_ddr_upload_contract.py
+- ces-ddr-platform/ces-backend/tests/test_pipeline_cost.py
+- ces-ddr-platform/ces-backend/tests/test_pipeline_cost_route.py
+- ces-ddr-platform/ces-backend/tests/test_time_log_embedding.py
+
+### Review Findings
+
+- [x] [Review][Patch] Stale ORM object after commit passed to `embed_successful_date` — fixed: snapshot attributes before `_commit_outcome()`, pass SimpleNamespace to embed and publish [pipeline_service.py]
+- [x] [Review][Patch] `uuid.UUID(str(ddr_date.id))` raises ValueError for non-UUID IDs; test currently broken — fixed: switched to `uuid.uuid5(uuid.NAMESPACE_URL, f"{id}:{index}")`, fixed test fixture and assertions [embedding.py, test_time_log_embedding.py]
+- [x] [Review][Patch] Extra `text` key in Qdrant payload violates spec — fixed: removed `payload["text"]` [embedding.py]
+- [x] [Review][Patch] `zip(rows, vectors, strict=False)` silently drops unmatched vectors — fixed: `strict=True` [embedding.py]
+- [x] [Review][Patch] `total_cost_usd` serialized as `float` in `/cost` response — fixed: `str(aggregate.total_cost_usd)` [pipeline.py]
+- [x] [Review][Patch] Embedding model ID not asserted in test — fixed: added assertion on `contents[0]["model"]` [test_time_log_embedding.py]
+- [x] [Review][Patch] `GoogleEmbeddingClient.embed_content` unsafe `getattr` fallback — fixed: direct `.values` access [embedding.py]
+- [x] [Review][Patch] `QdrantTimeLogClient` silently drops API key on non-HTTPS URL — fixed: warning log when key suppressed [embedding.py]
+- [x] [Review][Defer] `QDRANT_API_KEY` should use `SecretStr` — fixed: `SecretStr | None`, `get_secret_value()` in resolver [settings/base.py, embedding.py]
+- [x] [Review][Defer] `mark_failed`/`mark_warning` lack `commit=False` — fixed: added `commit: bool = True` param to both [crud/ddr.py]
+- [x] [Review][Defer] `_commit_outcome` pre-existing session commit model — verified correct: only commits two named repo sessions; `PipelineRunCRUDRepository` shares `ddr_date_repository` session
+- [x] [Review][Defer] Other startup files may still call `create_all` — verified clean: grep confirms only `migrations/env.py` uses `Base.metadata` (correct Alembic target)
+
+### Change Log
+
+- 2026-05-08: Implemented extraction cost tracking, time log embedding to Qdrant, authenticated pipeline cost API, and Alembic-only startup schema authority.

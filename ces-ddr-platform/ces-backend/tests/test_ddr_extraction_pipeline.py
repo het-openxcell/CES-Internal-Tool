@@ -33,8 +33,9 @@ class FakeGeminiClient:
 
 
 class FakeDDRDateRow:
-    def __init__(self, date: str):
+    def __init__(self, date: str, ddr_id: str = "ddr-1"):
         self.id = f"row-{date}"
+        self.ddr_id = ddr_id
         self.date = date
         self.status = DDRDateStatus.QUEUED
         self.raw_response = None
@@ -53,7 +54,7 @@ class FakeDDRDateRepository:
     async def read_dates_by_ddr_id(self, ddr_id):
         return list(self._rows)
 
-    async def mark_success(self, row, raw_response, final_json):
+    async def mark_success(self, row, raw_response, final_json, commit=True):
         row.status = DDRDateStatus.SUCCESS
         row.raw_response = raw_response
         row.final_json = final_json
@@ -114,6 +115,30 @@ class FakeDDRRepository:
         else:
             ddr.status = DDRStatus.FAILED
         return ddr
+
+
+class FakeCostService:
+    def __init__(self):
+        self.calls = []
+
+    async def record_extraction_run(self, *, ddr_date_id, input_tokens, output_tokens, commit=True):
+        self.calls.append(
+            {
+                "ddr_date_id": ddr_date_id,
+                "input_tokens": input_tokens,
+                "output_tokens": output_tokens,
+                "commit": commit,
+            }
+        )
+        return SimpleNamespace(id="run-1")
+
+
+class FakeEmbeddingService:
+    def __init__(self):
+        self.rows = []
+
+    async def embed_successful_date(self, row):
+        self.rows.append(row)
 
 
 def test_validator_accepts_valid_payload_and_preserves_order() -> None:
@@ -225,7 +250,7 @@ def test_pipeline_persists_success_warning_and_failure_per_date(tmp_path) -> Non
 
     fake_client = FakeGeminiClient(
         [
-            ExtractionResult(text=FIXTURE_JSON),
+            ExtractionResult(text=FIXTURE_JSON, input_tokens=100, output_tokens=200),
             ExtractionResult(text="{not-valid-json"),
             rate_err, rate_err, rate_err, rate_err,
         ]
@@ -243,6 +268,8 @@ def test_pipeline_persists_success_warning_and_failure_per_date(tmp_path) -> Non
         )
 
     splitter = SimpleNamespace(split_async=fake_split)
+    cost_service = FakeCostService()
+    embedding_service = FakeEmbeddingService()
 
     service = PreSplitPipelineService(
         ddr_repository=ddr_repo,
@@ -252,6 +279,8 @@ def test_pipeline_persists_success_warning_and_failure_per_date(tmp_path) -> Non
         extractor=extractor,
         max_concurrent=2,
         extract_after_split=True,
+        cost_service=cost_service,
+        embedding_service=embedding_service,
     )
 
     asyncio.run(service.run("ddr-1"))
@@ -263,6 +292,14 @@ def test_pipeline_persists_success_warning_and_failure_per_date(tmp_path) -> Non
 
     assert len(date_repo.success_calls) == 1
     assert date_repo.success_calls[0]["raw_response"]["text"] == FIXTURE_JSON
+    assert cost_service.calls == [
+        {"ddr_date_id": "row-20240115", "input_tokens": 100, "output_tokens": 200, "commit": False}
+    ]
+    assert len(embedding_service.rows) == 1
+    assert embedding_service.rows[0].id == rows[0].id
+    assert embedding_service.rows[0].ddr_id == rows[0].ddr_id
+    assert embedding_service.rows[0].date == rows[0].date
+    assert embedding_service.rows[0].final_json == rows[0].final_json
 
     failed = date_repo.failure_calls[0]
     assert failed["error_log"]["code"] == "VALIDATION_FAILED"
@@ -306,6 +343,8 @@ def test_pipeline_marks_parent_failed_when_all_dates_fail(tmp_path) -> None:
         extractor=extractor,
         max_concurrent=2,
         extract_after_split=True,
+        cost_service=FakeCostService(),
+        embedding_service=FakeEmbeddingService(),
     )
 
     asyncio.run(service.run("ddr-1"))
@@ -390,7 +429,14 @@ def test_settings_load_gemini_api_key_through_settings_class() -> None:
     assert hasattr(s, "GEMINI_MODEL")
     assert hasattr(s, "GEMINI_EXTRACTION_MAX_CONCURRENT")
     assert hasattr(s, "GEMINI_EXTRACTION_MAX_RETRIES")
-    assert s.GEMINI_MODEL == "gemini-2.5-flash-lite"
+    assert hasattr(s, "GEMINI_FLASH_LITE_INPUT_COST_PER_1M_TOKENS")
+    assert hasattr(s, "GEMINI_FLASH_LITE_OUTPUT_COST_PER_1M_TOKENS")
+    assert hasattr(s, "GEMINI_EMBEDDING_MODEL")
+    assert hasattr(s, "GEMINI_EMBEDDING_DIMENSION")
+    assert hasattr(s, "QDRANT_URL")
+    assert hasattr(s, "QDRANT_API_KEY")
+    assert hasattr(s, "QDRANT_COLLECTION_DDR_TIME_LOGS")
+    assert s.GEMINI_MODEL
 
 
 def test_extractor_does_not_log_api_key_in_exception() -> None:

@@ -1,5 +1,6 @@
 import time
 import typing
+from dataclasses import dataclass
 from decimal import Decimal
 
 import sqlalchemy
@@ -8,6 +9,12 @@ from src.models.db.ddr import DDR, DDRDate, PipelineRun, ProcessingQueue
 from src.models.schemas.ddr import DDRDateStatus, DDRStatus
 from src.repository.crud.base import BaseCRUDRepository
 from src.utilities.exceptions import EntityDoesNotExist
+
+
+@dataclass(frozen=True)
+class PipelineCostAggregate:
+    total_cost_usd: Decimal
+    total_runs: int
 
 
 class DDRCRUDRepository(BaseCRUDRepository[DDR]):
@@ -144,6 +151,7 @@ class DDRDateCRUDRepository(BaseCRUDRepository[DDRDate]):
         ddr_date: DDRDate,
         raw_response: dict,
         final_json: dict,
+        commit: bool = True,
     ) -> DDRDate:
         return await self.update(
             ddr_date,
@@ -154,6 +162,7 @@ class DDRDateCRUDRepository(BaseCRUDRepository[DDRDate]):
                 "error_log": None,
                 "updated_at": int(time.time()),
             },
+            commit=commit,
         )
 
     async def mark_failed(
@@ -161,6 +170,7 @@ class DDRDateCRUDRepository(BaseCRUDRepository[DDRDate]):
         ddr_date: DDRDate,
         error_log: dict,
         raw_response: dict | None = None,
+        commit: bool = True,
     ) -> DDRDate:
         return await self.update(
             ddr_date,
@@ -171,6 +181,7 @@ class DDRDateCRUDRepository(BaseCRUDRepository[DDRDate]):
                 "error_log": error_log,
                 "updated_at": int(time.time()),
             },
+            commit=commit,
         )
 
     async def mark_warning(
@@ -178,6 +189,7 @@ class DDRDateCRUDRepository(BaseCRUDRepository[DDRDate]):
         ddr_date: DDRDate,
         error_log: dict,
         raw_response: dict | None = None,
+        commit: bool = True,
     ) -> DDRDate:
         return await self.update(
             ddr_date,
@@ -188,6 +200,7 @@ class DDRDateCRUDRepository(BaseCRUDRepository[DDRDate]):
                 "error_log": error_log,
                 "updated_at": int(time.time()),
             },
+            commit=commit,
         )
 
     async def create_failed_boundary(
@@ -270,6 +283,7 @@ class PipelineRunCRUDRepository(BaseCRUDRepository[PipelineRun]):
         gemini_input_tokens: int | None = None,
         gemini_output_tokens: int | None = None,
         cost_usd: Decimal | None = None,
+        commit: bool = True,
     ) -> PipelineRun:
         return await self.create(
             {
@@ -278,5 +292,18 @@ class PipelineRunCRUDRepository(BaseCRUDRepository[PipelineRun]):
                 "gemini_output_tokens": gemini_output_tokens,
                 "cost_usd": cost_usd,
                 "created_at": int(time.time()),
-            }
+            },
+            commit=commit,
+        )
+
+    async def aggregate_all_time_cost(self) -> PipelineCostAggregate:
+        stmt = sqlalchemy.select(
+            sqlalchemy.func.coalesce(sqlalchemy.func.sum(PipelineRun.cost_usd), Decimal("0.000000")),
+            sqlalchemy.func.count(PipelineRun.id),
+        )
+        result = await self.async_session.execute(stmt)
+        total_cost_usd, total_runs = result.one()
+        return PipelineCostAggregate(
+            total_cost_usd=Decimal(total_cost_usd or Decimal("0.000000")),
+            total_runs=int(total_runs or 0),
         )

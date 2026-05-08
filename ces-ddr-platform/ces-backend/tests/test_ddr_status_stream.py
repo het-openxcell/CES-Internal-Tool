@@ -9,6 +9,7 @@ from fastapi.testclient import TestClient
 from src.main import backend_app
 from src.models.schemas.ddr import DDRDateFailedEvent, DDRProcessingCompleteEvent
 from src.securities.authorizations.jwt_authentication import stream_query_token_authentication
+from src.services.pipeline.extract import ExtractionResult
 from src.services.pipeline_service import PreSplitPipelineService
 from src.services.processing_status import ProcessingStatusStreamService
 
@@ -43,7 +44,7 @@ class StubDDRDateRepository:
     async def read_dates_by_ddr_id(self, ddr_id: str) -> list[Any]:
         return [row for row in self.rows if row.ddr_id == ddr_id]
 
-    async def mark_success(self, row: Any, raw_response: Any, final_json: Any) -> Any:
+    async def mark_success(self, row: Any, raw_response: Any, final_json: Any, commit: bool = True) -> Any:
         self.success_calls.append(row.date)
         row.status = "success"
         row.raw_response = raw_response
@@ -77,6 +78,16 @@ class StubExtractor:
 class StubValidator:
     def validate(self, text: str) -> Any:
         return SimpleNamespace(is_valid=True, final_json={"date": text}, errors=[])
+
+
+class StubCostService:
+    async def record_extraction_run(self, *, ddr_date_id, input_tokens, output_tokens, commit=True) -> Any:
+        return SimpleNamespace(id="run-1")
+
+
+class StubEmbeddingService:
+    async def embed_successful_date(self, row: Any) -> None:
+        return None
 
 
 def override_auth() -> dict[str, str]:
@@ -207,12 +218,14 @@ def test_pipeline_publishes_events_after_repository_writes_and_finalizes_counts(
             ddr_date_repository=date_repository,
             extractor=StubExtractor(
                 {
-                    "20241031": SimpleNamespace(text="20241031"),
-                    "20241101": SimpleNamespace(text="20241101"),
+                    "20241031": ExtractionResult(text="20241031"),
+                    "20241101": ExtractionResult(text="20241101"),
                 }
             ),
             validator=StubValidator(),
             status_stream_service=service,
+            cost_service=StubCostService(),
+            embedding_service=StubEmbeddingService(),
         )
 
         await pipeline._extract_all_dates(
