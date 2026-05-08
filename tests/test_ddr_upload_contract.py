@@ -56,6 +56,23 @@ class StubProcessingQueueRepository:
         return 1
 
 
+class StubDDRDateRepository:
+    async def read_dates_by_ddr_id(self, ddr_id: str):
+        return [
+            SimpleNamespace(
+                id="date-1",
+                ddr_id=ddr_id,
+                date="20240115",
+                status="success",
+                raw_response=None,
+                final_json={"time_logs": []},
+                error_log=None,
+                created_at=1,
+                updated_at=2,
+            )
+        ]
+
+
 def make_upload(filename: str, content_type: str, content: bytes = b"%PDF-1.7") -> UploadFile:
     return UploadFile(filename=filename, file=BytesIO(content), headers={"content-type": content_type})
 
@@ -247,6 +264,9 @@ def test_list_ddrs_route_returns_descending_items() -> None:
 def test_get_ddr_route_returns_detail_or_not_found() -> None:
     backend_app.dependency_overrides[jwt_authentication] = override_auth
     backend_app.dependency_overrides[ddr_dependency("/api/ddrs/{ddr_id}", "ddr_repository")] = StubQueuedDDRRepository
+    backend_app.dependency_overrides[
+        ddr_dependency("/api/ddrs/{ddr_id}", "ddr_date_repository")
+    ] = StubDDRDateRepository
 
     try:
         client = TestClient(backend_app)

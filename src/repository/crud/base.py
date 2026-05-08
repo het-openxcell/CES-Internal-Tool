@@ -14,11 +14,14 @@ class BaseCRUDRepository(Generic[ModelType]):
     def __init__(self, async_session: SQLAlchemyAsyncSession):
         self.async_session = async_session
 
-    async def create(self, values: dict[str, Any]) -> ModelType:
+    async def create(self, values: dict[str, Any], commit: bool = True) -> ModelType:
         record = self.model(**values)
         self.async_session.add(record)
-        await self.async_session.commit()
-        await self.async_session.refresh(record)
+        if commit:
+            await self.async_session.commit()
+            await self.async_session.refresh(record)
+        else:
+            await self.async_session.flush()
         return record
 
     async def read_by_id(self, record_id: Any) -> ModelType | None:
@@ -29,12 +32,15 @@ class BaseCRUDRepository(Generic[ModelType]):
         query = await self.async_session.execute(stmt)
         return query.scalars().all()
 
-    async def update(self, record: ModelType, values: dict[str, Any]) -> ModelType:
+    async def update(self, record: ModelType, values: dict[str, Any], commit: bool = True) -> ModelType:
         for field, value in values.items():
             setattr(record, field, value)
         self.async_session.add(record)
-        await self.async_session.commit()
-        await self.async_session.refresh(record)
+        if commit:
+            await self.async_session.commit()
+            await self.async_session.refresh(record)
+        else:
+            await self.async_session.flush()
         return record
 
     async def delete(self, record: ModelType) -> None:
