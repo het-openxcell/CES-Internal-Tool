@@ -77,7 +77,7 @@ development_status:
   3-1-occurrences-database-schema: done
   3-2-keyword-classification-engine-type-section: done
   3-3-mmd-inference-density-join-dedup-engine: done
-  3-4-occurrence-generation-api-pipeline-integration: review
+  3-4-occurrence-generation-api-pipeline-integration: done
   3-5-occurrencetable-ui-full-frontend-component: backlog
   epic-3-retrospective: optional
 

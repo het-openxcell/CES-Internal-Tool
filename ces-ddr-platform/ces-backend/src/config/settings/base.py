@@ -42,9 +42,6 @@ class BackendBaseSettings(BaseSettings):
     IS_DB_FORCE_ROLLBACK: bool = config("IS_DB_FORCE_ROLLBACK", default=False, cast=bool)
     IS_DB_EXPIRE_ON_COMMIT: bool = config("IS_DB_EXPIRE_ON_COMMIT", default=False, cast=bool)
 
-    API_TOKEN: str = config("API_TOKEN", default="", cast=str)
-    AUTH_TOKEN: str = config("AUTH_TOKEN", default="", cast=str)
-    JWT_TOKEN_PREFIX: str = config("JWT_TOKEN_PREFIX", default="Bearer", cast=str)
     JWT_SECRET_KEY: str = config("JWT_SECRET_KEY", default="placeholder-jwt-secret", cast=str)
     JWT_SUBJECT: str = config("JWT_SUBJECT", default="access", cast=str)
     JWT_MIN: int = config("JWT_MIN", default=60, cast=int)
@@ -74,21 +71,14 @@ class BackendBaseSettings(BaseSettings):
 
     LOG_LEVEL: str = config("LOG_LEVEL", default="INFO", cast=str)
 
-    PERFORMANCE_THRESHOLD_MS: float = config("PERFORMANCE_THRESHOLD_MS", default=1000.0, cast=float)
     UPLOAD_DIR: str = config(
         "UPLOAD_DIR",
         default="/app/uploads",
         cast=str,
     )
 
-    ASYNC_LOGGING: bool = config("ASYNC_LOGGING", default=True, cast=bool)
-    BACKTRACE_ENABLED: bool = config("BACKTRACE_ENABLED", default=True, cast=bool)
-    DIAGNOSE_ENABLED: bool = config("DIAGNOSE_ENABLED", default=True, cast=bool)
-    COLORIZE_CONSOLE: bool = config("COLORIZE_CONSOLE", default=True, cast=bool)
-
     HASHING_ALGORITHM_LAYER_1: str = config("HASHING_ALGORITHM_LAYER_1", default="bcrypt", cast=str)
     HASHING_ALGORITHM_LAYER_2: str = config("HASHING_ALGORITHM_LAYER_2", default="sha256", cast=str)
-    HASHING_SALT: str = config("HASHING_SALT", default="change-me-local-only", cast=str)
 
     KEY_HEX: str = config("KEY_HEX", cast=str, default="")
 
