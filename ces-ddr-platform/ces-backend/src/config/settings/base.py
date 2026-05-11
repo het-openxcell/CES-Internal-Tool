@@ -54,10 +54,7 @@ class BackendBaseSettings(BaseSettings):
 
     IS_ALLOWED_CREDENTIALS: bool = config("IS_ALLOWED_CREDENTIALS", default=True, cast=bool)
     ALLOWED_ORIGINS: list[str] = [
-        "http://localhost:3000",
-        "http://0.0.0.0:3000",
-        "http://127.0.0.1:3000",
-        "http://127.0.0.1:3001",
+        "https://ces-web.apps.openxcell.dev",
         "http://localhost:5173",
         "http://0.0.0.0:5173",
         "http://127.0.0.1:5173",
