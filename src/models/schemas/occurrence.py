@@ -3,6 +3,7 @@ import re
 from pydantic import field_validator
 
 from src.models.schemas.base import BaseSchemaModel
+from src.services.occurrence.classify import VALID_SECTIONS
 
 _YYYYMMDD = re.compile(r"^\d{8}$")
 
@@ -19,6 +20,13 @@ class OccurrenceInCreate(BaseSchemaModel):
     notes: str | None = None
     date: str | None = None
     is_exported: bool = False
+
+    @field_validator("section")
+    @classmethod
+    def validate_section(cls, v: str | None) -> str | None:
+        if v is not None and v not in VALID_SECTIONS:
+            raise ValueError(f"section must be one of {sorted(VALID_SECTIONS)} or None")
+        return v
 
     @field_validator("date")
     @classmethod
