@@ -1,0 +1,198 @@
+[
+  {
+    "description": "explicit depth on problem line",
+    "time_logs": [
+      {"start_time": "06:00", "end_time": "07:00", "duration_hours": 1.0, "activity": "drilling", "depth_md": 1450.0, "comment": null},
+      {"start_time": "07:00", "end_time": "08:00", "duration_hours": 1.0, "activity": "stuck pipe", "depth_md": 1455.0, "comment": null}
+    ],
+    "problem_index": 1,
+    "expected_mmd": 1455.0
+  },
+  {
+    "description": "no depth on problem line — backward scan 1 row",
+    "time_logs": [
+      {"start_time": "06:00", "end_time": "07:00", "duration_hours": 1.0, "activity": "drilling", "depth_md": 1430.0, "comment": null},
+      {"start_time": "07:00", "end_time": "08:00", "duration_hours": 1.0, "activity": "stuck pipe", "depth_md": null, "comment": null}
+    ],
+    "problem_index": 1,
+    "expected_mmd": 1430.0
+  },
+  {
+    "description": "no depth on problem line — backward scan multiple rows",
+    "time_logs": [
+      {"start_time": "05:00", "end_time": "06:00", "duration_hours": 1.0, "activity": "trip in", "depth_md": 2300.0, "comment": null},
+      {"start_time": "06:00", "end_time": "07:00", "duration_hours": 1.0, "activity": "reaming", "depth_md": null, "comment": null},
+      {"start_time": "07:00", "end_time": "08:00", "duration_hours": 1.0, "activity": "lost circulation", "depth_md": null, "comment": null}
+    ],
+    "problem_index": 2,
+    "expected_mmd": 2300.0
+  },
+  {
+    "description": "no depth anywhere — returns null",
+    "time_logs": [
+      {"start_time": "06:00", "end_time": "07:00", "duration_hours": 1.0, "activity": "stuck pipe", "depth_md": null, "comment": null}
+    ],
+    "problem_index": 0,
+    "expected_mmd": null
+  },
+  {
+    "description": "problem line is first row with explicit depth",
+    "time_logs": [
+      {"start_time": "00:00", "end_time": "01:00", "duration_hours": 1.0, "activity": "washout detected", "depth_md": 980.0, "comment": null},
+      {"start_time": "01:00", "end_time": "02:00", "duration_hours": 1.0, "activity": "drilling", "depth_md": 990.0, "comment": null}
+    ],
+    "problem_index": 0,
+    "expected_mmd": 980.0
+  },
+  {
+    "description": "problem line is first row, no depth — returns null (no rows to scan back)",
+    "time_logs": [
+      {"start_time": "00:00", "end_time": "01:00", "duration_hours": 1.0, "activity": "kick detected", "depth_md": null, "comment": null},
+      {"start_time": "01:00", "end_time": "02:00", "duration_hours": 1.0, "activity": "drilling", "depth_md": 1000.0, "comment": null}
+    ],
+    "problem_index": 0,
+    "expected_mmd": null
+  },
+  {
+    "description": "problem line depth takes priority over earlier rows",
+    "time_logs": [
+      {"start_time": "05:00", "end_time": "06:00", "duration_hours": 1.0, "activity": "drilling", "depth_md": 1000.0, "comment": null},
+      {"start_time": "06:00", "end_time": "07:00", "duration_hours": 1.0, "activity": "stuck pipe", "depth_md": 1050.0, "comment": null}
+    ],
+    "problem_index": 1,
+    "expected_mmd": 1050.0
+  },
+  {
+    "description": "backward scan skips null rows and finds depth 2 rows back",
+    "time_logs": [
+      {"start_time": "04:00", "end_time": "05:00", "duration_hours": 1.0, "activity": "casing run", "depth_md": 3100.0, "comment": null},
+      {"start_time": "05:00", "end_time": "06:00", "duration_hours": 1.0, "activity": "cementing", "depth_md": null, "comment": null},
+      {"start_time": "06:00", "end_time": "07:00", "duration_hours": 1.0, "activity": "WOC", "depth_md": null, "comment": null},
+      {"start_time": "07:00", "end_time": "08:00", "duration_hours": 1.0, "activity": "kick", "depth_md": null, "comment": null}
+    ],
+    "problem_index": 3,
+    "expected_mmd": 3100.0
+  },
+  {
+    "description": "integer depth on problem line — cast to float",
+    "time_logs": [
+      {"start_time": "08:00", "end_time": "09:00", "duration_hours": 1.0, "activity": "lost circulation", "depth_md": 2000, "comment": null}
+    ],
+    "problem_index": 0,
+    "expected_mmd": 2000.0
+  },
+  {
+    "description": "depth zero on problem line treated as valid",
+    "time_logs": [
+      {"start_time": "08:00", "end_time": "09:00", "duration_hours": 1.0, "activity": "surface blowout", "depth_md": 0.0, "comment": null}
+    ],
+    "problem_index": 0,
+    "expected_mmd": 0.0
+  },
+  {
+    "description": "deep depth value — 4000m",
+    "time_logs": [
+      {"start_time": "08:00", "end_time": "09:00", "duration_hours": 1.0, "activity": "drilling", "depth_md": 4000.0, "comment": null},
+      {"start_time": "09:00", "end_time": "10:00", "duration_hours": 1.0, "activity": "BHA failure", "depth_md": 4010.0, "comment": null}
+    ],
+    "problem_index": 1,
+    "expected_mmd": 4010.0
+  },
+  {
+    "description": "backward scan picks most recent non-null (index 2 of 5, scan finds index 1)",
+    "time_logs": [
+      {"start_time": "00:00", "end_time": "01:00", "duration_hours": 1.0, "activity": "spud", "depth_md": 50.0, "comment": null},
+      {"start_time": "01:00", "end_time": "02:00", "duration_hours": 1.0, "activity": "drilling", "depth_md": 100.0, "comment": null},
+      {"start_time": "02:00", "end_time": "03:00", "duration_hours": 1.0, "activity": "stuck pipe", "depth_md": null, "comment": null},
+      {"start_time": "03:00", "end_time": "04:00", "duration_hours": 1.0, "activity": "fishing", "depth_md": null, "comment": null},
+      {"start_time": "04:00", "end_time": "05:00", "duration_hours": 1.0, "activity": "washout", "depth_md": null, "comment": null}
+    ],
+    "problem_index": 2,
+    "expected_mmd": 100.0
+  },
+  {
+    "description": "backward scan for last element in long list",
+    "time_logs": [
+      {"start_time": "00:00", "end_time": "01:00", "duration_hours": 1.0, "activity": "drilling", "depth_md": 500.0, "comment": null},
+      {"start_time": "01:00", "end_time": "02:00", "duration_hours": 1.0, "activity": "drilling", "depth_md": null, "comment": null},
+      {"start_time": "02:00", "end_time": "03:00", "duration_hours": 1.0, "activity": "drilling", "depth_md": null, "comment": null},
+      {"start_time": "03:00", "end_time": "04:00", "duration_hours": 1.0, "activity": "drilling", "depth_md": null, "comment": null},
+      {"start_time": "04:00", "end_time": "05:00", "duration_hours": 1.0, "activity": "lost circ", "depth_md": null, "comment": null}
+    ],
+    "problem_index": 4,
+    "expected_mmd": 500.0
+  },
+  {
+    "description": "multiple null rows then null problem line — returns null",
+    "time_logs": [
+      {"start_time": "00:00", "end_time": "01:00", "duration_hours": 1.0, "activity": "rig move", "depth_md": null, "comment": null},
+      {"start_time": "01:00", "end_time": "02:00", "duration_hours": 1.0, "activity": "rigging up", "depth_md": null, "comment": null},
+      {"start_time": "02:00", "end_time": "03:00", "duration_hours": 1.0, "activity": "wellhead issue", "depth_md": null, "comment": null}
+    ],
+    "problem_index": 2,
+    "expected_mmd": null
+  },
+  {
+    "description": "backward scan across 4 null rows to find depth",
+    "time_logs": [
+      {"start_time": "00:00", "end_time": "01:00", "duration_hours": 1.0, "activity": "tripping", "depth_md": 1800.0, "comment": null},
+      {"start_time": "01:00", "end_time": "02:00", "duration_hours": 1.0, "activity": "connection", "depth_md": null, "comment": null},
+      {"start_time": "02:00", "end_time": "03:00", "duration_hours": 1.0, "activity": "connection", "depth_md": null, "comment": null},
+      {"start_time": "03:00", "end_time": "04:00", "duration_hours": 1.0, "activity": "connection", "depth_md": null, "comment": null},
+      {"start_time": "04:00", "end_time": "05:00", "duration_hours": 1.0, "activity": "connection", "depth_md": null, "comment": null},
+      {"start_time": "05:00", "end_time": "06:00", "duration_hours": 1.0, "activity": "BOP test fail", "depth_md": null, "comment": null}
+    ],
+    "problem_index": 5,
+    "expected_mmd": 1800.0
+  },
+  {
+    "description": "problem index in middle, has explicit depth",
+    "time_logs": [
+      {"start_time": "00:00", "end_time": "01:00", "duration_hours": 1.0, "activity": "drilling", "depth_md": 2100.0, "comment": null},
+      {"start_time": "01:00", "end_time": "02:00", "duration_hours": 1.0, "activity": "drilling", "depth_md": 2150.0, "comment": null},
+      {"start_time": "02:00", "end_time": "03:00", "duration_hours": 1.0, "activity": "twist off", "depth_md": 2155.0, "comment": null},
+      {"start_time": "03:00", "end_time": "04:00", "duration_hours": 1.0, "activity": "fishing", "depth_md": 2155.0, "comment": null},
+      {"start_time": "04:00", "end_time": "05:00", "duration_hours": 1.0, "activity": "fishing", "depth_md": 2155.0, "comment": null}
+    ],
+    "problem_index": 2,
+    "expected_mmd": 2155.0
+  },
+  {
+    "description": "depth only on problem line, all others null",
+    "time_logs": [
+      {"start_time": "00:00", "end_time": "01:00", "duration_hours": 1.0, "activity": "rigging up", "depth_md": null, "comment": null},
+      {"start_time": "01:00", "end_time": "02:00", "duration_hours": 1.0, "activity": "rigging up", "depth_md": null, "comment": null},
+      {"start_time": "02:00", "end_time": "03:00", "duration_hours": 1.0, "activity": "spudding", "depth_md": 25.0, "comment": null},
+      {"start_time": "03:00", "end_time": "04:00", "duration_hours": 1.0, "activity": "rigging down", "depth_md": null, "comment": null}
+    ],
+    "problem_index": 2,
+    "expected_mmd": 25.0
+  },
+  {
+    "description": "backward scan stops at first non-null (does not go to earliest)",
+    "time_logs": [
+      {"start_time": "00:00", "end_time": "01:00", "duration_hours": 1.0, "activity": "drilling", "depth_md": 1200.0, "comment": null},
+      {"start_time": "01:00", "end_time": "02:00", "duration_hours": 1.0, "activity": "drilling", "depth_md": 1250.0, "comment": null},
+      {"start_time": "02:00", "end_time": "03:00", "duration_hours": 1.0, "activity": "kick", "depth_md": null, "comment": null}
+    ],
+    "problem_index": 2,
+    "expected_mmd": 1250.0
+  },
+  {
+    "description": "float with decimal precision preserved",
+    "time_logs": [
+      {"start_time": "06:00", "end_time": "07:00", "duration_hours": 1.0, "activity": "drilling", "depth_md": 3456.78, "comment": null},
+      {"start_time": "07:00", "end_time": "08:00", "duration_hours": 1.0, "activity": "stuck pipe", "depth_md": null, "comment": null}
+    ],
+    "problem_index": 1,
+    "expected_mmd": 3456.78
+  },
+  {
+    "description": "single row list with explicit depth",
+    "time_logs": [
+      {"start_time": "12:00", "end_time": "13:00", "duration_hours": 1.0, "activity": "lost circulation", "depth_md": 1750.5, "comment": null}
+    ],
+    "problem_index": 0,
+    "expected_mmd": 1750.5
+  }
+]
