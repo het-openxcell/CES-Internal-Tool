@@ -1,6 +1,6 @@
 import re
 
-from pydantic import field_validator
+from pydantic import ConfigDict, field_validator
 
 from src.models.schemas.base import BaseSchemaModel
 from src.services.occurrence.classify import VALID_SECTIONS
@@ -40,3 +40,20 @@ class OccurrenceInDB(OccurrenceInCreate):
     id: str
     created_at: int
     updated_at: int
+
+
+class OccurrenceInResponse(BaseSchemaModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    ddr_id: str
+    ddr_date_id: str
+    well_name: str | None = None
+    surface_location: str | None = None
+    type: str
+    section: str | None = None
+    mmd: float | None = None
+    density: float | None = None
+    notes: str | None = None
+    date: str | None = None
+    is_exported: bool

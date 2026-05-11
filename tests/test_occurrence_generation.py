@@ -1,0 +1,482 @@
+import asyncio
+from types import SimpleNamespace
+from unittest.mock import AsyncMock, MagicMock, patch
+
+import pytest
+
+from src.models.schemas.ddr import DDRDateStatus
+from src.services.keywords.loader import KeywordLoader
+from src.services.occurrence.generate import OccurrenceGenerationService
+
+
+def _make_date_row(id_, date, status, time_logs=None, mud_records=None):
+    row = MagicMock()
+    row.id = id_
+    row.date = date
+    row.status = status
+    row.final_json = {
+        "time_logs": time_logs or [],
+        "mud_records": mud_records or [],
+        "deviation_surveys": [],
+        "bit_records": [],
+    }
+    return row
+
+
+def _tl(activity, depth=None, comment=None):
+    return {
+        "start_time": "06:00",
+        "end_time": "07:00",
+        "duration_hours": 1.0,
+        "activity": activity,
+        "depth_md": depth,
+        "comment": comment,
+    }
+
+
+def _mud(depth, weight):
+    return {"depth_md": depth, "mud_weight": weight, "viscosity": None, "ph": None}
+
+
+def _bulk_args(occurrence_repo):
+    """Return the list of occurrence dicts passed to bulk_create_occurrences."""
+    return occurrence_repo.bulk_create_occurrences.call_args[0][0]
+
+
+@pytest.fixture
+def occurrence_repo():
+    return AsyncMock()
+
+
+@pytest.fixture
+def ddr_date_repo():
+    return AsyncMock()
+
+
+@pytest.fixture
+def service(ddr_date_repo, occurrence_repo):
+    return OccurrenceGenerationService(
+        ddr_date_repository=ddr_date_repo,
+        occurrence_repository=occurrence_repo,
+    )
+
+
+@patch.object(KeywordLoader, "get_keywords", return_value={"stuck": "Stuck Pipe", "lost": "Lost Circulation"})
+def test_skips_failed_date_rows(mock_keywords, service, ddr_date_repo, occurrence_repo):
+    async def run():
+        ddr_date_repo.read_dates_by_ddr_id.return_value = [
+            _make_date_row("dd1", "20240115", DDRDateStatus.FAILED),
+            _make_date_row("dd2", "20240116", DDRDateStatus.WARNING),
+        ]
+        count = await service.generate_for_ddr("d1")
+        assert count == 0
+        occurrence_repo.delete_by_ddr_id.assert_awaited_once_with("d1")
+        occurrence_repo.bulk_create_occurrences.assert_not_called()
+
+    asyncio.run(run())
+
+
+@patch.object(KeywordLoader, "get_keywords", return_value={"stuck": "Stuck Pipe"})
+def test_skips_unclassified_time_logs(mock_keywords, service, ddr_date_repo, occurrence_repo):
+    async def run():
+        ddr_date_repo.read_dates_by_ddr_id.return_value = [
+            _make_date_row(
+                "dd1",
+                "20240115",
+                DDRDateStatus.SUCCESS,
+                time_logs=[_tl("normal drilling", 1000.0)],
+            ),
+        ]
+        count = await service.generate_for_ddr("d1")
+        assert count == 0
+        occurrence_repo.bulk_create_occurrences.assert_not_called()
+
+    asyncio.run(run())
+
+
+@patch.object(KeywordLoader, "get_keywords", return_value={"stuck": "Stuck Pipe"})
+def test_classified_entry_creates_occurrence(mock_keywords, service, ddr_date_repo, occurrence_repo):
+    async def run():
+        ddr_date_repo.read_dates_by_ddr_id.return_value = [
+            _make_date_row(
+                "dd1",
+                "20240115",
+                DDRDateStatus.SUCCESS,
+                time_logs=[_tl("stuck pipe at 1500", 1500.0)],
+                mud_records=[_mud(1500.0, 12.5)],
+            ),
+        ]
+        count = await service.generate_for_ddr("d1")
+        assert count == 1
+        occurrence_repo.bulk_create_occurrences.assert_awaited_once()
+        occ = _bulk_args(occurrence_repo)[0]
+        assert occ["ddr_id"] == "d1"
+        assert occ["type"] == "Stuck Pipe"
+        assert occ["mmd"] == 1500.0
+        assert occ["section"] == "Int."
+        assert occ["density"] == 12.5
+
+    asyncio.run(run())
+
+
+@patch.object(KeywordLoader, "get_keywords", return_value={"stuck": "Stuck Pipe"})
+def test_occurrence_has_ddr_id_and_date(mock_keywords, service, ddr_date_repo, occurrence_repo):
+    async def run():
+        ddr_date_repo.read_dates_by_ddr_id.return_value = [
+            _make_date_row(
+                "dd1",
+                "20240115",
+                DDRDateStatus.SUCCESS,
+                time_logs=[_tl("stuck pipe", 500.0)],
+            ),
+        ]
+        count = await service.generate_for_ddr("d1")
+        assert count == 1
+        occ = _bulk_args(occurrence_repo)[0]
+        assert occ["ddr_id"] == "d1"
+        assert occ["date"] == "20240115"
+        assert occ["ddr_date_id"] == "dd1"
+
+    asyncio.run(run())
+
+
+@patch.object(KeywordLoader, "get_keywords", return_value={"stuck": "Stuck Pipe"})
+def test_well_name_propagated(mock_keywords, service, ddr_date_repo, occurrence_repo):
+    async def run():
+        ddr_date_repo.read_dates_by_ddr_id.return_value = [
+            _make_date_row(
+                "dd1",
+                "20240115",
+                DDRDateStatus.SUCCESS,
+                time_logs=[_tl("stuck pipe", 500.0)],
+            ),
+        ]
+        count = await service.generate_for_ddr("d1", ddr_well_name="Well-A")
+        assert count == 1
+        occ = _bulk_args(occurrence_repo)[0]
+        assert occ["well_name"] == "Well-A"
+
+    asyncio.run(run())
+
+
+@patch.object(KeywordLoader, "get_keywords", return_value={"stuck": "Stuck Pipe"})
+def test_surface_location_always_none(mock_keywords, service, ddr_date_repo, occurrence_repo):
+    async def run():
+        ddr_date_repo.read_dates_by_ddr_id.return_value = [
+            _make_date_row(
+                "dd1",
+                "20240115",
+                DDRDateStatus.SUCCESS,
+                time_logs=[_tl("stuck pipe", 500.0)],
+            ),
+        ]
+        count = await service.generate_for_ddr("d1")
+        assert count == 1
+        occ = _bulk_args(occurrence_repo)[0]
+        assert occ["surface_location"] is None
+
+    asyncio.run(run())
+
+
+@patch.object(KeywordLoader, "get_keywords", return_value={"stuck": "Stuck Pipe"})
+def test_mmd_and_section_inferred(mock_keywords, service, ddr_date_repo, occurrence_repo):
+    async def run():
+        ddr_date_repo.read_dates_by_ddr_id.return_value = [
+            _make_date_row(
+                "dd1",
+                "20240115",
+                DDRDateStatus.SUCCESS,
+                time_logs=[_tl("stuck pipe", 500.0)],
+            ),
+        ]
+        count = await service.generate_for_ddr("d1")
+        assert count == 1
+        occ = _bulk_args(occurrence_repo)[0]
+        assert occ["mmd"] == 500.0
+        assert occ["section"] == "Surface"
+
+    asyncio.run(run())
+
+
+@patch.object(KeywordLoader, "get_keywords", return_value={"stuck": "Stuck Pipe"})
+def test_density_from_mud_records(mock_keywords, service, ddr_date_repo, occurrence_repo):
+    async def run():
+        ddr_date_repo.read_dates_by_ddr_id.return_value = [
+            _make_date_row(
+                "dd1",
+                "20240115",
+                DDRDateStatus.SUCCESS,
+                time_logs=[_tl("stuck pipe", 1500.0)],
+                mud_records=[_mud(1400.0, 11.0), _mud(1500.0, 12.0)],
+            ),
+        ]
+        count = await service.generate_for_ddr("d1")
+        assert count == 1
+        occ = _bulk_args(occurrence_repo)[0]
+        assert occ["density"] == 12.0
+
+    asyncio.run(run())
+
+
+@patch.object(KeywordLoader, "get_keywords", return_value={"stuck": "Stuck Pipe"})
+def test_empty_final_json_skipped(mock_keywords, service, ddr_date_repo, occurrence_repo):
+    async def run():
+        row = MagicMock()
+        row.id = "dd1"
+        row.date = "20240115"
+        row.status = DDRDateStatus.SUCCESS
+        row.final_json = None
+        ddr_date_repo.read_dates_by_ddr_id.return_value = [row]
+        count = await service.generate_for_ddr("d1")
+        assert count == 0
+        occurrence_repo.bulk_create_occurrences.assert_not_called()
+
+    asyncio.run(run())
+
+
+@patch.object(KeywordLoader, "get_keywords", return_value={"stuck": "Stuck Pipe"})
+def test_dedup_within_same_date(mock_keywords, service, ddr_date_repo, occurrence_repo):
+    async def run():
+        ddr_date_repo.read_dates_by_ddr_id.return_value = [
+            _make_date_row(
+                "dd1",
+                "20240115",
+                DDRDateStatus.SUCCESS,
+                time_logs=[
+                    _tl("stuck pipe", 1500.0),
+                    _tl("stuck pipe again", 1500.0),
+                ],
+            ),
+        ]
+        count = await service.generate_for_ddr("d1")
+        assert count == 1
+        assert len(_bulk_args(occurrence_repo)) == 1
+
+    asyncio.run(run())
+
+
+@patch.object(KeywordLoader, "get_keywords", return_value={"stuck": "Stuck Pipe"})
+def test_same_type_mmd_different_dates_preserved(mock_keywords, service, ddr_date_repo, occurrence_repo):
+    async def run():
+        ddr_date_repo.read_dates_by_ddr_id.return_value = [
+            _make_date_row(
+                "dd1",
+                "20240115",
+                DDRDateStatus.SUCCESS,
+                time_logs=[_tl("stuck pipe", 1500.0)],
+            ),
+            _make_date_row(
+                "dd2",
+                "20240116",
+                DDRDateStatus.SUCCESS,
+                time_logs=[_tl("stuck pipe", 1500.0)],
+            ),
+        ]
+        count = await service.generate_for_ddr("d1")
+        assert count == 2
+        assert len(_bulk_args(occurrence_repo)) == 2
+
+    asyncio.run(run())
+
+
+@patch.object(KeywordLoader, "get_keywords", return_value={"stuck": "Stuck Pipe"})
+def test_returns_count_of_inserted_occurrences(mock_keywords, service, ddr_date_repo, occurrence_repo):
+    async def run():
+        ddr_date_repo.read_dates_by_ddr_id.return_value = [
+            _make_date_row(
+                "dd1",
+                "20240115",
+                DDRDateStatus.SUCCESS,
+                time_logs=[_tl("stuck pipe", 1500.0)],
+            ),
+        ]
+        count = await service.generate_for_ddr("d1")
+        assert count == 1
+
+    asyncio.run(run())
+
+
+@patch.object(KeywordLoader, "get_keywords", return_value={"stuck": "Stuck Pipe"})
+def test_no_successful_dates_returns_zero(mock_keywords, service, ddr_date_repo, occurrence_repo):
+    async def run():
+        ddr_date_repo.read_dates_by_ddr_id.return_value = [
+            _make_date_row("dd1", "20240115", DDRDateStatus.FAILED),
+        ]
+        count = await service.generate_for_ddr("d1")
+        assert count == 0
+        occurrence_repo.bulk_create_occurrences.assert_not_called()
+
+    asyncio.run(run())
+
+
+@patch.object(KeywordLoader, "get_keywords", return_value={"stuck": "Stuck Pipe"})
+def test_notes_equals_text_used_for_classification(mock_keywords, service, ddr_date_repo, occurrence_repo):
+    async def run():
+        ddr_date_repo.read_dates_by_ddr_id.return_value = [
+            _make_date_row(
+                "dd1",
+                "20240115",
+                DDRDateStatus.SUCCESS,
+                time_logs=[_tl("stuck pipe", 1500.0, comment="while drilling")],
+            ),
+        ]
+        count = await service.generate_for_ddr("d1")
+        assert count == 1
+        occ = _bulk_args(occurrence_repo)[0]
+        assert occ["notes"] == "stuck pipe while drilling"
+
+    asyncio.run(run())
+
+
+@patch.object(KeywordLoader, "get_keywords", return_value={"stuck": "Stuck Pipe"})
+def test_notes_is_none_when_activity_is_empty(mock_keywords, service, ddr_date_repo, occurrence_repo):
+    async def run():
+        ddr_date_repo.read_dates_by_ddr_id.return_value = [
+            _make_date_row(
+                "dd1",
+                "20240115",
+                DDRDateStatus.SUCCESS,
+                time_logs=[
+                    {
+                        "start_time": "06:00",
+                        "end_time": "07:00",
+                        "duration_hours": 1.0,
+                        "activity": "",
+                        "comment": "",
+                    }
+                ],
+            ),
+        ]
+        count = await service.generate_for_ddr("d1")
+        assert count == 0
+        occurrence_repo.bulk_create_occurrences.assert_not_called()
+
+    asyncio.run(run())
+
+
+@patch.object(KeywordLoader, "get_keywords", return_value={"stuck": "Stuck Pipe"})
+def test_custom_shoe_depths(mock_keywords, service, ddr_date_repo, occurrence_repo):
+    async def run():
+        ddr_date_repo.read_dates_by_ddr_id.return_value = [
+            _make_date_row(
+                "dd1",
+                "20240115",
+                DDRDateStatus.SUCCESS,
+                time_logs=[_tl("stuck pipe", 400.0)],
+            ),
+        ]
+        count = await service.generate_for_ddr("d1", surface_shoe=500.0, intermediate_shoe=2000.0)
+        assert count == 1
+        occ = _bulk_args(occurrence_repo)[0]
+        assert occ["section"] == "Surface"
+
+    asyncio.run(run())
+
+
+@patch.object(KeywordLoader, "get_keywords", return_value={"stuck": "Stuck Pipe"})
+def test_invalid_shoe_depths_raises(mock_keywords, service, ddr_date_repo, occurrence_repo):
+    async def run():
+        with pytest.raises(ValueError, match="surface_shoe"):
+            await service.generate_for_ddr("d1", surface_shoe=3000.0, intermediate_shoe=500.0)
+
+    asyncio.run(run())
+
+
+@patch.object(KeywordLoader, "get_keywords", return_value={"stuck": "Stuck Pipe"})
+def test_non_dict_time_log_skipped(mock_keywords, service, ddr_date_repo, occurrence_repo):
+    async def run():
+        ddr_date_repo.read_dates_by_ddr_id.return_value = [
+            _make_date_row(
+                "dd1",
+                "20240115",
+                DDRDateStatus.SUCCESS,
+                time_logs=["not-a-dict", _tl("stuck pipe", 1500.0)],
+            ),
+        ]
+        count = await service.generate_for_ddr("d1")
+        assert count == 1
+        occurrence_repo.bulk_create_occurrences.assert_awaited_once()
+
+    asyncio.run(run())
+
+
+@patch.object(KeywordLoader, "get_keywords", return_value={"stuck": "Stuck Pipe", "lost": "Lost Circulation"})
+def test_multiple_time_logs_same_date(mock_keywords, service, ddr_date_repo, occurrence_repo):
+    async def run():
+        ddr_date_repo.read_dates_by_ddr_id.return_value = [
+            _make_date_row(
+                "dd1",
+                "20240115",
+                DDRDateStatus.SUCCESS,
+                time_logs=[
+                    _tl("stuck pipe", 1500.0),
+                    _tl("lost circulation", 2000.0),
+                ],
+            ),
+        ]
+        count = await service.generate_for_ddr("d1")
+        assert count == 2
+        assert len(_bulk_args(occurrence_repo)) == 2
+
+    asyncio.run(run())
+
+
+@patch.object(KeywordLoader, "get_keywords", return_value={"stuck": "Stuck Pipe"})
+def test_rerun_clears_existing_occurrences(mock_keywords, service, ddr_date_repo, occurrence_repo):
+    async def run():
+        ddr_date_repo.read_dates_by_ddr_id.return_value = [
+            _make_date_row(
+                "dd1",
+                "20240115",
+                DDRDateStatus.SUCCESS,
+                time_logs=[_tl("stuck pipe", 1500.0)],
+            ),
+        ]
+        await service.generate_for_ddr("ddr-x")
+        occurrence_repo.delete_by_ddr_id.assert_awaited_once_with("ddr-x")
+
+    asyncio.run(run())
+
+
+def test_pipeline_service_generate_occurrences_returns_zero_when_no_repo():
+    from src.services.pipeline_service import PreSplitPipelineService
+
+    async def run():
+        service = PreSplitPipelineService(
+            ddr_repository=MagicMock(),
+            ddr_date_repository=MagicMock(),
+            occurrence_repository=None,
+        )
+        count = await service._generate_occurrences("d1", MagicMock())
+        assert count == 0
+
+    asyncio.run(run())
+
+
+@patch.object(KeywordLoader, "get_keywords", return_value={"stuck": "Stuck Pipe"})
+def test_pipeline_service_generate_occurrences_runs_service(mock_keywords):
+    from src.services.pipeline_service import PreSplitPipelineService
+
+    async def run():
+        ddr_repo = MagicMock()
+        date_repo = AsyncMock()
+        occurrence_repo = AsyncMock()
+        date_repo.read_dates_by_ddr_id.return_value = [
+            _make_date_row(
+                "dd1",
+                "20240115",
+                DDRDateStatus.SUCCESS,
+                time_logs=[_tl("stuck pipe", 1500.0)],
+            ),
+        ]
+        service = PreSplitPipelineService(
+            ddr_repository=ddr_repo,
+            ddr_date_repository=date_repo,
+            occurrence_repository=occurrence_repo,
+        )
+        ddr = SimpleNamespace(well_name="Well-X")
+        count = await service._generate_occurrences("d1", ddr)
+        assert count == 1
+        occurrence_repo.bulk_create_occurrences.assert_awaited_once()
+
+    asyncio.run(run())

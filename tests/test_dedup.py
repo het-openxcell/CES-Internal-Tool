@@ -1,10 +1,10 @@
-import logging
+from unittest.mock import patch
 
 from src.services.occurrence.dedup import dedup
 
 
-def _occ(type_, mmd):
-    return {"type": type_, "mmd": mmd, "notes": "test"}
+def _occ(type_, mmd, ddr_date_id=None):
+    return {"type": type_, "mmd": mmd, "notes": "test", "ddr_date_id": ddr_date_id}
 
 
 def test_no_duplicates_returns_same():
@@ -52,19 +52,22 @@ def test_empty_list_returns_empty():
     assert dedup([]) == []
 
 
-def test_logs_removed_count(caplog):
+def test_logs_removed_count():
     occs = [_occ("Stuck Pipe", 1450.0), _occ("Stuck Pipe", 1450.0), _occ("Stuck Pipe", 1450.0)]
-    with caplog.at_level(logging.INFO, logger="src.services.occurrence.dedup"):
+    with patch("src.services.occurrence.dedup.logger") as mock_logger:
         result = dedup(occs)
     assert len(result) == 1
-    assert "removed 2" in caplog.text
+    mock_logger.info.assert_called_once()
+    args = mock_logger.info.call_args[0]
+    assert "removed" in args[0]
+    assert args[1] == 2
 
 
-def test_no_log_when_no_duplicates(caplog):
+def test_no_log_when_no_duplicates():
     occs = [_occ("Stuck Pipe", 1450.0)]
-    with caplog.at_level(logging.INFO, logger="src.services.occurrence.dedup"):
+    with patch("src.services.occurrence.dedup.logger") as mock_logger:
         dedup(occs)
-    assert caplog.text == ""
+    mock_logger.info.assert_not_called()
 
 
 def test_three_duplicates_one_kept():

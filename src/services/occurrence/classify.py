@@ -26,7 +26,7 @@ DEFAULT_INTERMEDIATE_SHOE_DEPTH: float = 2500.0
 
 
 def classify_type(text: str, keywords: dict[str, str]) -> str:
-    for keyword, occurrence_type in keywords.items():
+    for keyword, occurrence_type in sorted(keywords.items(), key=lambda kv: len(kv[0]), reverse=True):
         if re.search(r"\b" + re.escape(keyword) + r"\b", text, re.IGNORECASE):
             return occurrence_type
     return "Unclassified"
