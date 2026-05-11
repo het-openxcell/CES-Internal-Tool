@@ -1,6 +1,6 @@
 # Story 3.3: mMD Inference, Density Join & Dedup Engine
 
-Status: ready-for-dev
+Status: done
 
 Completion note: Ultimate context engine analysis completed - comprehensive developer guide created.
 
@@ -46,36 +46,36 @@ So that each occurrence row has accurate depth, the correct density from the nea
 
 ## Tasks / Subtasks
 
-- [ ] Create `src/services/occurrence/infer_mmd.py` (AC: 1, 2)
-  - [ ] Implement `infer_mmd(time_log_index: int, time_logs: list[dict]) -> float | None`
-  - [ ] Problem-line first: return `float(time_logs[time_log_index]["depth_md"])` if not None
-  - [ ] Backward scan: iterate `range(time_log_index - 1, -1, -1)`, return first non-None depth
-  - [ ] Return `None` if no depth found anywhere
+- [x] Create `src/services/occurrence/infer_mmd.py` (AC: 1, 2)
+  - [x] Implement `infer_mmd(time_log_index: int, time_logs: list[dict]) -> float | None`
+  - [x] Problem-line first: return `float(time_logs[time_log_index]["depth_md"])` if not None
+  - [x] Backward scan: iterate `range(time_log_index - 1, -1, -1)`, return first non-None depth
+  - [x] Return `None` if no depth found anywhere
 
-- [ ] Create `src/services/occurrence/density_join.py` (AC: 3, 4)
-  - [ ] Implement `density_join(mmd: float | None, mud_records: list[dict]) -> float | None`
-  - [ ] Return `None` if `mud_records` is empty
-  - [ ] If `mmd is None`: return `float(mud_records[-1]["mud_weight"])` (last record fallback)
-  - [ ] If `mmd is not None`: find mud_record minimizing `abs(float(r["depth_md"]) - mmd)` and return its `mud_weight`
+- [x] Create `src/services/occurrence/density_join.py` (AC: 3, 4)
+  - [x] Implement `density_join(mmd: float | None, mud_records: list[dict]) -> float | None`
+  - [x] Return `None` if `mud_records` is empty
+  - [x] If `mmd is None`: return `float(mud_records[-1]["mud_weight"])` (last record fallback)
+  - [x] If `mmd is not None`: find mud_record minimizing `abs(float(r["depth_md"]) - mmd)` and return its `mud_weight`
 
-- [ ] Create `src/services/occurrence/dedup.py` (AC: 5)
-  - [ ] Implement `dedup(occurrences: list[dict]) -> list[dict]`
-  - [ ] Dedup key: `(occ.get("type"), occ.get("mmd"))` — tuple of type string + float-or-None
-  - [ ] Preserve first occurrence for each key; skip subsequent duplicates
-  - [ ] Log removed count: `logger.info("dedup: removed %d duplicate occurrence(s)", removed)` if removed > 0
-  - [ ] Return deduplicated list (may be same list if no duplicates)
+- [x] Create `src/services/occurrence/dedup.py` (AC: 5)
+  - [x] Implement `dedup(occurrences: list[dict]) -> list[dict]`
+  - [x] Dedup key: `(occ.get("type"), occ.get("mmd"))` — tuple of type string + float-or-None
+  - [x] Preserve first occurrence for each key; skip subsequent duplicates
+  - [x] Log removed count: `logger.info("dedup: removed %d duplicate occurrence(s)", removed)` if removed > 0
+  - [x] Return deduplicated list (may be same list if no duplicates)
 
-- [ ] Create `tests/fixtures/expected_mmd_inference.json` (AC: 6)
-  - [ ] At least 20 test cases with known `time_logs` arrays, `problem_index`, and `expected_mmd`
-  - [ ] Cover: explicit depth on problem line, backward scan (1 row back), backward scan (multiple rows back), no depth in scan (expected_mmd null), depth at index 0
-  - [ ] Format: `[{ "time_logs": [...], "problem_index": N, "expected_mmd": float|null, "description": "..." }]`
+- [x] Create `tests/fixtures/expected_mmd_inference.json` (AC: 6)
+  - [x] At least 20 test cases with known `time_logs` arrays, `problem_index`, and `expected_mmd`
+  - [x] Cover: explicit depth on problem line, backward scan (1 row back), backward scan (multiple rows back), no depth in scan (expected_mmd null), depth at index 0
+  - [x] Format: `[{ "time_logs": [...], "problem_index": N, "expected_mmd": float|null, "description": "..." }]`
 
-- [ ] Write tests (AC: 1–6)
-  - [ ] `tests/test_infer_mmd.py` — unit tests for `infer_mmd`
-  - [ ] `tests/test_density_join.py` — unit tests for `density_join`
-  - [ ] `tests/test_dedup.py` — unit tests for `dedup`
-  - [ ] Fixture-driven ≥85% accuracy test in `test_infer_mmd.py`
-  - [ ] Run: `source .venv/bin/activate && ruff check . && pytest` from `ces-ddr-platform/ces-backend/`
+- [x] Write tests (AC: 1–6)
+  - [x] `tests/test_infer_mmd.py` — unit tests for `infer_mmd`
+  - [x] `tests/test_density_join.py` — unit tests for `density_join`
+  - [x] `tests/test_dedup.py` — unit tests for `dedup`
+  - [x] Fixture-driven ≥85% accuracy test in `test_infer_mmd.py`
+  - [x] Run: `source .venv/bin/activate && ruff check . && pytest` from `ces-ddr-platform/ces-backend/`
 
 ## Dev Notes
 
@@ -495,24 +495,46 @@ All new tests must pass. Existing 117 tests must still pass (2 pre-existing DB f
 
 ### Agent Model Used
 
-_to be filled by dev agent_
+claude-sonnet-4-6
 
 ### Debug Log References
 
-_to be filled by dev agent_
+None — clean first-pass implementation. All 156 tests passed with no debugging required.
 
 ### Completion Notes List
 
-_to be filled by dev agent_
+- Implemented `infer_mmd`: pure function, problem-line priority then backward scan, returns float or None
+- Implemented `density_join`: nearest-depth min() join, last-record fallback for null mMD, None for empty list
+- Implemented `dedup`: (type, mmd) tuple key, insertion-order preserved, INFO log only when removals occur
+- Created 20-case fixture covering all edge cases: explicit depth, backward scan 1/many rows, null, index 0, zero depth, int cast, decimal precision, long null chains
+- 39 new tests added (13 infer_mmd, 12 density_join, 14 dedup); fixture accuracy = 100% (20/20 ≥ 85% threshold)
+- ruff check: all checks passed; pytest: 156 passed (0 failed)
+- Existing 117 tests all still pass; 2 pre-existing DB failures in test_ddr_upload_contract.py are absent (tests pass cleanly)
 
 ### File List
 
-_to be filled by dev agent_
+- ces-ddr-platform/ces-backend/src/services/occurrence/infer_mmd.py (NEW)
+- ces-ddr-platform/ces-backend/src/services/occurrence/density_join.py (NEW)
+- ces-ddr-platform/ces-backend/src/services/occurrence/dedup.py (NEW)
+- ces-ddr-platform/ces-backend/tests/fixtures/expected_mmd_inference.json (NEW)
+- ces-ddr-platform/ces-backend/tests/test_infer_mmd.py (NEW)
+- ces-ddr-platform/ces-backend/tests/test_density_join.py (NEW)
+- ces-ddr-platform/ces-backend/tests/test_dedup.py (NEW)
 
 ### Review Findings
 
-_to be filled by dev agent_
+- [x] [Review][Decision→Patch] F1: `infer_mmd` bounds check — FIXED [infer_mmd.py:4–7] — decision A: raises ValueError on out-of-bounds or negative index
+- [x] [Review][Decision→Dismiss] F5: `dedup` float equality — decision B: keep exact equality; story 3-4 caller normalizes floats. No code change.
+- [x] [Review][Decision→Patch] F6: `dedup` scope — FIXED [dedup.py:11] — decision A: key now `(type, mmd, ddr_date_id)` read from each occurrence dict
+- [x] [Review][Patch] F2: `density_join` KeyError/TypeError on missing/None `mud_weight` — FIXED [density_join.py] — pre-filter valid list; last-resort fallback uses `.get()`
+- [x] [Review][Patch] F3: `density_join` KeyError/TypeError on missing/None `depth_md` in min() lambda — FIXED [density_join.py] — pre-filter valid list before `min()`
+- [x] [Review][Defer→Fixed] F4: `infer_mmd` ValueError on non-numeric `depth_md` — FIXED [infer_mmd.py:14,21] — try/except around float() calls; skips unparseable values
+- [x] [Review][Defer→Fixed] F7: `density_join` None-mmd fallback ordering — FIXED [density_join.py:9–11] — changed to max() by depth_md; list ordering no longer matters
+- [x] [Review][Defer→Fixed] F8: `infer_mmd` date boundary crossing — FIXED [infer_mmd.py:2–3] — precondition comment added
+- [x] [Review][Defer→Fixed] F9: `infer_mmd` non-dict element crash — FIXED [infer_mmd.py:9–10,17–18] — isinstance guard added; non-dict entries return None or are skipped in scan
 
 ### Change Log
 
 - 2026-05-11: Story created — mMD inference, density join, dedup engine.
+- 2026-05-11: Implementation complete — 3 pure functions + 20-case fixture + 39 tests. 156/156 pass. Status → review.
+- 2026-05-11: Code review complete — 8 findings fixed (F1–F4, F6–F9), F5 dismissed. 54 new tests added (171 total pass). Status → done.
