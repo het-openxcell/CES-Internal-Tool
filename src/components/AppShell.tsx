@@ -1,15 +1,7 @@
-import { Link, NavLink, useNavigate } from "react-router";
+import { Link, useNavigate } from "react-router";
 
+import CollapsibleSidebar from "@/components/CollapsibleSidebar";
 import { authToken } from "@/lib/auth";
-import { cn } from "@/lib/utils";
-
-const NAV_ITEMS = [
-  { path: "/", label: "Dashboard" },
-  { path: "/history", label: "History" },
-  { path: "/query", label: "Query" },
-  { path: "/monitor", label: "Monitor" },
-  { path: "/settings/keywords", label: "Settings" },
-];
 
 function LogoutIcon({ className }: { className?: string }) {
   return (
@@ -30,59 +22,44 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="flex flex-col min-h-screen">
+      <a
+        href="#main-content"
+        className="sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:z-[100] focus:px-3 focus:py-1.5 focus:bg-white focus:border focus:border-ces-red focus:rounded focus:text-ces-red focus:text-sm focus:font-semibold"
+      >
+        Skip to main content
+      </a>
+
       <header className="sticky top-0 z-50 border-b border-border-default bg-white/82 backdrop-blur-[12px]">
-        <div className="flex items-center gap-4 w-full mx-0 px-6 min-h-[72px] max-[760px]:px-4 max-[760px]:min-h-[52px]">
-          <div className="flex items-center gap-1 flex-1">
-            <Link to="/" className="flex items-center gap-2.5 no-underline shrink-0" aria-label="CES Home">
-              <img
-                src="/logo.png"
-                alt=""
-                className="w-auto h-7 block shrink-0"
-                width={120}
-                height={28}
-                loading="eager"
-              />
-            </Link>
-
-            <nav className="flex items-center gap-0.5 max-[760px]:hidden" aria-label="Main">
-              {NAV_ITEMS.map((item) => (
-                <NavLink
-                  key={item.path}
-                  to={item.path}
-                  end={item.path === "/"}
-                  className={({ isActive }) =>
-                    cn(
-                      "inline-flex items-center min-h-9 px-3.5 rounded-md text-[13px] font-semibold text-text-muted no-underline tracking-wide transition-colors duration-150",
-                      "hover:text-text-primary hover:bg-black/[0.04]",
-                      isActive && "text-white bg-ces-red hover:text-white hover:bg-ces-red-dark",
-                      "max-[860px]:px-2.5 max-[860px]:text-xs"
-                    )
-                  }
-                >
-                  {item.label}
-                </NavLink>
-              ))}
-            </nav>
-          </div>
-
-          <div className="flex items-center gap-2 shrink-0 ml-auto">
-            <button
-              type="button"
-              className="flex items-center justify-center gap-1.5 min-h-8 px-3 border border-border-default rounded-md bg-white text-text-muted text-xs font-semibold cursor-pointer transition-colors duration-200 hover:text-error-text hover:bg-error-bg hover:border-[#FECACA]"
-              onClick={handleLogout}
-              aria-label="Sign out"
-              title="Sign out"
-            >
-              <LogoutIcon className="w-4 h-4" />
-              <span className="text-xs font-semibold max-[860px]:hidden">Sign out</span>
-            </button>
-          </div>
+        <div className="flex items-center justify-between w-full px-6 min-h-[56px]">
+          <Link to="/" aria-label="CES Home">
+            <img
+              src="/logo.png"
+              alt=""
+              className="w-auto h-7 block"
+              width={120}
+              height={28}
+              loading="eager"
+            />
+          </Link>
+          <button
+            type="button"
+            className="flex items-center justify-center gap-1.5 min-h-8 px-3 border border-border-default rounded-md bg-white text-text-muted text-xs font-semibold cursor-pointer transition-colors duration-200 hover:text-error-text hover:bg-error-bg hover:border-[#FECACA]"
+            onClick={handleLogout}
+            aria-label="Sign out"
+            title="Sign out"
+          >
+            <LogoutIcon className="w-4 h-4" />
+            <span className="text-xs font-semibold">Sign out</span>
+          </button>
         </div>
       </header>
 
-      <main className="flex-1 px-8 pt-7 pb-10 bg-surface max-[760px]:px-5 max-[760px]:pt-5 max-[760px]:pb-8">
-        {children}
-      </main>
+      <div className="flex flex-1 overflow-hidden">
+        <CollapsibleSidebar />
+        <main id="main-content" className="flex-1 overflow-auto px-8 pt-7 pb-10 bg-surface max-[760px]:px-5 max-[760px]:pt-5 max-[760px]:pb-8">
+          {children}
+        </main>
+      </div>
     </div>
   );
 }
