@@ -1,5 +1,5 @@
 # generated: 2026-05-06
-# last_updated: 2026-05-08
+# last_updated: 2026-05-11 — story 3-2 done
 # project: Canadian Energy Service Internal Tool
 # project_key: NOKEY
 # tracking_system: file-system
@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-05-06
-last_updated: 2026-05-08
+last_updated: 2026-05-11
 project: Canadian Energy Service Internal Tool
 project_key: NOKEY
 tracking_system: file-system
@@ -75,8 +75,8 @@ development_status:
   # ── Epic 3: Occurrence Table & Generation ──
   epic-3: in-progress
   3-1-occurrences-database-schema: done
-  3-2-keyword-classification-engine-type-section: backlog
-  3-3-mmd-inference-density-join-dedup-engine: backlog
+  3-2-keyword-classification-engine-type-section: done
+  3-3-mmd-inference-density-join-dedup-engine: ready-for-dev
   3-4-occurrence-generation-api-pipeline-integration: backlog
   3-5-occurrencetable-ui-full-frontend-component: backlog
   epic-3-retrospective: optional

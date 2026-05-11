@@ -1,0 +1,23 @@
+[
+  {"text": "pipe stuck in formation", "expected_type": "Stuck Pipe"},
+  {"text": "lost circulation during drilling", "expected_type": "Lost Circulation"},
+  {"text": "backreamed to free string", "expected_type": "Back Ream"},
+  {"text": "REAMING AHEAD TO BOTTOM", "expected_type": "Ream"},
+  {"text": "tight hole overpull observed", "expected_type": "Tight Hole"},
+  {"text": "bit washout detected", "expected_type": "Washout"},
+  {"text": "mwd failure in bha", "expected_type": "BHA Failure"},
+  {"text": "stick slip and vibration issues", "expected_type": "Vibration"},
+  {"text": "pit gain and shut in", "expected_type": "Kick / Well Control"},
+  {"text": "h2s detected at surface", "expected_type": "H2S"},
+  {"text": "fish left in hole from stuck bha", "expected_type": "Fishing"},
+  {"text": "casing collapse encountered", "expected_type": "Casing Issue"},
+  {"text": "bit balling causing slow progress", "expected_type": "Bit Failure"},
+  {"text": "cement job performed", "expected_type": "Cementing Issue"},
+  {"text": "packoff encountered while drilling", "expected_type": "Pack Off"},
+  {"text": "dogleg severity exceeded plan", "expected_type": "Deviation"},
+  {"text": "normal drilling operations continue", "expected_type": "Unclassified"},
+  {"text": "surface pressure readings taken during survey", "expected_type": "Unclassified"},
+  {"text": "Jarring downward to free stuck string", "expected_type": "Stuck Pipe"},
+  {"text": "Total loss of returns observed", "expected_type": "Lost Circulation"},
+  {"text": "Hydrogen sulphide alarm triggered", "expected_type": "H2S"}
+]
