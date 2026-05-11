@@ -53,7 +53,7 @@ describe("DashboardPage", () => {
     await waitFor(() => expect(screen.getByText("field-1.pdf")).toBeInTheDocument());
     expect(screen.getByRole("heading", { name: "DDR Processing" })).toBeInTheDocument();
     expect(screen.getByLabelText("DDR queue summary")).toHaveTextContent("Active DDRs1");
-    expect(screen.getByLabelText("Recent DDRs")).toHaveTextContent("3 DDRs loaded from backend");
+    expect(screen.getByLabelText("Recent DDRs")).toHaveTextContent("3 DDRs");
     expect(screen.getByLabelText("Recent DDRs")).toHaveTextContent("1 active, 1 complete, 1 failed");
     expect(screen.queryByText("Local scaffold")).not.toBeInTheDocument();
     expect(screen.queryByText("Extraction and reporting foundation")).not.toBeInTheDocument();

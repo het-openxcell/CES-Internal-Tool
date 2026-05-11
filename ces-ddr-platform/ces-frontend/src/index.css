@@ -47,3 +47,210 @@
   60% { transform: scale(1.05); }
   100% { transform: scale(1); opacity: 1; }
 }
+
+/* ── Login page ── */
+.login-shell {
+  position: relative;
+  display: grid;
+  min-height: 100vh;
+  place-items: center;
+  padding: 24px;
+  background: var(--color-surface-warm);
+  overflow: hidden;
+}
+
+.login-bg {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.4;
+  background-image:
+    radial-gradient(circle at 20% 30%, rgba(196, 18, 48, 0.06) 0%, transparent 50%),
+    radial-gradient(circle at 80% 70%, rgba(196, 18, 48, 0.04) 0%, transparent 50%),
+    radial-gradient(circle at 50% 50%, rgba(17, 24, 39, 0.02) 0%, transparent 60%);
+}
+
+.login-bg::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%239CA3AF' fill-opacity='0.08'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+  opacity: 0.5;
+}
+
+.login-panel {
+  position: relative;
+  width: min(420px, 100%);
+  padding: 40px 36px 28px;
+  border: 1px solid var(--color-border-default);
+  border-radius: 12px;
+  background: #fff;
+  box-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.04),
+    0 4px 8px rgba(0, 0, 0, 0.03),
+    0 12px 24px rgba(0, 0, 0, 0.03);
+}
+
+.login-shake {
+  animation: var(--animate-login-shake);
+}
+
+.login-brand {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 8px;
+  text-align: center;
+}
+
+.login-brand-text { display: grid; gap: 4px; }
+
+.login-logo {
+  width: auto;
+  max-width: 220px;
+  height: auto;
+  flex-shrink: 0;
+}
+
+.eyebrow {
+  margin: 0 0 4px;
+  color: var(--color-ces-red);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.login-title {
+  margin: 0;
+  font-size: 28px;
+  line-height: 1.2;
+  font-weight: 700;
+  color: var(--color-text-primary);
+  letter-spacing: -0.01em;
+}
+
+.login-form {
+  display: grid;
+  gap: 16px;
+  margin-top: 28px;
+}
+
+.input-group { display: grid; gap: 6px; }
+
+.field-label {
+  color: var(--color-text-secondary);
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+
+.input-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.input-icon {
+  position: absolute;
+  left: 12px;
+  width: 18px;
+  height: 18px;
+  color: var(--color-text-muted);
+  pointer-events: none;
+  transition: color 0.2s ease;
+}
+
+.text-field {
+  width: 100%;
+  min-height: 44px;
+  padding: 0 12px;
+  border: 1px solid var(--color-border-input);
+  border-radius: 8px;
+  color: var(--color-text-primary);
+  background: #fff;
+  font: inherit;
+  font-size: 15px;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.text-field::placeholder { color: #9ca3af; }
+
+.text-field--icon { padding-left: 38px; }
+
+.text-field--action { padding-right: 42px; }
+
+.text-field:focus {
+  border-color: var(--color-ces-red);
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(196, 18, 48, 0.12);
+}
+
+.input-wrap:focus-within .input-icon { color: var(--color-ces-red); }
+
+.input-action {
+  position: absolute;
+  right: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  transition: color 0.2s ease, background 0.2s ease;
+}
+
+.input-action:hover {
+  background: var(--color-surface);
+  color: var(--color-text-secondary);
+}
+
+.input-action-icon { width: 18px; height: 18px; }
+
+.form-error {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 8px;
+  color: var(--color-error-text);
+  background: var(--color-error-bg);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.login-submit {
+  width: 100%;
+  min-height: 44px;
+  margin-top: 4px;
+}
+
+.spinner {
+  width: 18px;
+  height: 18px;
+  animation: spin 1s linear infinite;
+}
+
+.spinner-lead {
+  animation: spin 1s linear infinite;
+  transform-origin: center;
+}
+
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.login-footer {
+  margin-top: 24px;
+  padding-top: 20px;
+  border-top: 1px solid var(--color-border-default);
+  text-align: center;
+}
+
+.login-footer p {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: 12px;
+}

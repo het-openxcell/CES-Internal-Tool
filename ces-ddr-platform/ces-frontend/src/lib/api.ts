@@ -40,6 +40,26 @@ export type DDRUploadResponse = {
   status: DDRStatus;
 };
 
+export type OccurrenceRow = {
+  id: string;
+  ddr_id: string;
+  well_name: string | null;
+  surface_location: string | null;
+  type: string;
+  section: string | null;
+  mmd: number | null;
+  density: number | null;
+  notes: string | null;
+  date: string | null;
+};
+
+export type OccurrenceFilters = {
+  type?: string;
+  section?: string;
+  date_from?: string;
+  date_to?: string;
+};
+
 export type ApiErrorCode = "UNAUTHORIZED" | "API_ERROR";
 
 export class ApiError extends Error {
@@ -112,6 +132,16 @@ class ApiClient {
       form.append("file", file);
       request.send(form);
     });
+  }
+
+  async getOccurrences(ddrId: string, filters?: OccurrenceFilters, signal?: AbortSignal) {
+    const params = new URLSearchParams();
+    if (filters?.type) params.set("type", filters.type);
+    if (filters?.section) params.set("section", filters.section);
+    if (filters?.date_from) params.set("date_from", filters.date_from);
+    if (filters?.date_to) params.set("date_to", filters.date_to);
+    const query = params.toString() ? `?${params.toString()}` : "";
+    return this.request<OccurrenceRow[]>(`/ddrs/${encodeURIComponent(ddrId)}/occurrences${query}`, { signal });
   }
 
   async request<TResponse>(path: string, options: RequestInit & { skipAuth?: boolean } = {}) {
