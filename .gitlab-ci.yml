@@ -1,0 +1,30 @@
+include:
+   remote: 'https://${CI_SERVER_HOST}/public-resources/gitlab-ci/-/raw/master/templates/build.yaml'
+
+stages:
+   - build
+   - deploy
+
+variables:
+   PROJECT: 'ces-web'
+   TECHNOLOGY: 'nextjs'
+
+build:
+  stage: build
+  extends: .build
+  before_script:
+    - cp "$DEV_ENV" .env
+  variables:
+    BUILD_ARGS: "--build-arg APP_NAME=${PROJECT} --build-arg NODE_ENV=${CI_COMMIT_REF_NAME}"
+  only:
+    - development
+
+deploy_dev:
+   stage: deploy
+   extends: .deploy_devspace
+   environment:
+      url: https://$PROJECT.$DEV_BASE_DOMAIN
+   variables:
+      CONT_PORT: '3000'
+   only:
+     - development
