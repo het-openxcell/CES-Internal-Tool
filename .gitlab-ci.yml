@@ -1,0 +1,30 @@
+include:
+  remote: 'https://${CI_SERVER_HOST}/public-resources/gitlab-ci/-/raw/master/templates/build.yaml'
+
+stages:
+  - build
+  - deploy
+
+variables:
+  PROJECT: "ces-backend"
+  TECHNOLOGY: "python" 
+
+build:
+  stage: build
+  extends: .build
+  variables:
+    BUILD_ARGS: "--build-arg APP_NAME=${PROJECT} --build-arg PROFILE=${CI_COMMIT_REF_NAME}"
+
+deploy_dev:
+  stage: deploy
+  extends: .deploy_devspace
+  environment:
+    url: https://$PROJECT.$DEV_BASE_DOMAIN
+  variables:
+    CONT_PORT: "8000"
+    CPU_REQUEST: 200m
+    MEMORY_REQUEST: 1700Mi
+    CPU_LIMIT: 300m
+    MEMORY_LIMIT: 2Gi
+  only:
+    - development
