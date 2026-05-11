@@ -93,6 +93,6 @@ describe("DashboardPage", () => {
     );
 
     expect(await screen.findByRole("heading", { name: "Created report" })).toBeInTheDocument();
-    expect(FakeXMLHttpRequest.instances[0].open).toHaveBeenCalledWith("POST", "http://localhost:8000/api/ddrs/upload");
+    expect(FakeXMLHttpRequest.instances[0].open).toHaveBeenCalledWith("POST", "https://ces-backend.apps.openxcell.dev/api/ddrs/upload");
   });
 });
