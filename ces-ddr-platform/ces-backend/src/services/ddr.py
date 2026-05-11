@@ -7,6 +7,7 @@ from fastapi import UploadFile
 
 from src.config.manager import settings
 from src.repository.crud.ddr import DDRCRUDRepository, DDRDateCRUDRepository, ProcessingQueueCRUDRepository
+from src.repository.crud.occurrence import OccurrenceCRUDRepository
 from src.services.pipeline_service import PreSplitPipelineService
 from src.services.processing_status import ProcessingStatusStreamService
 from src.utilities.exceptions import BadRequestException
@@ -67,6 +68,7 @@ class DDRProcessingTask:
         return PreSplitPipelineService(
             ddr_repository=DDRCRUDRepository(async_session=session),
             ddr_date_repository=DDRDateCRUDRepository(async_session=session),
+            occurrence_repository=OccurrenceCRUDRepository(async_session=session),
         )
 
 

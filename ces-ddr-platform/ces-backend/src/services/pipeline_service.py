@@ -5,6 +5,7 @@ from typing import Any, Awaitable, Callable
 from src.config.manager import settings
 from src.models.schemas.ddr import DDRDateStatus, DDRStatus
 from src.repository.crud.ddr import PipelineRunCRUDRepository
+from src.services.occurrence.generate import OccurrenceGenerationService
 from src.services.pipeline.cost import ExtractionCostService
 from src.services.pipeline.embedding import TimeLogEmbeddingService
 from src.services.pipeline.extract import (
@@ -34,9 +35,11 @@ class PreSplitPipelineService:
         status_stream_service: ProcessingStatusStreamService | None = None,
         cost_service: ExtractionCostService | None = None,
         embedding_service: TimeLogEmbeddingService | None = None,
+        occurrence_repository: Any | None = None,
     ) -> None:
         self.ddr_repository = ddr_repository
         self.ddr_date_repository = ddr_date_repository
+        self.occurrence_repository = occurrence_repository
         self.pre_splitter = pre_splitter or PDFPreSplitter()
         self.pdf_loader = pdf_loader or self._default_pdf_loader
         self.extractor = extractor
@@ -104,8 +107,12 @@ class PreSplitPipelineService:
             else:
                 final_statuses.append(outcome)
 
+        try:
+            total_occurrences = await self._generate_occurrences(ddr_id=ddr_id, ddr=ddr)
+        except Exception:  # noqa: BLE001
+            total_occurrences = 0
         await self.ddr_repository.finalize_status_from_dates(ddr, final_statuses)
-        await self._publish_processing_complete(ddr_id)
+        await self._publish_processing_complete(ddr_id, total_occurrences=total_occurrences)
 
     async def _process_one_date(
         self,
@@ -200,7 +207,19 @@ class PreSplitPipelineService:
             raw_response_id=self._raw_response_id(row),
         )
 
-    async def _publish_processing_complete(self, ddr_id: str) -> None:
+    async def _generate_occurrences(self, ddr_id: str, ddr: Any) -> int:
+        if self.occurrence_repository is None:
+            return 0
+        service = OccurrenceGenerationService(
+            ddr_date_repository=self.ddr_date_repository,
+            occurrence_repository=self.occurrence_repository,
+        )
+        return await service.generate_for_ddr(
+            ddr_id=ddr_id,
+            ddr_well_name=getattr(ddr, "well_name", None),
+        )
+
+    async def _publish_processing_complete(self, ddr_id: str, total_occurrences: int = 0) -> None:
         if self.status_stream_service is None:
             return
         rows = await self.ddr_date_repository.read_dates_by_ddr_id(ddr_id)
@@ -209,7 +228,7 @@ class PreSplitPipelineService:
             total_dates=len(rows),
             failed_dates=sum(1 for row in rows if row.status == DDRDateStatus.FAILED),
             warning_dates=sum(1 for row in rows if row.status == DDRDateStatus.WARNING),
-            total_occurrences=0,
+            total_occurrences=total_occurrences,
         )
 
     def _error_message(self, row: Any) -> str:

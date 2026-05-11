@@ -1,9 +1,13 @@
-from fastapi import APIRouter, BackgroundTasks, Depends, Request, UploadFile, status
+from typing import Annotated
+
+from fastapi import APIRouter, BackgroundTasks, Depends, Query, Request, UploadFile, status
 from fastapi.responses import JSONResponse, StreamingResponse
 
 from src.api.dependencies.repository import get_repository
 from src.models.schemas.ddr import DDRDateInResponse, DDRDetailResponse, DDRListItemResponse, DDRUploadResponse
+from src.models.schemas.occurrence import OccurrenceInResponse
 from src.repository.crud.ddr import DDRCRUDRepository, DDRDateCRUDRepository, ProcessingQueueCRUDRepository
+from src.repository.crud.occurrence import OccurrenceCRUDRepository
 from src.securities.authorizations.jwt_authentication import jwt_authentication, stream_query_token_authentication
 from src.services.ddr import DDRProcessingTask, DDRUploadService
 from src.services.processing_status import ProcessingStatusStreamService
@@ -73,6 +77,34 @@ async def stream_ddr_status(
         media_type="text/event-stream",
         headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
     )
+
+
+@router.get("/{ddr_id}/occurrences", response_model=list[OccurrenceInResponse])
+async def get_ddr_occurrences(
+    ddr_id: str,
+    occurrence_type: Annotated[str | None, Query(alias="type")] = None,
+    section: str | None = None,
+    date_from: Annotated[str | None, Query(pattern=r"^\d{8}$")] = None,
+    date_to: Annotated[str | None, Query(pattern=r"^\d{8}$")] = None,
+    limit: Annotated[int, Query(ge=1, le=10000)] = 1000,
+    offset: Annotated[int, Query(ge=0)] = 0,
+    current_user = Depends(jwt_authentication),
+    ddr_repository: DDRCRUDRepository = Depends(get_repository(DDRCRUDRepository)),
+    occurrence_repository: OccurrenceCRUDRepository = Depends(get_repository(OccurrenceCRUDRepository)),
+) -> list[OccurrenceInResponse]:
+    ddr = await ddr_repository.read_by_id(ddr_id)
+    if ddr is None:
+        raise EntityDoesNotExist("ddr_not_found")
+    occurrences = await occurrence_repository.get_by_ddr_id_filtered(
+        ddr_id=ddr_id,
+        type_filter=occurrence_type,
+        section_filter=section,
+        date_from=date_from,
+        date_to=date_to,
+        limit=limit,
+        offset=offset,
+    )
+    return [OccurrenceInResponse.model_validate(o) for o in occurrences]
 
 
 @router.get("/{ddr_id}", response_model=DDRDetailResponse)
