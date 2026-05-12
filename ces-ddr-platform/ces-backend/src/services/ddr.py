@@ -94,12 +94,12 @@ class DDRUploadService:
         await self.validate_pdf(file)
         ddr_id = str(uuid.uuid4())
         data = await self.read_upload(file)
-        file_path = await self.storage_service.upload_pdf(ddr_id, data)
+        await self.storage_service.upload_pdf(ddr_id, data)
 
         try:
             return await self.ddr_repository.create_queued_with_queue(
                 ddr_id=ddr_id,
-                file_path=file_path,
+                file_path=file.filename or f"{ddr_id}.pdf",
                 processing_queue_repository=self.processing_queue_repository,
             )
         except Exception:

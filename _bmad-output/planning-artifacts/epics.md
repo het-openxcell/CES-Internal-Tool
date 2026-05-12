@@ -764,6 +764,29 @@ So that I can scan all occurrences at a glance and immediately identify rows nee
 
 Users can correct any occurrence field inline — reason captured, stored with full metadata, reviewed in a dashboard, and automatically summarized into future extraction prompts so the same mistake doesn't repeat.
 
+### Story 4.0: Well Name & Surface Location Extraction
+
+As a CES staff member,
+I want Well Name and Surface Location columns in the occurrence table to show actual values extracted from the DDR PDF,
+so that I can identify which well each occurrence belongs to without opening the source PDF.
+
+**Acceptance Criteria:**
+
+**Given** a DDR PDF is processed through the Gemini extraction pipeline
+**When** at least one date chunk is successfully extracted
+**Then** `ddrs.well_name` is populated with the well name found in the PDF (null if not found)
+**And** `ddrs.surface_location` is populated with the surface location found in the PDF (null if not found)
+**And** both values are written to `ddrs` after all date extractions complete
+
+**Given** `ddrs.well_name` and `ddrs.surface_location` are populated
+**When** `OccurrenceGenerationService.generate_for_ddr` runs
+**Then** every occurrence row has `well_name` from `ddr.well_name` and `surface_location` from `ddr.surface_location`
+**And** `surface_location` is no longer hardcoded `None`
+
+**Given** Gemini returns `well_name` and `surface_location` in extracted JSON
+**When** `DDRExtractionValidator` validates the response
+**Then** both fields pass validation and appear in `final_json`
+
 ### Story 4.1: Corrections Database Schema
 
 As a platform developer,

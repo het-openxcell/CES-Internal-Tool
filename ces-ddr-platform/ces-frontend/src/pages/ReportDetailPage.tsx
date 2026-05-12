@@ -1,17 +1,33 @@
+import { useCallback, useState } from "react";
 import { Navigate, useParams } from "react-router";
 
 import { OccurrenceTable } from "@/components/OccurrenceTable";
 import { useOccurrences } from "@/hooks/useOccurrences";
 import { useProcessingStatus } from "@/hooks/useProcessingStatus";
+import { apiClient } from "@/lib/api";
 import { cn } from "@/lib/utils";
 
 export default function ReportDetailPage() {
   const { id } = useParams();
+  const [retryingDate, setRetryingDate] = useState<string | null>(null);
 
   if (!id) return <Navigate to="/" replace />;
 
   const status = useProcessingStatus(id);
   const { data: occurrences, isLoading: occurrencesLoading } = useOccurrences(id);
+
+  const handleRetryDate = useCallback(
+    async (date: string) => {
+      setRetryingDate(date);
+      try {
+        await apiClient.retryDate(id, date);
+        await status.refresh();
+      } finally {
+        setRetryingDate(null);
+      }
+    },
+    [id, status],
+  );
 
   const processedLabel = `Processing date ${status.currentProcessedCount} of ${status.totalDates || status.currentProcessedCount}…`;
   const extractedCount = status.finalSummary
@@ -144,6 +160,8 @@ export default function ReportDetailPage() {
           occurrences={occurrences ?? []}
           failedDates={failedDates}
           isLoading={occurrencesLoading}
+          onRetryDate={handleRetryDate}
+          retryingDate={retryingDate}
         />
       </section>
 

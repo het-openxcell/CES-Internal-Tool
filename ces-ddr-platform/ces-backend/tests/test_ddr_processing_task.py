@@ -97,6 +97,10 @@ class FakeStorageService:
     async def download(self, key: str) -> bytes:
         return self.pdfs.get(key, b"")
 
+    async def download_original(self, ddr_id: str) -> bytes:
+        key = f"ces/ddrs/{ddr_id}/original.pdf"
+        return self.pdfs.get(key, b"")
+
     async def delete_ddr(self, ddr_id: str) -> None:
         prefix = f"ces/ddrs/{ddr_id}/"
         for k in list(self.chunks):

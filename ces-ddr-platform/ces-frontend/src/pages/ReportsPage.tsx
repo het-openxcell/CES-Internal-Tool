@@ -1,14 +1,31 @@
+import { useCallback, useState } from "react";
 import { useNavigate, useParams } from "react-router";
 
 import DDRUploadPanel from "@/components/DDRUploadPanel";
 import { EmptyState } from "@/components/ui/empty-state";
 import { useProcessingStatus } from "@/hooks/useProcessingStatus";
+import { apiClient } from "@/lib/api";
 import { cn } from "@/lib/utils";
 
 export default function ReportsPage() {
   const { id } = useParams();
   const navigate = useNavigate();
   const status = useProcessingStatus(id);
+  const [retryingDate, setRetryingDate] = useState<string | null>(null);
+
+  const handleRetryDate = useCallback(
+    async (date: string) => {
+      if (!id) return;
+      setRetryingDate(date);
+      try {
+        await apiClient.retryDate(id, date);
+        await status.refresh();
+      } finally {
+        setRetryingDate(null);
+      }
+    },
+    [id, status],
+  );
   const processedLabel = `Processing date ${status.currentProcessedCount} of ${status.totalDates || status.currentProcessedCount}...`;
   const extractedCount = status.finalSummary
     ? Math.max(status.finalSummary.total_dates - status.finalSummary.failed_dates, 0)
@@ -105,7 +122,33 @@ export default function ReportsPage() {
             {status.rows.map((row) => (
               <div className="relative grid grid-cols-[1fr_auto] gap-x-3 gap-y-1 px-[18px] py-3 border border-border-default rounded-[10px] bg-white transition-colors duration-200 hover:bg-[#FAFBFC] hover:border-border-input" key={row.date}>
                 <span className="text-sm font-medium text-text-primary tabular-nums tracking-wide">{row.date}</span>
-                <strong className="inline-flex items-center gap-1.5 capitalize text-xs font-bold">{row.status}</strong>
+                <div className="flex items-center gap-2">
+                  {(row.status === "failed" || row.status === "warning") ? (
+                    <button
+                      onClick={() => handleRetryDate(row.date)}
+                      disabled={retryingDate === row.date}
+                      className="inline-flex items-center gap-1 px-2 py-0.5 text-[11px] font-semibold text-[#C41230] border border-[#C41230] rounded bg-white hover:bg-[#FEF2F2] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                    >
+                      {retryingDate === row.date ? (
+                        <>
+                          <svg className="w-3 h-3 animate-spin" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                            <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" strokeDasharray="60" strokeDashoffset="20" />
+                          </svg>
+                          …
+                        </>
+                      ) : (
+                        <>
+                          <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                            <polyline points="23 4 23 10 17 10" />
+                            <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" />
+                          </svg>
+                          Retry
+                        </>
+                      )}
+                    </button>
+                  ) : null}
+                  <strong className="inline-flex items-center gap-1.5 capitalize text-xs font-bold">{row.status}</strong>
+                </div>
                 {row.error ? <p className="col-span-full mt-0.5 text-text-muted text-xs leading-relaxed">{row.error}</p> : null}
               </div>
             ))}

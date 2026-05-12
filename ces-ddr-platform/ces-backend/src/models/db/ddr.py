@@ -26,6 +26,7 @@ class DDR(Base):
         server_default=sqlalchemy.text("'queued'"),
     )
     well_name: Mapped[str | None] = mapped_column(sqlalchemy.Text(), nullable=True)
+    surface_location: Mapped[str | None] = mapped_column(sqlalchemy.Text(), nullable=True)
     created_at: Mapped[int] = mapped_column(sqlalchemy.BigInteger(), nullable=False)
     updated_at: Mapped[int] = mapped_column(sqlalchemy.BigInteger(), nullable=False)
 

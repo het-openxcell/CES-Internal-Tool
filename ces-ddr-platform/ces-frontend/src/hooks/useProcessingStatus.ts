@@ -87,6 +87,7 @@ export function useProcessingStatus(ddrId?: string) {
   const completedRef = useRef(false);
   const rowsRef = useRef<ProcessingStatusRow[]>([]);
   const totalDatesRef = useRef(0);
+  const refreshCounterRef = useRef(0);
 
   useEffect(() => {
     rowsRef.current = rows;
@@ -229,6 +230,35 @@ export function useProcessingStatus(ddrId?: string) {
     };
   }, [rows]);
 
+  const refresh = async () => {
+    if (!ddrId) return;
+    try {
+      const detail: DDRDetail = await apiClient.getDDR(ddrId);
+      const detailRows = rowsFromDetail(detail);
+      setDdrStatus(detail.status);
+      setRows(detailRows);
+      setTotalDates(detail.dates?.length ?? detailRows.length);
+      if (detail.status === "complete" || detail.status === "failed") {
+        completedRef.current = true;
+        setConnectionMode("closed");
+        const failedDates = detailRows.filter((row) => row.status === "failed").length;
+        const warningDates = detailRows.filter((row) => row.status === "warning").length;
+        setFinalSummary({
+          total_dates: detail.dates?.length ?? detailRows.length,
+          failed_dates: failedDates,
+          warning_dates: warningDates,
+          total_occurrences: 0,
+        });
+      } else {
+        completedRef.current = false;
+        setConnectionMode("polling");
+        setFinalSummary(null);
+      }
+    } catch {
+      setError("Refresh failed");
+    }
+  };
+
   return {
     connectionMode,
     ddrStatus,
@@ -237,5 +267,6 @@ export function useProcessingStatus(ddrId?: string) {
     totalDates: totalDates || rows.length,
     finalSummary,
     error,
+    refresh,
   };
 }

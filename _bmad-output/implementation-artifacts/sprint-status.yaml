@@ -1,5 +1,5 @@
 # generated: 2026-05-06
-# last_updated: 2026-05-11 — story 3-5 done
+# last_updated: 2026-05-12 — story 4-0 created
 # project: Canadian Energy Service Internal Tool
 # project_key: NOKEY
 # tracking_system: file-system
@@ -64,7 +64,7 @@ development_status:
 
   # ── Epic 2: DDR Upload & AI Extraction Pipeline ──
   epic-2: in-progress
-  2-1-ddr-pipeline-database-schema: in-progress
+  2-1-ddr-pipeline-database-schema: done
   2-2-pdf-upload-endpoint-processing-queue: done
   2-3-pdf-pre-splitter-date-boundary-detection: done
   2-4-per-date-gemini-extraction-pydantic-validation: done
@@ -82,7 +82,8 @@ development_status:
   epic-3-retrospective: optional
 
   # ── Epic 4: Inline Editing & Correction Store ──
-  epic-4: backlog
+  epic-4: in-progress
+  4-0-well-name-surface-location-extraction: review
   4-1-corrections-database-schema: backlog
   4-2-occurrence-edit-api-correction-store-write: backlog
   4-3-correction-context-builder-pipeline-injection: backlog

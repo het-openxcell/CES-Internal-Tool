@@ -45,6 +45,7 @@ class DDRBase(BaseSchemaModel):
     file_path: str
     status: str = DDRStatus.QUEUED
     well_name: str | None = None
+    surface_location: str | None = None
 
     @pydantic.field_validator("status")
     @classmethod
@@ -86,6 +87,7 @@ class DDRListItemResponse(BaseSchemaModel):
     file_path: str
     status: str
     well_name: str | None = None
+    surface_location: str | None = None
     created_at: int
 
     @pydantic.field_validator("status")
@@ -226,3 +228,5 @@ class DDRExtractionPayload(DDRExtractionSchemaModel):
     mud_records: list[DDRExtractionMudRecord]
     deviation_surveys: list[DDRExtractionDeviationSurvey]
     bit_records: list[DDRExtractionBitRecord]
+    well_name: str | None = None
+    surface_location: str | None = None

@@ -10,6 +10,7 @@ from src.repository.crud.ddr import DDRCRUDRepository, DDRDateCRUDRepository, Pr
 from src.repository.crud.occurrence import OccurrenceCRUDRepository
 from src.securities.authorizations.jwt_authentication import jwt_authentication, stream_query_token_authentication
 from src.services.ddr import DDRProcessingTask, DDRUploadService
+from src.services.pipeline_service import PreSplitPipelineService
 from src.services.processing_status import ProcessingStatusStreamService
 from src.services.storage_service import StorageService
 from src.utilities.exceptions import EntityDoesNotExist
@@ -136,3 +137,24 @@ async def get_ddr(
         created_at=ddr.created_at,
         dates=[DDRDateInResponse.model_validate(row) for row in rows],
     )
+
+
+@router.post("/{ddr_id}/dates/{date}/retry", response_model=DDRDateInResponse)
+async def retry_ddr_date(
+    ddr_id: str,
+    date: str,
+    current_user = Depends(jwt_authentication),
+    ddr_repository: DDRCRUDRepository = Depends(get_repository(DDRCRUDRepository)),
+    ddr_date_repository: DDRDateCRUDRepository = Depends(get_repository(DDRDateCRUDRepository)),
+    occurrence_repository: OccurrenceCRUDRepository = Depends(get_repository(OccurrenceCRUDRepository)),
+    status_stream_service: ProcessingStatusStreamService = Depends(get_processing_status_stream_service),
+) -> DDRDateInResponse:
+    service = PreSplitPipelineService(
+        ddr_repository=ddr_repository,
+        ddr_date_repository=ddr_date_repository,
+        occurrence_repository=occurrence_repository,
+        storage_service=StorageService(),
+        status_stream_service=status_stream_service,
+    )
+    row = await service.retry_date(ddr_id, date)
+    return DDRDateInResponse.model_validate(row)
