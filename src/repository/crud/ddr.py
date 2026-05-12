@@ -59,6 +59,19 @@ class DDRCRUDRepository(BaseCRUDRepository[DDR]):
         query = await self.async_session.execute(statement=stmt)
         return query.scalars().all()
 
+    async def update_well_metadata(
+        self,
+        ddr: DDR,
+        well_name: str | None,
+        surface_location: str | None,
+        commit: bool = True,
+    ) -> DDR:
+        return await self.update(
+            ddr,
+            {"well_name": well_name, "surface_location": surface_location, "updated_at": int(time.time())},
+            commit=commit,
+        )
+
     async def finalize_status_from_dates(self, ddr: DDR, date_statuses: typing.Iterable[str]) -> DDR:
         statuses = list(date_statuses)
         if not statuses:

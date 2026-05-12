@@ -90,6 +90,10 @@ class FakeStorageService:
     async def download(self, key: str) -> bytes:
         return Path(key).read_bytes()
 
+    async def download_original(self, ddr_id: str) -> bytes:
+        path = self.base_dir / f"{ddr_id}.pdf"
+        return path.read_bytes()
+
     async def delete_ddr(self, ddr_id: str) -> None:
         for f in self.base_dir.glob(f"{ddr_id}*"):
             f.unlink(missing_ok=True)
@@ -151,8 +155,8 @@ def test_upload_service_saves_pdf_and_creates_queue_row(tmp_path) -> None:
         result = await service.upload(make_upload("FIELD.PDF", "application/pdf"))
 
         assert result.status == "queued"
-        assert result.file_path.endswith(".pdf")
-        assert Path(result.file_path).exists()
+        assert result.file_path == "FIELD.PDF"
+        assert list(tmp_path.glob("*.pdf"))  # file was actually stored in S3
         assert repository.created[0]["processing_queue_repository"].__class__ is StubProcessingQueueRepository
 
     asyncio.run(run())
@@ -243,7 +247,7 @@ def test_upload_route_accepts_pdf_and_returns_queued(tmp_path, monkeypatch) -> N
     body = response.json()
     assert body["status"] == "queued"
     assert repository.created[0]["ddr_id"] == body["id"]
-    assert Path(repository.created[0]["file_path"]).exists()
+    assert repository.created[0]["file_path"] == "field.pdf"
 
 
 def test_upload_route_rejects_non_pdf_without_file_write(tmp_path, monkeypatch) -> None:

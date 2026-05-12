@@ -20,6 +20,7 @@ class OccurrenceGenerationService:
         self,
         ddr_id: str,
         ddr_well_name: str | None = None,
+        ddr_surface_location: str | None = None,
         surface_shoe: float = DEFAULT_SURFACE_SHOE_DEPTH,
         intermediate_shoe: float = DEFAULT_INTERMEDIATE_SHOE_DEPTH,
     ) -> int:
@@ -58,7 +59,7 @@ class OccurrenceGenerationService:
                     "section": section,
                     "density": density,
                     "well_name": ddr_well_name,
-                    "surface_location": None,
+                    "surface_location": ddr_surface_location,
                     "notes": text if text else None,
                     "date": row.date,
                 })

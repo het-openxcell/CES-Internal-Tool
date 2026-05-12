@@ -116,6 +116,9 @@ class FakeDDRRepository:
             ddr.status = DDRStatus.FAILED
         return ddr
 
+    async def update_well_metadata(self, ddr, well_name, surface_location, commit=True):
+        return ddr
+
 
 class FakeCostService:
     def __init__(self):
@@ -157,6 +160,10 @@ class FakeStorageService:
         return key
 
     async def download(self, key: str) -> bytes:
+        return self.pdfs.get(key, b"")
+
+    async def download_original(self, ddr_id: str) -> bytes:
+        key = f"ces/ddrs/{ddr_id}/original.pdf"
         return self.pdfs.get(key, b"")
 
     async def delete_ddr(self, ddr_id: str) -> None:

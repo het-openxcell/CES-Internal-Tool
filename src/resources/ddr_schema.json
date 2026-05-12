@@ -5,6 +5,8 @@
   "additionalProperties": false,
   "required": ["time_logs", "mud_records", "deviation_surveys", "bit_records"],
   "properties": {
+    "well_name": {"type": ["string", "null"]},
+    "surface_location": {"type": ["string", "null"]},
     "time_logs": {
       "type": "array",
       "items": {

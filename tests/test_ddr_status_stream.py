@@ -31,6 +31,9 @@ class StubDDRRepository:
         ddr.status = "complete" if "success" in list(statuses) else "failed"
         return ddr
 
+    async def update_well_metadata(self, ddr: Any, well_name: Any, surface_location: Any, commit: bool = True) -> Any:
+        return ddr
+
 
 class StubDDRDateRepository:
     def __init__(self) -> None:
