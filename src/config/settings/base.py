@@ -74,6 +74,13 @@ class BackendBaseSettings(BaseSettings):
         cast=str,
     )
 
+    # S3 Configuration
+    S3_BUCKET_NAME: str = config("S3_BUCKET_NAME", default="", cast=str)
+    S3_REGION: str = config("S3_REGION", default="ap-south-1", cast=str)
+    S3_ACCESS_KEY_ID: str = config("S3_ACCESS_KEY_ID", default="", cast=str)
+    S3_SECRET_ACCESS_KEY: str = config("S3_SECRET_ACCESS_KEY", default="", cast=str)
+    S3_KEY_PREFIX: str = config("S3_KEY_PREFIX", default="ces/", cast=str)
+
     HASHING_ALGORITHM_LAYER_1: str = config("HASHING_ALGORITHM_LAYER_1", default="bcrypt", cast=str)
     HASHING_ALGORITHM_LAYER_2: str = config("HASHING_ALGORITHM_LAYER_2", default="sha256", cast=str)
 
