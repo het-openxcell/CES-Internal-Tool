@@ -12,6 +12,8 @@ variables:
 build:
   stage: build
   extends: .build
+  before_script:
+    - cp "$DEV_ENV" .env
   variables:
     BUILD_ARGS: "--build-arg APP_NAME=${PROJECT} --build-arg PROFILE=${CI_COMMIT_REF_NAME}"
 
@@ -24,7 +26,7 @@ deploy_dev:
     CONT_PORT: "8000"
     CPU_REQUEST: 200m
     MEMORY_REQUEST: 1700Mi
-    CPU_LIMIT: 300m
+    CPU_LIMIT: 400m
     MEMORY_LIMIT: 2Gi
   only:
     - development
