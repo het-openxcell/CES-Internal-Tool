@@ -16,6 +16,7 @@ from src.services.pipeline.extract import (
 from src.services.pipeline.pre_split import PDFPreSplitter, PreSplitResult
 from src.services.pipeline.validate import DDRExtractionValidator
 from src.services.processing_status import ProcessingStatusStreamService
+from src.services.storage_service import StorageService
 
 
 class PreSplitPipelineService:
@@ -36,11 +37,13 @@ class PreSplitPipelineService:
         cost_service: ExtractionCostService | None = None,
         embedding_service: TimeLogEmbeddingService | None = None,
         occurrence_repository: Any | None = None,
+        storage_service: StorageService | None = None,
     ) -> None:
         self.ddr_repository = ddr_repository
         self.ddr_date_repository = ddr_date_repository
         self.occurrence_repository = occurrence_repository
         self.pre_splitter = pre_splitter or PDFPreSplitter()
+        self.storage_service = storage_service or StorageService()
         self.pdf_loader = pdf_loader or self._default_pdf_loader
         self.extractor = extractor
         self.validator = validator or DDRExtractionValidator()
@@ -74,6 +77,9 @@ class PreSplitPipelineService:
         await self.ddr_date_repository.bulk_create_queued(ddr_id=ddr_id, dates=ordered_dates, commit=False)
         await self.ddr_repository.update_status(ddr, DDRStatus.PROCESSING, commit=False)
         await self._commit_outcome()
+
+        for date, chunk_bytes in result.date_chunks.items():
+            await self.storage_service.upload_chunk(ddr_id, date, chunk_bytes)
 
         if self.extract_after_split:
             await self._extract_all_dates(ddr_id=ddr_id, ddr=ddr, date_chunks=result.date_chunks)
@@ -252,7 +258,7 @@ class PreSplitPipelineService:
         return str(row.id)
 
     async def _default_pdf_loader(self, file_path: str) -> bytes:
-        return await asyncio.to_thread(self._read_file_bytes, file_path)
+        return await self.storage_service.download(file_path)
 
     async def _commit_outcome(self) -> None:
         sessions = {
@@ -279,11 +285,6 @@ class PreSplitPipelineService:
         if self.embedding_service is None:
             self.embedding_service = TimeLogEmbeddingService()
         return self.embedding_service
-
-    @staticmethod
-    def _read_file_bytes(file_path: str) -> bytes:
-        with open(file_path, "rb") as fh:
-            return fh.read()
 
 
 __all__ = ["PreSplitPipelineService"]

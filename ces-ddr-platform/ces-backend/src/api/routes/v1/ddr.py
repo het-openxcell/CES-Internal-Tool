@@ -11,6 +11,7 @@ from src.repository.crud.occurrence import OccurrenceCRUDRepository
 from src.securities.authorizations.jwt_authentication import jwt_authentication, stream_query_token_authentication
 from src.services.ddr import DDRProcessingTask, DDRUploadService
 from src.services.processing_status import ProcessingStatusStreamService
+from src.services.storage_service import StorageService
 from src.utilities.exceptions import EntityDoesNotExist
 
 router = APIRouter(prefix="/ddrs", tags=["DDRs"])
@@ -33,8 +34,17 @@ async def upload_ddr(
     processing_queue_repository: ProcessingQueueCRUDRepository = Depends(get_repository(ProcessingQueueCRUDRepository)),
     status_stream_service: ProcessingStatusStreamService = Depends(get_processing_status_stream_service),
 ) -> DDRUploadResponse:
-    processing_task = DDRProcessingTask(status_stream_service=status_stream_service)
-    service = DDRUploadService(ddr_repository, processing_queue_repository, processing_task=processing_task)
+    storage_service = StorageService()
+    processing_task = DDRProcessingTask(
+        status_stream_service=status_stream_service,
+        storage_service=storage_service,
+    )
+    service = DDRUploadService(
+        ddr_repository,
+        processing_queue_repository,
+        storage_service=storage_service,
+        processing_task=processing_task,
+    )
     ddr = await service.upload(file)
     background_tasks.add_task(service.dispatch_background, ddr.id)
     return DDRUploadResponse(id=ddr.id, status=ddr.status)

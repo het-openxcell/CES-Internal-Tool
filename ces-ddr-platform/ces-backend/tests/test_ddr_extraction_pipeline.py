@@ -141,6 +141,34 @@ class FakeEmbeddingService:
         self.rows.append(row)
 
 
+class FakeStorageService:
+    def __init__(self):
+        self.chunks: dict[str, bytes] = {}
+        self.pdfs: dict[str, bytes] = {}
+
+    async def upload_pdf(self, ddr_id: str, data: bytes) -> str:
+        key = f"ces/ddrs/{ddr_id}/original.pdf"
+        self.pdfs[key] = data
+        return key
+
+    async def upload_chunk(self, ddr_id: str, date: str, data: bytes) -> str:
+        key = f"ces/ddrs/{ddr_id}/chunks/{date}.pdf"
+        self.chunks[key] = data
+        return key
+
+    async def download(self, key: str) -> bytes:
+        return self.pdfs.get(key, b"")
+
+    async def delete_ddr(self, ddr_id: str) -> None:
+        prefix = f"ces/ddrs/{ddr_id}/"
+        for k in list(self.chunks):
+            if k.startswith(prefix):
+                del self.chunks[k]
+        for k in list(self.pdfs):
+            if k.startswith(prefix):
+                del self.pdfs[k]
+
+
 def test_validator_accepts_valid_payload_and_preserves_order() -> None:
     validator = DDRExtractionValidator()
     result = validator.validate(FIXTURE_JSON)
@@ -281,6 +309,7 @@ def test_pipeline_persists_success_warning_and_failure_per_date(tmp_path) -> Non
         extract_after_split=True,
         cost_service=cost_service,
         embedding_service=embedding_service,
+        storage_service=FakeStorageService(),
     )
 
     asyncio.run(service.run("ddr-1"))
@@ -345,6 +374,7 @@ def test_pipeline_marks_parent_failed_when_all_dates_fail(tmp_path) -> None:
         extract_after_split=True,
         cost_service=FakeCostService(),
         embedding_service=FakeEmbeddingService(),
+        storage_service=FakeStorageService(),
     )
 
     asyncio.run(service.run("ddr-1"))

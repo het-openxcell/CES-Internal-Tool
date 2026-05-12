@@ -97,7 +97,7 @@ export default function CollapsibleSidebar() {
               cn(
                 "flex items-center gap-3 py-2.5 rounded-md text-sm font-semibold transition-colors relative",
                 isActive
-                  ? "text-ces-red bg-[#FEF2F2] border-l-[3px] border-ces-red"
+                  ? "text-ces-red bg-[#FEF2F2]"
                   : "text-text-muted hover:text-text-primary hover:bg-black/[0.04]",
                 collapsed ? "justify-center px-0" : "px-3"
               )

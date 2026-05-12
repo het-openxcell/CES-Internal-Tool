@@ -79,6 +79,34 @@ class StubSplitter:
         return self._result
 
 
+class FakeStorageService:
+    def __init__(self):
+        self.chunks: dict[str, bytes] = {}
+        self.pdfs: dict[str, bytes] = {}
+
+    async def upload_pdf(self, ddr_id: str, data: bytes) -> str:
+        key = f"ces/ddrs/{ddr_id}/original.pdf"
+        self.pdfs[key] = data
+        return key
+
+    async def upload_chunk(self, ddr_id: str, date: str, data: bytes) -> str:
+        key = f"ces/ddrs/{ddr_id}/chunks/{date}.pdf"
+        self.chunks[key] = data
+        return key
+
+    async def download(self, key: str) -> bytes:
+        return self.pdfs.get(key, b"")
+
+    async def delete_ddr(self, ddr_id: str) -> None:
+        prefix = f"ces/ddrs/{ddr_id}/"
+        for k in list(self.chunks):
+            if k.startswith(prefix):
+                del self.chunks[k]
+        for k in list(self.pdfs):
+            if k.startswith(prefix):
+                del self.pdfs[k]
+
+
 def _split_result(date_chunks: dict[str, bytes], raw_text_preview: str = "") -> SimpleNamespace:
     return SimpleNamespace(
         date_chunks=date_chunks,
@@ -102,6 +130,7 @@ def test_pipeline_service_creates_queued_dates_and_marks_processing(tmp_path) ->
             pre_splitter=StubSplitter(result),
             pdf_loader=lambda path: _async_return(b"%PDF-1.7"),
             extract_after_split=False,
+            storage_service=FakeStorageService(),
         )
 
         await service.run("ddr-1")

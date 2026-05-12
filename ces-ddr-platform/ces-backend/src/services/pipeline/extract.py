@@ -137,7 +137,7 @@ class GeminiDDRExtractor:
             except Exception as exc:
                 last_error = exc
                 if not self._is_rate_limit(exc):
-                    raise ExtractionError("gemini_call_failed") from None
+                    raise ExtractionError(f"gemini_call_failed: {exc}") from exc
                 if attempt >= self._max_retries:
                     break
                 await self._sleep(self.backoff_seconds[min(attempt, len(self.backoff_seconds) - 1)])

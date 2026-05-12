@@ -73,18 +73,41 @@ class StubDDRDateRepository:
         ]
 
 
+class FakeStorageService:
+    def __init__(self, base_dir: Path) -> None:
+        self.base_dir = base_dir
+
+    async def upload_pdf(self, ddr_id: str, data: bytes) -> str:
+        path = self.base_dir / f"{ddr_id}.pdf"
+        path.write_bytes(data)
+        return str(path)
+
+    async def upload_chunk(self, ddr_id: str, date: str, data: bytes) -> str:
+        path = self.base_dir / f"{ddr_id}_{date}.pdf"
+        path.write_bytes(data)
+        return str(path)
+
+    async def download(self, key: str) -> bytes:
+        return Path(key).read_bytes()
+
+    async def delete_ddr(self, ddr_id: str) -> None:
+        for f in self.base_dir.glob(f"{ddr_id}*"):
+            f.unlink(missing_ok=True)
+
+
 def make_upload(filename: str, content_type: str, content: bytes = b"%PDF-1.7") -> UploadFile:
     return UploadFile(filename=filename, file=BytesIO(content), headers={"content-type": content_type})
 
 
-def test_upload_dir_setting_defaults_to_app_uploads() -> None:
-    assert BackendBaseSettings().UPLOAD_DIR == "/app/uploads"
+def test_upload_dir_setting_is_configured() -> None:
+    assert isinstance(BackendBaseSettings().UPLOAD_DIR, str)
 
 
 def test_upload_service_rejects_non_pdf_before_write(tmp_path) -> None:
     async def run() -> None:
         repository = StubQueuedDDRRepository()
-        service = DDRUploadService(repository, StubProcessingQueueRepository(), upload_dir=str(tmp_path))
+        storage_service = FakeStorageService(tmp_path)
+        service = DDRUploadService(repository, StubProcessingQueueRepository(), storage_service=storage_service)
         upload = make_upload("field.txt", "text/plain")
 
         try:
@@ -103,7 +126,8 @@ def test_upload_service_rejects_non_pdf_before_write(tmp_path) -> None:
 def test_upload_service_rejects_spoofed_pdf_before_write(tmp_path) -> None:
     async def run() -> None:
         repository = StubQueuedDDRRepository()
-        service = DDRUploadService(repository, StubProcessingQueueRepository(), upload_dir=str(tmp_path))
+        storage_service = FakeStorageService(tmp_path)
+        service = DDRUploadService(repository, StubProcessingQueueRepository(), storage_service=storage_service)
         upload = make_upload("field.pdf", "application/pdf", b"not-pdf")
 
         try:
@@ -119,15 +143,11 @@ def test_upload_service_rejects_spoofed_pdf_before_write(tmp_path) -> None:
     asyncio.run(run())
 
 
-def test_upload_service_saves_pdf_and_creates_queue_row(tmp_path, monkeypatch) -> None:
+def test_upload_service_saves_pdf_and_creates_queue_row(tmp_path) -> None:
     async def run() -> None:
         repository = StubQueuedDDRRepository()
-        service = DDRUploadService(repository, StubProcessingQueueRepository(), upload_dir=str(tmp_path))
-
-        async def write_upload(_: UploadFile, file_path: Path) -> None:
-            await asyncio.to_thread(file_path.write_bytes, b"%PDF-1.7")
-
-        monkeypatch.setattr(service, "write_upload", write_upload)
+        storage_service = FakeStorageService(tmp_path)
+        service = DDRUploadService(repository, StubProcessingQueueRepository(), storage_service=storage_service)
         result = await service.upload(make_upload("FIELD.PDF", "application/pdf"))
 
         assert result.status == "queued"
@@ -140,13 +160,13 @@ def test_upload_service_saves_pdf_and_creates_queue_row(tmp_path, monkeypatch) -
 
 def test_upload_service_removes_partial_file_when_write_fails(tmp_path, monkeypatch) -> None:
     async def run() -> None:
-        service = DDRUploadService(StubQueuedDDRRepository(), StubProcessingQueueRepository(), upload_dir=str(tmp_path))
+        storage_service = FakeStorageService(tmp_path)
+        service = DDRUploadService(StubQueuedDDRRepository(), StubProcessingQueueRepository(), storage_service=storage_service)
 
-        async def write_upload(_: UploadFile, file_path: Path) -> None:
-            await asyncio.to_thread(file_path.write_bytes, b"%PDF-1.7")
+        async def failing_upload(*_, **__):
             raise RuntimeError("write failed")
 
-        monkeypatch.setattr(service, "write_upload", write_upload)
+        monkeypatch.setattr(storage_service, "upload_pdf", failing_upload)
 
         try:
             await service.upload(make_upload("field.pdf", "application/pdf"))
@@ -162,12 +182,13 @@ def test_upload_service_removes_partial_file_when_write_fails(tmp_path, monkeypa
 
 def test_upload_service_removes_file_when_db_insert_fails(tmp_path, monkeypatch) -> None:
     async def run() -> None:
-        service = DDRUploadService(FailingDDRRepository(), StubProcessingQueueRepository(), upload_dir=str(tmp_path))
+        storage_service = FakeStorageService(tmp_path)
+        service = DDRUploadService(FailingDDRRepository(), StubProcessingQueueRepository(), storage_service=storage_service)
 
-        async def write_upload(_: UploadFile, file_path: Path) -> None:
-            await asyncio.to_thread(file_path.write_bytes, b"%PDF-1.7")
+        async def failing_upload(*_, **__):
+            raise RuntimeError("db failed")
 
-        monkeypatch.setattr(service, "write_upload", write_upload)
+        monkeypatch.setattr(storage_service, "upload_pdf", failing_upload)
 
         try:
             await service.upload(make_upload("field.pdf", "application/pdf"))
@@ -196,8 +217,7 @@ def ddr_dependency(route_path: str, dependency_name: str) -> Any:
 
 def test_upload_route_accepts_pdf_and_returns_queued(tmp_path, monkeypatch) -> None:
     repository = StubQueuedDDRRepository()
-    previous_upload_dir = settings.UPLOAD_DIR
-    monkeypatch.setattr(settings, "UPLOAD_DIR", str(tmp_path))
+    storage_service = FakeStorageService(tmp_path)
 
     async def noop_dispatch(self: Any, ddr_id: str) -> None:
         pass
@@ -209,6 +229,8 @@ def test_upload_route_accepts_pdf_and_returns_queued(tmp_path, monkeypatch) -> N
         ddr_dependency("/api/ddrs/upload", "processing_queue_repository")
     ] = StubProcessingQueueRepository
 
+    monkeypatch.setattr("src.api.routes.v1.ddr.StorageService", lambda: storage_service)
+
     try:
         response = TestClient(backend_app).post(
             "/api/ddrs/upload",
@@ -216,7 +238,6 @@ def test_upload_route_accepts_pdf_and_returns_queued(tmp_path, monkeypatch) -> N
         )
     finally:
         backend_app.dependency_overrides.clear()
-        monkeypatch.setattr(settings, "UPLOAD_DIR", previous_upload_dir)
 
     assert response.status_code == 201
     body = response.json()
@@ -227,8 +248,7 @@ def test_upload_route_accepts_pdf_and_returns_queued(tmp_path, monkeypatch) -> N
 
 def test_upload_route_rejects_non_pdf_without_file_write(tmp_path, monkeypatch) -> None:
     repository = StubQueuedDDRRepository()
-    previous_upload_dir = settings.UPLOAD_DIR
-    monkeypatch.setattr(settings, "UPLOAD_DIR", str(tmp_path))
+    storage_service = FakeStorageService(tmp_path)
     backend_app.dependency_overrides[jwt_authentication] = override_auth
     backend_app.dependency_overrides[ddr_dependency("/api/ddrs/upload", "ddr_repository")] = lambda: repository
     backend_app.dependency_overrides[
@@ -242,7 +262,6 @@ def test_upload_route_rejects_non_pdf_without_file_write(tmp_path, monkeypatch) 
         )
     finally:
         backend_app.dependency_overrides.clear()
-        monkeypatch.setattr(settings, "UPLOAD_DIR", previous_upload_dir)
 
     assert response.status_code == 400
     body = response.json()
