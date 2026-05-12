@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-05-06
-last_updated: 2026-05-11
+last_updated: 2026-05-12
 project: Canadian Energy Service Internal Tool
 project_key: NOKEY
 tracking_system: file-system
@@ -84,7 +84,7 @@ development_status:
   # ── Epic 4: Inline Editing & Correction Store ──
   epic-4: in-progress
   4-0-well-name-surface-location-extraction: review
-  4-1-corrections-database-schema: backlog
+  4-1-corrections-database-schema: ready-for-dev
   4-2-occurrence-edit-api-correction-store-write: backlog
   4-3-correction-context-builder-pipeline-injection: backlog
   4-4-correction-store-review-api: backlog
