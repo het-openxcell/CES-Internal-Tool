@@ -89,7 +89,7 @@ describe("useProcessingStatus", () => {
     });
 
     expect(result.current.ddrStatus).toBe("complete");
-    expect(fetch).toHaveBeenCalledWith("https://ces-backend.apps.openxcell.dev/api/ddrs/ddr-1", expect.any(Object));
+    expect(fetch).toHaveBeenCalledWith("http://localhost:8000/api/ddrs/ddr-1", expect.any(Object));
 
     vi.useRealTimers();
   });
