@@ -87,8 +87,6 @@ export function useProcessingStatus(ddrId?: string) {
   const completedRef = useRef(false);
   const rowsRef = useRef<ProcessingStatusRow[]>([]);
   const totalDatesRef = useRef(0);
-  const refreshCounterRef = useRef(0);
-
   useEffect(() => {
     rowsRef.current = rows;
     totalDatesRef.current = totalDates;
@@ -243,15 +241,15 @@ export function useProcessingStatus(ddrId?: string) {
         setConnectionMode("closed");
         const failedDates = detailRows.filter((row) => row.status === "failed").length;
         const warningDates = detailRows.filter((row) => row.status === "warning").length;
+        const occurrences = await apiClient.getOccurrences(ddrId);
         setFinalSummary({
           total_dates: detail.dates?.length ?? detailRows.length,
           failed_dates: failedDates,
           warning_dates: warningDates,
-          total_occurrences: 0,
+          total_occurrences: occurrences?.length ?? 0,
         });
       } else {
         completedRef.current = false;
-        setConnectionMode("polling");
         setFinalSummary(null);
       }
     } catch {
