@@ -125,6 +125,15 @@ class DDRDateCRUDRepository(BaseCRUDRepository[DDRDate]):
         query = await self.async_session.execute(statement=stmt)
         return query.scalars().all()
 
+    async def read_date_for_update(self, ddr_id: str, date: str) -> DDRDate | None:
+        stmt = (
+            sqlalchemy.select(DDRDate)
+            .where(DDRDate.ddr_id == ddr_id, DDRDate.date == date)
+            .with_for_update()
+        )
+        result = await self.async_session.execute(stmt)
+        return result.scalar_one_or_none()
+
     async def update_status(self, ddr_date: DDRDate, status: str) -> DDRDate:
         return await self.update(ddr_date, {"status": DDRDateStatus.validate(status), "updated_at": int(time.time())})
 

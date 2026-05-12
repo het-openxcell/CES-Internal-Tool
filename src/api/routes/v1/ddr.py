@@ -1,6 +1,6 @@
 from typing import Annotated
 
-from fastapi import APIRouter, BackgroundTasks, Depends, Query, Request, UploadFile, status
+from fastapi import APIRouter, BackgroundTasks, Depends, Path, Query, Request, UploadFile, status
 from fastapi.responses import JSONResponse, StreamingResponse
 
 from src.api.dependencies.repository import get_repository
@@ -16,6 +16,10 @@ from src.services.storage_service import StorageService
 from src.utilities.exceptions import EntityDoesNotExist
 
 router = APIRouter(prefix="/ddrs", tags=["DDRs"])
+
+
+def get_storage_service() -> StorageService:
+    return StorageService()
 
 
 def get_processing_status_stream_service(request: Request) -> ProcessingStatusStreamService:
@@ -142,18 +146,19 @@ async def get_ddr(
 @router.post("/{ddr_id}/dates/{date}/retry", response_model=DDRDateInResponse)
 async def retry_ddr_date(
     ddr_id: str,
-    date: str,
+    date: Annotated[str, Path(pattern=r"^\d{8}$")],
     current_user = Depends(jwt_authentication),
     ddr_repository: DDRCRUDRepository = Depends(get_repository(DDRCRUDRepository)),
     ddr_date_repository: DDRDateCRUDRepository = Depends(get_repository(DDRDateCRUDRepository)),
     occurrence_repository: OccurrenceCRUDRepository = Depends(get_repository(OccurrenceCRUDRepository)),
+    storage_service: StorageService = Depends(get_storage_service),
     status_stream_service: ProcessingStatusStreamService = Depends(get_processing_status_stream_service),
 ) -> DDRDateInResponse:
     service = PreSplitPipelineService(
         ddr_repository=ddr_repository,
         ddr_date_repository=ddr_date_repository,
         occurrence_repository=occurrence_repository,
-        storage_service=StorageService(),
+        storage_service=storage_service,
         status_stream_service=status_stream_service,
     )
     row = await service.retry_date(ddr_id, date)

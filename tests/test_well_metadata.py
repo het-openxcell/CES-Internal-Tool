@@ -112,7 +112,7 @@ def test_surface_location_propagated_to_occurrences(mock_keywords):
         ]
         count = await service.generate_for_ddr("d1", ddr_surface_location="AB 01-02-003-04W5")
         assert count == 1
-        occ = occurrence_repo.bulk_create_occurrences.call_args[0][0][0]
+        occ = occurrence_repo.replace_for_ddr.call_args[0][1][0]
         assert occ["surface_location"] == "AB 01-02-003-04W5"
 
     asyncio.run(run())
@@ -135,7 +135,7 @@ def test_surface_location_none_when_not_provided(mock_keywords):
         ]
         count = await service.generate_for_ddr("d1")
         assert count == 1
-        occ = occurrence_repo.bulk_create_occurrences.call_args[0][0][0]
+        occ = occurrence_repo.replace_for_ddr.call_args[0][1][0]
         assert occ["surface_location"] is None
 
     asyncio.run(run())

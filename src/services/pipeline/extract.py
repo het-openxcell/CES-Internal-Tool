@@ -108,9 +108,10 @@ class GeminiDDRExtractor:
             self._client = GoogleGenAIClient(api_key=api_key)
         return self._client
 
+    _METADATA_KEYS: frozenset[str] = frozenset({"well_name", "surface_location"})
+
     def build_prompt(self, date: str) -> str:
-        metadata_keys = {"well_name", "surface_location"}
-        data_sections = [k for k in self._schema.section_names() if k not in metadata_keys]
+        data_sections = [k for k in self._schema.section_names() if k not in self._METADATA_KEYS]
         sections = ", ".join(data_sections)
         time_log_fields = ", ".join(
             self._schema.raw["properties"]["time_logs"]["items"]["properties"].keys()

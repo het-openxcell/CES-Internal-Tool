@@ -1,10 +1,14 @@
 import asyncio
+import logging
 from types import SimpleNamespace
 from typing import Any, Awaitable, Callable
 
 from src.config.manager import settings
+from src.models.db.ddr import DDRDate
 from src.models.schemas.ddr import DDRDateStatus, DDRStatus
 from src.repository.crud.ddr import PipelineRunCRUDRepository
+
+logger = logging.getLogger(__name__)
 from src.services.occurrence.generate import OccurrenceGenerationService
 from src.services.pipeline.cost import ExtractionCostService
 from src.services.pipeline.embedding import TimeLogEmbeddingService
@@ -86,24 +90,23 @@ class PreSplitPipelineService:
             await self._extract_all_dates(ddr_id=ddr_id, ddr=ddr, date_chunks=result.date_chunks)
         return result
 
-    async def retry_date(self, ddr_id: str, date: str) -> Any:
+    async def retry_date(self, ddr_id: str, date: str) -> DDRDate:
         ddr = await self.ddr_repository.read_ddr_by_id(ddr_id)
-        rows = await self.ddr_date_repository.read_dates_by_ddr_id(ddr_id)
-        row = next((r for r in rows if r.date == date), None)
+
+        # SELECT FOR UPDATE: atomically claim the retry, preventing concurrent retries (D1 + P2)
+        row = await self.ddr_date_repository.read_date_for_update(ddr_id, date)
         if row is None:
             raise EntityDoesNotExist("date_not_found")
         if row.status not in (DDRDateStatus.FAILED, DDRDateStatus.WARNING):
             raise BadRequestException("date_not_retryable")
-
-        chunk_bytes = await self.storage_service.download_chunk(ddr_id, date)
         await self.ddr_date_repository.update_status(row, DDRDateStatus.QUEUED)
 
+        chunk_bytes = await self.storage_service.download_chunk(ddr_id, date)
         extractor = self.extractor or GeminiDDRExtractor()
         await self._process_one_date(extractor, row, date, chunk_bytes)
 
         rows = await self.ddr_date_repository.read_dates_by_ddr_id(ddr_id)
         all_statuses = [r.status for r in rows]
-        await self.ddr_repository.finalize_status_from_dates(ddr, all_statuses)
 
         well_name = next(
             (r.final_json.get("well_name") for r in rows if r.final_json and r.final_json.get("well_name")),
@@ -114,12 +117,15 @@ class PreSplitPipelineService:
             None,
         )
         await self.ddr_repository.update_well_metadata(ddr, well_name, surface_location)
+        ddr = await self.ddr_repository.read_ddr_by_id(ddr_id)  # P3: re-read after mutation
+        await self.ddr_repository.finalize_status_from_dates(ddr, all_statuses)
 
         try:
             total_occurrences = await self._generate_occurrences(
-                ddr_id=ddr_id, ddr=ddr, well_name=well_name, surface_location=surface_location
+                ddr_id=ddr_id, well_name=well_name, surface_location=surface_location
             )
-        except Exception:
+        except Exception:  # noqa: BLE001
+            logger.warning("Occurrence generation failed during retry for DDR %s", ddr_id)
             total_occurrences = 0
 
         await self._publish_processing_complete(ddr_id, total_occurrences=total_occurrences)
@@ -165,14 +171,15 @@ class PreSplitPipelineService:
             None,
         )
         await self.ddr_repository.update_well_metadata(ddr, well_name, surface_location)
+        await self.ddr_repository.finalize_status_from_dates(ddr, final_statuses)  # D3: before generation
 
         try:
             total_occurrences = await self._generate_occurrences(
-                ddr_id=ddr_id, ddr=ddr, well_name=well_name, surface_location=surface_location
+                ddr_id=ddr_id, well_name=well_name, surface_location=surface_location
             )
         except Exception:  # noqa: BLE001
+            logger.warning("Occurrence generation failed for DDR %s", ddr_id)
             total_occurrences = 0
-        await self.ddr_repository.finalize_status_from_dates(ddr, final_statuses)
         await self._publish_processing_complete(ddr_id, total_occurrences=total_occurrences)
 
     async def _process_one_date(
@@ -269,7 +276,7 @@ class PreSplitPipelineService:
         )
 
     async def _generate_occurrences(
-        self, ddr_id: str, ddr: Any, well_name: str | None = None, surface_location: str | None = None
+        self, ddr_id: str, well_name: str | None = None, surface_location: str | None = None
     ) -> int:
         if self.occurrence_repository is None:
             return 0

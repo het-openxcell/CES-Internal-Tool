@@ -1,4 +1,4 @@
-def infer_mmd(time_log_index: int, time_logs: list[dict]) -> float | None:
+def infer_mmd(time_log_index: int, time_logs: list[dict], max_lookback: int = 5) -> float | None:
     # Precondition (F8): time_logs must be scoped to a single ddr_date — caller must not
     # pass a concatenated multi-date list; the backward scan does not respect date boundaries.
     if not 0 <= time_log_index < len(time_logs):  # F1: bounds guard
@@ -14,7 +14,9 @@ def infer_mmd(time_log_index: int, time_logs: list[dict]) -> float | None:
             return float(d)  # F4: guard non-numeric strings from LLM output
         except (TypeError, ValueError):
             pass  # treat unparseable depth as absent; fall through to backward scan
-    for i in range(time_log_index - 1, -1, -1):
+    # max_lookback prevents stale depth from hours earlier in the same day
+    stop = max(time_log_index - 1 - max_lookback, -1)
+    for i in range(time_log_index - 1, stop, -1):
         row_i = time_logs[i]
         if not isinstance(row_i, dict):  # F9
             continue

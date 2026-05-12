@@ -39,8 +39,8 @@ def _mud(depth, weight):
 
 
 def _bulk_args(occurrence_repo):
-    """Return the list of occurrence dicts passed to bulk_create_occurrences."""
-    return occurrence_repo.bulk_create_occurrences.call_args[0][0]
+    """Return the list of occurrence dicts passed to replace_for_ddr."""
+    return occurrence_repo.replace_for_ddr.call_args[0][1]
 
 
 @pytest.fixture
@@ -70,8 +70,9 @@ def test_skips_failed_date_rows(mock_keywords, service, ddr_date_repo, occurrenc
         ]
         count = await service.generate_for_ddr("d1")
         assert count == 0
-        occurrence_repo.delete_by_ddr_id.assert_awaited_once_with("d1")
-        occurrence_repo.bulk_create_occurrences.assert_not_called()
+        occurrence_repo.replace_for_ddr.assert_awaited_once_with("d1", [])
+        occurrence_repo.replace_for_ddr.assert_awaited_once()
+        assert occurrence_repo.replace_for_ddr.call_args[0][1] == []
 
     asyncio.run(run())
 
@@ -89,7 +90,8 @@ def test_skips_unclassified_time_logs(mock_keywords, service, ddr_date_repo, occ
         ]
         count = await service.generate_for_ddr("d1")
         assert count == 0
-        occurrence_repo.bulk_create_occurrences.assert_not_called()
+        occurrence_repo.replace_for_ddr.assert_awaited_once()
+        assert occurrence_repo.replace_for_ddr.call_args[0][1] == []
 
     asyncio.run(run())
 
@@ -108,7 +110,7 @@ def test_classified_entry_creates_occurrence(mock_keywords, service, ddr_date_re
         ]
         count = await service.generate_for_ddr("d1")
         assert count == 1
-        occurrence_repo.bulk_create_occurrences.assert_awaited_once()
+        occurrence_repo.replace_for_ddr.assert_awaited_once()
         occ = _bulk_args(occurrence_repo)[0]
         assert occ["ddr_id"] == "d1"
         assert occ["type"] == "Stuck Pipe"
@@ -160,7 +162,7 @@ def test_well_name_propagated(mock_keywords, service, ddr_date_repo, occurrence_
 
 
 @patch.object(KeywordLoader, "get_keywords", return_value={"stuck": "Stuck Pipe"})
-def test_surface_location_always_none(mock_keywords, service, ddr_date_repo, occurrence_repo):
+def test_surface_location_none_when_not_supplied(mock_keywords, service, ddr_date_repo, occurrence_repo):
     async def run():
         ddr_date_repo.read_dates_by_ddr_id.return_value = [
             _make_date_row(
@@ -229,7 +231,8 @@ def test_empty_final_json_skipped(mock_keywords, service, ddr_date_repo, occurre
         ddr_date_repo.read_dates_by_ddr_id.return_value = [row]
         count = await service.generate_for_ddr("d1")
         assert count == 0
-        occurrence_repo.bulk_create_occurrences.assert_not_called()
+        occurrence_repo.replace_for_ddr.assert_awaited_once()
+        assert occurrence_repo.replace_for_ddr.call_args[0][1] == []
 
     asyncio.run(run())
 
@@ -304,7 +307,8 @@ def test_no_successful_dates_returns_zero(mock_keywords, service, ddr_date_repo,
         ]
         count = await service.generate_for_ddr("d1")
         assert count == 0
-        occurrence_repo.bulk_create_occurrences.assert_not_called()
+        occurrence_repo.replace_for_ddr.assert_awaited_once()
+        assert occurrence_repo.replace_for_ddr.call_args[0][1] == []
 
     asyncio.run(run())
 
@@ -349,7 +353,8 @@ def test_notes_is_none_when_activity_is_empty(mock_keywords, service, ddr_date_r
         ]
         count = await service.generate_for_ddr("d1")
         assert count == 0
-        occurrence_repo.bulk_create_occurrences.assert_not_called()
+        occurrence_repo.replace_for_ddr.assert_awaited_once()
+        assert occurrence_repo.replace_for_ddr.call_args[0][1] == []
 
     asyncio.run(run())
 
@@ -395,7 +400,7 @@ def test_non_dict_time_log_skipped(mock_keywords, service, ddr_date_repo, occurr
         ]
         count = await service.generate_for_ddr("d1")
         assert count == 1
-        occurrence_repo.bulk_create_occurrences.assert_awaited_once()
+        occurrence_repo.replace_for_ddr.assert_awaited_once()
 
     asyncio.run(run())
 
@@ -433,7 +438,7 @@ def test_rerun_clears_existing_occurrences(mock_keywords, service, ddr_date_repo
             ),
         ]
         await service.generate_for_ddr("ddr-x")
-        occurrence_repo.delete_by_ddr_id.assert_awaited_once_with("ddr-x")
+        occurrence_repo.replace_for_ddr.assert_awaited_once_with("ddr-x", [])
 
     asyncio.run(run())
 
@@ -477,6 +482,6 @@ def test_pipeline_service_generate_occurrences_runs_service(mock_keywords):
         ddr = SimpleNamespace(well_name="Well-X")
         count = await service._generate_occurrences("d1", ddr)
         assert count == 1
-        occurrence_repo.bulk_create_occurrences.assert_awaited_once()
+        occurrence_repo.replace_for_ddr.assert_awaited_once()
 
     asyncio.run(run())
