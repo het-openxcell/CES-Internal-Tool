@@ -64,8 +64,6 @@ class OccurrenceGenerationService:
                     "date": row.date,
                 })
 
-        await self.occurrence_repository.delete_by_ddr_id(ddr_id)
         deduped = dedup(all_occurrences)
-        if deduped:
-            await self.occurrence_repository.bulk_create_occurrences(deduped)
+        await self.occurrence_repository.replace_for_ddr(ddr_id, deduped)
         return len(deduped)

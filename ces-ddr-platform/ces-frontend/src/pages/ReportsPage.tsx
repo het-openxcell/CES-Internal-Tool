@@ -1,31 +1,16 @@
-import { useCallback, useState } from "react";
 import { useNavigate, useParams } from "react-router";
 
 import DDRUploadPanel from "@/components/DDRUploadPanel";
 import { EmptyState } from "@/components/ui/empty-state";
 import { useProcessingStatus } from "@/hooks/useProcessingStatus";
-import { apiClient } from "@/lib/api";
+import { useRetryDate } from "@/hooks/useRetryDate";
 import { cn } from "@/lib/utils";
 
 export default function ReportsPage() {
   const { id } = useParams();
   const navigate = useNavigate();
   const status = useProcessingStatus(id);
-  const [retryingDate, setRetryingDate] = useState<string | null>(null);
-
-  const handleRetryDate = useCallback(
-    async (date: string) => {
-      if (!id) return;
-      setRetryingDate(date);
-      try {
-        await apiClient.retryDate(id, date);
-        await status.refresh();
-      } finally {
-        setRetryingDate(null);
-      }
-    },
-    [id, status],
-  );
+  const { retryingDate, handleRetryDate } = useRetryDate(id, status.refresh);
   const processedLabel = `Processing date ${status.currentProcessedCount} of ${status.totalDates || status.currentProcessedCount}...`;
   const extractedCount = status.finalSummary
     ? Math.max(status.finalSummary.total_dates - status.finalSummary.failed_dates, 0)

@@ -48,6 +48,32 @@ class OccurrenceCRUDRepository(BaseCRUDRepository[Occurrence]):
         await self.async_session.execute(stmt)
         await self.async_session.commit()
 
+    async def replace_for_ddr(self, ddr_id: str, occurrences: list[dict]) -> None:
+        stmt = sqlalchemy.delete(Occurrence).where(Occurrence.ddr_id == ddr_id)
+        await self.async_session.execute(stmt)
+        if occurrences:
+            now = int(time.time())
+            records = [
+                Occurrence(
+                    ddr_id=occ["ddr_id"],
+                    ddr_date_id=occ["ddr_date_id"],
+                    type=occ["type"],
+                    well_name=occ.get("well_name"),
+                    surface_location=occ.get("surface_location"),
+                    section=occ.get("section"),
+                    mmd=occ.get("mmd"),
+                    density=occ.get("density"),
+                    notes=occ.get("notes"),
+                    date=occ.get("date"),
+                    is_exported=False,
+                    created_at=now,
+                    updated_at=now,
+                )
+                for occ in occurrences
+            ]
+            self.async_session.add_all(records)
+        await self.async_session.commit()
+
     async def bulk_create_occurrences(self, occurrences: list[dict]) -> None:
         if not occurrences:
             return

@@ -1,6 +1,6 @@
 # Story 4.0: Well Name & Surface Location Extraction
 
-Status: review
+Status: done
 
 ## Story
 
@@ -269,6 +269,32 @@ claude-sonnet-4-6
 - ces-ddr-platform/ces-backend/tests/test_ddr_extraction_pipeline.py (UPDATED — added update_well_metadata stub)
 - ces-ddr-platform/ces-backend/tests/test_ddr_status_stream.py (UPDATED — added update_well_metadata stub)
 
+### Review Findings
+
+- [ ] [Review][Decision] D1: Race condition — no atomic guard on retry — Two concurrent retries pass status guard simultaneously; no DB lock or SELECT FOR UPDATE on date row. Options: (a) SELECT FOR UPDATE, (b) app-level lock per (ddr_id,date), (c) accept+document.
+- [ ] [Review][Decision] D2: file_path now stores client filename instead of S3 key — Not in spec; frontend receives OS paths. Options: (a) accept as intentional, (b) rename column to original_filename, (c) revert.
+- [ ] [Review][Decision] D3: finalize_status_from_dates called after _generate_occurrences in normal flow — Spec note prescribed update_well_metadata → finalize_status_from_dates; actual order is update_well_metadata → _generate_occurrences → finalize_status_from_dates. Options: (a) accept as functionally equivalent, (b) reorder to match spec.
+- [ ] [Review][Decision] D4: Frontend retry UI shipped but out of spec scope — 200+ frontend lines not in story spec. Options: (a) accept as bonus, (b) revert frontend.
+- [ ] [Review][Patch] P1: No ownership check — any authenticated user can retry any DDR [ces-backend/src/api/routes/v1/ddr.py:retry_ddr_date]
+- [ ] [Review][Patch] P2: update_status(QUEUED) runs outside _write_lock [ces-backend/src/services/pipeline_service.py:~99]
+- [ ] [Review][Patch] P3: Stale ddr object used in retry_date after _process_one_date mutates DB [ces-backend/src/services/pipeline_service.py:retry_date]
+- [ ] [Review][Patch] P4: StorageService() hardcoded in route handler — breaks DI and testability [ces-backend/src/api/routes/v1/ddr.py:retry_ddr_date]
+- [ ] [Review][Patch] P5: Silent bare except Exception in retry — no logging [ces-backend/src/services/pipeline_service.py:~119]
+- [ ] [Review][Patch] P6: No date format validation on date path parameter [ces-backend/src/api/routes/v1/ddr.py:retry_ddr_date]
+- [ ] [Review][Patch] P7: refresh() sets connectionMode="polling" but never starts poll loop [ces-frontend/src/hooks/useProcessingStatus.ts:~252]
+- [ ] [Review][Patch] P8: _generate_occurrences keeps dead ddr:Any param after metadata moved to explicit args [ces-backend/src/services/pipeline_service.py:~268]
+- [ ] [Review][Patch] P9: retry_date return type is Any instead of DDRDate [ces-backend/src/services/pipeline_service.py:~235]
+- [ ] [Review][Patch] P10: refresh() hardcodes total_occurrences: 0 in finalSummary [ces-frontend/src/hooks/useProcessingStatus.ts:~249]
+- [ ] [Review][Patch] P11: refreshCounterRef declared but never used [ces-frontend/src/hooks/useProcessingStatus.ts:90]
+- [ ] [Review][Patch] P12: test_surface_location_always_none test name contradicts AC2 post-implementation [ces-backend/tests/test_occurrence_generation.py:163]
+- [x] [Review][Defer] W1: Occurrence delete-then-insert not atomic [ces-backend/src/services/occurrence/generate.py] — deferred, pre-existing
+- [x] [Review][Defer] W2: Well metadata aggregation uses first-non-null from arbitrary DB row order — deferred, design limitation out of scope
+- [x] [Review][Defer] W3: Duplicate handleRetryDate in ReportDetailPage + ReportsPage — deferred, low-risk cleanup
+- [x] [Review][Defer] W4: build_prompt hard-codes metadata_keys as magic set literal — deferred, minor smell
+- [x] [Review][Defer] W5: AC4 test exercises aggregation snippet only, not full pipeline — deferred, test coverage gap
+- [x] [Review][Defer] W6: AC5 has no HTTP-level integration test for occurrence API response — deferred, test coverage gap
+
 ## Change Log
 
 - 2026-05-12: Story 4.0 implemented — surface_location extraction from DDR headers, written to ddrs table, propagated to occurrences
+- 2026-05-12: Code review completed — 4 decision-needed, 12 patch, 6 deferred, 3 dismissed

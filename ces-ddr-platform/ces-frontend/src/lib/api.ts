@@ -174,7 +174,7 @@ class ApiClient {
     const body = await response.text();
 
     if (!body) {
-      return undefined as TResponse;
+      throw new ApiError("Unexpected empty response body", "API_ERROR", response.status);
     }
 
     return JSON.parse(body) as TResponse;
@@ -208,8 +208,7 @@ class ApiClient {
 
   private redirectToLogin() {
     if (window.location.pathname !== "/login") {
-      window.history.pushState({}, "", "/login");
-      window.dispatchEvent(new PopStateEvent("popstate"));
+      window.location.href = "/login";
     }
   }
 }
