@@ -1,22 +1,38 @@
 from src.services.keywords.loader import KeywordLoader
 
 ALL_TYPES = {
-    "Stuck Pipe",
-    "Lost Circulation",
+    "Anhydrite",
     "Back Ream",
-    "Ream",
-    "Tight Hole",
-    "Washout",
-    "BHA Failure",
-    "Vibration",
-    "Kick / Well Control",
-    "H2S",
+    "Ballooning",
+    "Bit Balling",
+    "Bit DBR",
+    "Blowout",
+    "CO2",
+    "Calcite",
+    "Cement Plug",
+    "Coal",
+    "F.I.T. / L.O.T.",
     "Fishing",
-    "Casing Issue",
-    "Bit Failure",
-    "Cementing Issue",
-    "Pack Off",
-    "Deviation",
+    "Foaming",
+    "Formation Fracture",
+    "Gas Spike",
+    "Gravel",
+    "H2S",
+    "High Torque",
+    "Kick / Well Control",
+    "Lost Circulation",
+    "Mud Ring",
+    "Other",
+    "Pressure Loss",
+    "Pressure Spike",
+    "Ream",
+    "Sand",
+    "Sidetrack",
+    "Sloughing",
+    "Stuck Pipe",
+    "Tight Hole",
+    "Tool Failure",
+    "Water Flow",
 }
 
 
@@ -36,7 +52,7 @@ def test_keywords_are_str_to_str() -> None:
         assert isinstance(v, str)
 
 
-def test_all_16_types_covered() -> None:
+def test_all_types_covered() -> None:
     keywords = KeywordLoader.get_keywords()
     types_in_file = set(keywords.values())
     assert ALL_TYPES <= types_in_file, f"Missing types: {ALL_TYPES - types_in_file}"
