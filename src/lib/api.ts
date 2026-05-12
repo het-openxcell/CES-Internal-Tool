@@ -134,6 +134,12 @@ class ApiClient {
     });
   }
 
+  async retryDate(ddrId: string, date: string) {
+    return this.request<DDRDateDetail>(`/ddrs/${encodeURIComponent(ddrId)}/dates/${encodeURIComponent(date)}/retry`, {
+      method: "POST",
+    });
+  }
+
   async getOccurrences(ddrId: string, filters?: OccurrenceFilters, signal?: AbortSignal) {
     const params = new URLSearchParams();
     if (filters?.type) params.set("type", filters.type);

@@ -90,9 +90,11 @@ export type OccurrenceTableProps = {
   occurrences: OccurrenceRow[];
   failedDates: { date: string; error: string }[];
   isLoading: boolean;
+  onRetryDate?: (date: string) => void;
+  retryingDate?: string | null;
 };
 
-export function OccurrenceTable({ occurrences, failedDates, isLoading }: OccurrenceTableProps) {
+export function OccurrenceTable({ occurrences, failedDates, isLoading, onRetryDate, retryingDate }: OccurrenceTableProps) {
   const [searchParams, setSearchParams] = useSearchParams();
 
   const [sorting, setSorting] = useState<SortingState>([{ id: "date", desc: true }]);
@@ -332,6 +334,8 @@ export function OccurrenceTable({ occurrences, failedDates, isLoading }: Occurre
                   date={fd.date}
                   error={fd.error}
                   colSpan={VISIBLE_COLUMN_KEYS.length}
+                  onRetry={onRetryDate ? () => onRetryDate(fd.date) : undefined}
+                  retrying={retryingDate === fd.date}
                 />
               ))}
 
