@@ -12,6 +12,8 @@ variables:
 build:
   stage: build
   extends: .build
+  before_script:
+    - cp "$DEV_ENV" .env
   variables:
     BUILD_ARGS: "--build-arg APP_NAME=${PROJECT} --build-arg PROFILE=${CI_COMMIT_REF_NAME}"
 
