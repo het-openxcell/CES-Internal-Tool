@@ -1,10 +1,10 @@
 import { Navigate, useParams } from "react-router";
 
+import { OccurrenceMetrics } from "@/components/OccurrenceMetrics";
 import { OccurrenceTable } from "@/components/OccurrenceTable";
 import { useOccurrences } from "@/hooks/useOccurrences";
 import { useProcessingStatus } from "@/hooks/useProcessingStatus";
 import { useRetryDate } from "@/hooks/useRetryDate";
-import { cn } from "@/lib/utils";
 
 export default function ReportDetailPage() {
   const { id } = useParams();
@@ -25,21 +25,6 @@ export default function ReportDetailPage() {
       ? Math.min(100, (status.currentProcessedCount / status.totalDates) * 100)
       : 0;
 
-  const pillVariant = {
-    idle: "border-border-default bg-white text-text-secondary",
-    sse: "border-[#FDE68A] bg-[#FFFBEB] text-[#92400E]",
-    polling: "border-[#FDE68A] bg-[#FFFBEB] text-[#92400E]",
-    closed: "border-[#A7F3D0] bg-[#ECFDF5] text-[#047857]",
-    error: "border-[#FECACA] bg-[#FEF2F2] text-error-text",
-  }[status.connectionMode];
-
-  const dotColor = {
-    idle: "bg-text-muted",
-    sse: "bg-[#F59E0B] animate-pulse-dot",
-    polling: "bg-[#F59E0B] animate-pulse-dot",
-    closed: "bg-[#10B981]",
-    error: "bg-ces-red",
-  }[status.connectionMode];
 
   const failedDates = status.rows
     .filter((row) => row.status === "failed" && row.error)
@@ -53,30 +38,37 @@ export default function ReportDetailPage() {
         className="rounded-2xl border border-border-default bg-white"
         aria-label="DDR processing status"
       >
-        {/* Top strip: label + title + pill */}
-        <div className="flex items-start justify-between gap-4 px-8 pt-7 pb-6 max-[760px]:px-5 max-[760px]:pt-5">
-          <div>
-            <p className="m-0 mb-1.5 text-ces-red text-[11px] font-bold tracking-[0.08em] uppercase">
-              Extraction
-            </p>
-            <h2 className="m-0 text-[22px] font-bold text-text-primary leading-tight">
-              {isProcessing ? processedLabel : "Processing Status"}
-            </h2>
-            {status.finalSummary ? (
-              <p className="mt-1.5 text-sm text-text-muted">
-                {extractedCount} dates extracted &bull; {status.finalSummary.failed_dates} failed
-              </p>
-            ) : null}
+        {/* Header: label + title + creative stat row */}
+        <div className="px-8 pt-7 pb-5 max-[760px]:px-5 max-[760px]:pt-5">
+          <p className="m-0 mb-1.5 text-ces-red text-[11px] font-bold tracking-[0.08em] uppercase">
+            Extraction
+          </p>
+          <div className="flex items-baseline justify-between gap-4 max-[640px]:flex-col">
+            <div>
+              <h2 className="m-0 text-[22px] font-bold text-text-primary leading-tight">
+                {isProcessing ? processedLabel : "Processing Status"}
+              </h2>
+              {status.finalSummary ? (
+                <p className="mt-1 text-sm text-text-muted">
+                  {extractedCount} dates extracted &bull; {status.finalSummary.failed_dates} failed
+                </p>
+              ) : null}
+            </div>
+            <div className="flex items-center gap-1 shrink-0 rounded-2xl bg-[#F3F4F6] p-1 max-[640px]:self-stretch max-[640px]:justify-around">
+              <div className="flex flex-col items-center px-4 py-1.5 rounded-xl min-w-[64px]">
+                <span className="text-[26px] font-black leading-none tabular-nums text-emerald-600">{status.successCount}</span>
+                <span className="mt-0.5 text-[10px] font-bold uppercase tracking-widest text-emerald-500">Success</span>
+              </div>
+              <div className="flex flex-col items-center px-4 py-1.5 rounded-xl min-w-[64px]">
+                <span className="text-[26px] font-black leading-none tabular-nums text-amber-600">{status.warningCount}</span>
+                <span className="mt-0.5 text-[10px] font-bold uppercase tracking-widest text-amber-500">Warning</span>
+              </div>
+              <div className="flex flex-col items-center px-4 py-1.5 rounded-xl min-w-[64px]">
+                <span className="text-[26px] font-black leading-none tabular-nums text-red-600">{status.failedCount}</span>
+                <span className="mt-0.5 text-[10px] font-bold uppercase tracking-widest text-red-500">Failed</span>
+              </div>
+            </div>
           </div>
-          <span
-            className={cn(
-              "inline-flex items-center gap-2 min-h-8 px-3.5 border rounded-full text-xs font-bold capitalize tracking-wide shrink-0",
-              pillVariant,
-            )}
-          >
-            <span className={cn("w-[7px] h-[7px] rounded-full shrink-0", dotColor)} />
-            {status.connectionMode}
-          </span>
         </div>
 
         {/* Progress bar */}
@@ -96,43 +88,10 @@ export default function ReportDetailPage() {
             </div>
           </div>
         ) : null}
-
-        {/* Divider */}
-        <div className="border-t border-border-default" />
-
-        {/* Stat trio */}
-        <div className="grid grid-cols-3 divide-x divide-border-default max-[640px]:grid-cols-1 max-[640px]:divide-x-0 max-[640px]:divide-y">
-          <div className="px-8 py-7 max-[760px]:px-5">
-            <p className="m-0 text-[11px] font-bold uppercase tracking-[0.08em] text-emerald-600 mb-3">
-              Success
-            </p>
-            <span className="block text-[52px] font-black leading-none tabular-nums text-text-primary animate-count-pop">
-              {status.successCount}
-            </span>
-            <p className="m-0 mt-2.5 text-xs text-text-muted">dates extracted</p>
-          </div>
-
-          <div className="px-8 py-7 max-[760px]:px-5">
-            <p className="m-0 text-[11px] font-bold uppercase tracking-[0.08em] text-amber-500 mb-3">
-              Warning
-            </p>
-            <span className="block text-[52px] font-black leading-none tabular-nums text-text-primary animate-count-pop">
-              {status.warningCount}
-            </span>
-            <p className="m-0 mt-2.5 text-xs text-text-muted">partial extractions</p>
-          </div>
-
-          <div className="px-8 py-7 max-[760px]:px-5">
-            <p className="m-0 text-[11px] font-bold uppercase tracking-[0.08em] text-ces-red mb-3">
-              Failed
-            </p>
-            <span className="block text-[52px] font-black leading-none tabular-nums text-text-primary animate-count-pop">
-              {status.failedCount}
-            </span>
-            <p className="m-0 mt-2.5 text-xs text-text-muted">dates failed</p>
-          </div>
-        </div>
       </section>
+
+      {/* ── Occurrence Metrics ─────────────────────────────── */}
+      <OccurrenceMetrics occurrences={occurrences ?? []} />
 
       {/* ── Occurrence Table ───────────────────────────────── */}
       <section aria-label="Occurrence table">
