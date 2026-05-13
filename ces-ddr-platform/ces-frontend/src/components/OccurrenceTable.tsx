@@ -11,8 +11,9 @@ import {
 
 import { TypeBadge } from "@/components/TypeBadge";
 import { SectionBadge } from "@/components/SectionBadge";
-import { FailedDateRow } from "@/components/FailedDateRow";
+
 import { EmptyState } from "@/components/ui/empty-state";
+import { cn } from "@/lib/utils";
 import type { OccurrenceRow } from "@/lib/api";
 
 const ALL_TYPES = [
@@ -39,16 +40,6 @@ const ALL_SECTIONS = ["Surface", "Int.", "Main"];
 const columns: ColumnDef<OccurrenceRow>[] = [
   { accessorKey: "date", header: "Date", enableHiding: true },
   {
-    accessorKey: "well_name",
-    header: "Well Name",
-    cell: ({ getValue }) => (getValue() as string | null) ?? "—",
-  },
-  {
-    accessorKey: "surface_location",
-    header: "Surface Location",
-    cell: ({ getValue }) => (getValue() as string | null) ?? "—",
-  },
-  {
     accessorKey: "type",
     header: "Type",
     cell: ({ getValue }) => {
@@ -63,13 +54,8 @@ const columns: ColumnDef<OccurrenceRow>[] = [
   },
   {
     accessorKey: "mmd",
-    header: "mMD (m)",
+    header: "MMD",
     cell: ({ getValue }) => (getValue() != null ? (getValue() as number).toFixed(1) : "—"),
-  },
-  {
-    accessorKey: "density",
-    header: "Density",
-    cell: ({ getValue }) => (getValue() != null ? (getValue() as number).toFixed(2) : "—"),
   },
   {
     accessorKey: "notes",
@@ -78,23 +64,14 @@ const columns: ColumnDef<OccurrenceRow>[] = [
   },
 ];
 
-const VISIBLE_COLUMN_KEYS = ["well_name", "surface_location", "type", "section", "mmd", "density", "notes"];
-
-function SortIcon({ state }: { state: "asc" | "desc" | false }) {
-  if (state === "asc") return <span aria-hidden>↑</span>;
-  if (state === "desc") return <span aria-hidden>↓</span>;
-  return <span className="opacity-30" aria-hidden>⇅</span>;
-}
+const VISIBLE_COLUMN_KEYS = ["date", "type", "section", "mmd", "notes"];
 
 export type OccurrenceTableProps = {
   occurrences: OccurrenceRow[];
-  failedDates: { date: string; error: string }[];
   isLoading: boolean;
-  onRetryDate?: (date: string) => void;
-  retryingDate?: string | null;
 };
 
-export function OccurrenceTable({ occurrences, failedDates, isLoading, onRetryDate, retryingDate }: OccurrenceTableProps) {
+export function OccurrenceTable({ occurrences, isLoading }: OccurrenceTableProps) {
   const [searchParams, setSearchParams] = useSearchParams();
 
   const [sorting, setSorting] = useState<SortingState>([{ id: "date", desc: true }]);
@@ -106,7 +83,6 @@ export function OccurrenceTable({ occurrences, failedDates, isLoading, onRetryDa
   const tbodyRef = useRef<HTMLTableSectionElement>(null);
   const [focusedCell, setFocusedCell] = useState<{ row: number; col: number } | null>(null);
 
-  // Write local state → URL (debounced, functional update avoids searchParams dep)
   useEffect(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(() => {
@@ -129,14 +105,12 @@ export function OccurrenceTable({ occurrences, failedDates, isLoading, onRetryDa
     };
   }, [typeFilter, sectionFilter, globalFilter, setSearchParams]);
 
-  // Read URL → local state (handles browser back/forward navigation)
   useEffect(() => {
     setTypeFilter(searchParams.get("type") ?? "");
     setSectionFilter(searchParams.get("section") ?? "");
     setGlobalFilter(searchParams.get("q") ?? "");
   }, [searchParams]);
 
-  // Move DOM focus when keyboard navigation changes active cell
   useEffect(() => {
     if (!focusedCell) return;
     const cell = tbodyRef.current?.querySelector<HTMLElement>(
@@ -161,7 +135,7 @@ export function OccurrenceTable({ occurrences, failedDates, isLoading, onRetryDa
   const table = useReactTable({
     data: filtered,
     columns,
-    state: { sorting, columnVisibility: { date: false } },
+    state: { sorting },
     onSortingChange: setSorting,
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
@@ -197,43 +171,65 @@ export function OccurrenceTable({ occurrences, failedDates, isLoading, onRetryDa
     setFocusedCell({ row, col });
   }
 
+  const totalRows = filtered.length;
+
   return (
-    <div className="grid gap-4">
-      <div className="flex flex-wrap items-center gap-3">
-        <input
-          type="text"
-          value={globalFilter}
-          onChange={(e) => setGlobalFilter(e.target.value)}
-          placeholder="Search occurrences..."
-          aria-label="Search occurrences"
-          className="min-h-[36px] px-3 py-1.5 border border-border-default rounded-md bg-white text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-ces-red/30 focus:border-ces-red w-[260px] max-[760px]:w-full"
-        />
-        <select
-          value={typeFilter}
-          onChange={(e) => setTypeFilter(e.target.value)}
-          aria-label="Filter by type"
-          className="min-h-[36px] px-3 py-1.5 border border-border-default rounded-md bg-white text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-ces-red/30 focus:border-ces-red"
-        >
-          <option value="">All Types</option>
-          {ALL_TYPES.map((t) => (
-            <option key={t} value={t}>
-              {t}
-            </option>
-          ))}
-        </select>
-        <select
-          value={sectionFilter}
-          onChange={(e) => setSectionFilter(e.target.value)}
-          aria-label="Filter by section"
-          className="min-h-[36px] px-3 py-1.5 border border-border-default rounded-md bg-white text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-ces-red/30 focus:border-ces-red"
-        >
-          <option value="">All Sections</option>
-          {ALL_SECTIONS.map((s) => (
-            <option key={s} value={s}>
-              {s}
-            </option>
-          ))}
-        </select>
+    <div className="grid gap-3">
+      <div className="flex flex-wrap items-center gap-2 mb-3 p-2 bg-surface rounded-lg border border-border-default">
+        <div className="relative">
+          <svg className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-text-muted pointer-events-none" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="11" cy="11" r="7" />
+            <path d="m20 20-3.5-3.5" />
+          </svg>
+          <input
+            type="text"
+            value={globalFilter}
+            onChange={(e) => setGlobalFilter(e.target.value)}
+            placeholder="Search notes, types..."
+            aria-label="Search occurrences"
+            className="h-8 pl-8 pr-3 text-[12.5px] rounded-md border border-border-default bg-white focus:border-ces-red focus:outline-none w-64 max-[760px]:w-full"
+          />
+        </div>
+        <div className="inline-flex items-center h-8 rounded-md border border-border-default bg-white text-[12px] hover:border-text-muted focus-within:border-ces-red">
+          <span className="px-2 text-text-muted">Type</span>
+          <select
+            value={typeFilter}
+            onChange={(e) => setTypeFilter(e.target.value)}
+            aria-label="Filter by type"
+            className="bg-transparent pr-2 py-1 text-[12px] font-medium text-text-primary focus:outline-none cursor-pointer"
+          >
+            <option value="">All types</option>
+            {ALL_TYPES.map((t) => (
+              <option key={t} value={t}>{t}</option>
+            ))}
+          </select>
+        </div>
+        <div className="inline-flex items-center h-8 rounded-md border border-border-default bg-white text-[12px] hover:border-text-muted focus-within:border-ces-red">
+          <span className="px-2 text-text-muted">Section</span>
+          <select
+            value={sectionFilter}
+            onChange={(e) => setSectionFilter(e.target.value)}
+            aria-label="Filter by section"
+            className="bg-transparent pr-2 py-1 text-[12px] font-medium text-text-primary focus:outline-none cursor-pointer"
+          >
+            <option value="">All sections</option>
+            {ALL_SECTIONS.map((s) => (
+              <option key={s} value={s}>{s}</option>
+            ))}
+          </select>
+        </div>
+        <div className="inline-flex items-center h-8 rounded-md border border-border-default bg-white text-[12px] hover:border-text-muted focus-within:border-ces-red">
+          <span className="px-2 text-text-muted">Status</span>
+          <select
+            aria-label="Filter by status"
+            className="bg-transparent pr-2 py-1 text-[12px] font-medium text-text-primary focus:outline-none cursor-pointer"
+          >
+            <option value="">All rows</option>
+          </select>
+        </div>
+        <div className="ml-auto text-[12px] text-text-muted">
+          <span className="text-text-primary font-semibold">{filtered.length}</span> of {occurrences.length} rows
+        </div>
       </div>
 
       {activeFilters.length > 0 && (
@@ -241,7 +237,7 @@ export function OccurrenceTable({ occurrences, failedDates, isLoading, onRetryDa
           {activeFilters.map((f) => (
             <span
               key={f.key}
-              className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-gray-100 text-xs font-medium text-text-secondary"
+              className="inline-flex items-center gap-1 px-2 py-0.5 rounded border border-border-default bg-white text-[11.5px]"
             >
               {f.label}
               <button
@@ -256,46 +252,28 @@ export function OccurrenceTable({ occurrences, failedDates, isLoading, onRetryDa
         </div>
       )}
 
-      <div className="overflow-auto max-h-[600px] border border-border-default rounded-xl">
+      <div className="overflow-auto max-h-[600px] border border-border-default rounded-lg bg-white">
         <table
           role="grid"
-          aria-rowcount={isLoading ? -1 : filtered.length + failedDates.length}
-          className="w-full text-sm border-collapse"
+          aria-rowcount={isLoading ? -1 : totalRows}
+          className="w-full text-[12.5px] border-collapse"
         >
-          <thead className="sticky top-0 z-10 bg-white">
-            {table.getHeaderGroups().map((headerGroup) => (
-              <tr key={headerGroup.id} className="border-b border-border-default">
-                {headerGroup.headers
-                  .filter((h) => VISIBLE_COLUMN_KEYS.includes(h.column.id))
-                  .map((header) => (
-                    <th
-                      key={header.id}
-                      className="px-4 py-3 text-left text-xs font-bold uppercase tracking-wider text-text-muted bg-white cursor-pointer select-none"
-                      onClick={header.column.getToggleSortingHandler()}
-                      aria-sort={
-                        header.column.getIsSorted() === "asc"
-                          ? "ascending"
-                          : header.column.getIsSorted() === "desc"
-                            ? "descending"
-                            : "none"
-                      }
-                    >
-                      <span className="inline-flex items-center gap-1">
-                        {flexRender(header.column.columnDef.header, header.getContext())}
-                        <SortIcon state={header.column.getIsSorted()} />
-                      </span>
-                    </th>
-                  ))}
-              </tr>
-            ))}
+          <thead>
+            <tr className="text-[10.5px] uppercase tracking-wider font-semibold text-text-muted border-b border-border-default">
+              <th className="py-2 px-3 text-left font-semibold w-[88px]">Date</th>
+              <th className="py-2 px-3 text-left font-semibold w-[130px]">Type</th>
+              <th className="py-2 px-3 text-left font-semibold w-[90px]">Section</th>
+              <th className="py-2 px-3 text-right font-semibold w-[88px]">MMD</th>
+              <th className="py-2 px-3 text-left font-semibold">Notes</th>
+            </tr>
           </thead>
           <tbody ref={tbodyRef} onKeyDown={handleTableKeyDown}>
             {isLoading &&
               Array.from({ length: 5 }).map((_, i) => (
                 <tr key={`sk-${i}`} className="animate-pulse border-b border-border-default">
                   {Array.from({ length: VISIBLE_COLUMN_KEYS.length }).map((_, j) => (
-                    <td key={j} className="px-4 py-3">
-                      <div className={`h-4 bg-gray-200 rounded ${j < 4 ? "w-3/4" : "w-1/2"}`} />
+                    <td key={j} className="py-2 px-3">
+                      <div className={cn("h-4 bg-gray-200 rounded", j < 4 ? "w-3/4" : "w-1/2")} />
                     </td>
                   ))}
                 </tr>
@@ -306,11 +284,14 @@ export function OccurrenceTable({ occurrences, failedDates, isLoading, onRetryDa
                 <tr
                   key={row.id}
                   className="border-b border-border-default hover:bg-slate-50 transition-colors"
+                  style={{ height: "40px" }}
                 >
                   {row.getVisibleCells().map((cell, colIndex) => {
                     if (!VISIBLE_COLUMN_KEYS.includes(cell.column.id)) return null;
                     const isFocused =
                       focusedCell?.row === rowIndex && focusedCell?.col === colIndex;
+                    const isNumeric = cell.column.id === "mmd";
+                    const isDate = cell.column.id === "date";
                     return (
                       <td
                         key={cell.id}
@@ -318,7 +299,11 @@ export function OccurrenceTable({ occurrences, failedDates, isLoading, onRetryDa
                         tabIndex={isFocused ? 0 : rowIndex === 0 && colIndex === 0 && !focusedCell ? 0 : -1}
                         data-cell-rc={`${rowIndex}-${colIndex}`}
                         onFocus={() => setFocusedCell({ row: rowIndex, col: colIndex })}
-                        className="px-4 py-2.5 text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-inset focus:ring-ces-red/40"
+                        className={cn(
+                          "py-2 px-3 text-[12.5px] text-text-primary focus:outline-none focus:ring-2 focus:ring-inset focus:ring-ces-red/40",
+                          isNumeric && "text-right font-mono tabular-nums text-[12px] text-text-primary",
+                          isDate && "font-mono text-[12px] text-text-primary"
+                        )}
                       >
                         {flexRender(cell.column.columnDef.cell, cell.getContext())}
                       </td>
@@ -327,19 +312,7 @@ export function OccurrenceTable({ occurrences, failedDates, isLoading, onRetryDa
                 </tr>
               ))}
 
-            {!isLoading &&
-              failedDates.map((fd) => (
-                <FailedDateRow
-                  key={`${fd.date}-${fd.error.slice(0, 30)}`}
-                  date={fd.date}
-                  error={fd.error}
-                  colSpan={VISIBLE_COLUMN_KEYS.length}
-                  onRetry={onRetryDate ? () => onRetryDate(fd.date) : undefined}
-                  retrying={retryingDate === fd.date}
-                />
-              ))}
-
-            {!isLoading && filtered.length === 0 && failedDates.length === 0 && (
+            {!isLoading && filtered.length === 0 && (
               <tr>
                 <td colSpan={VISIBLE_COLUMN_KEYS.length} className="px-4 py-2">
                   <EmptyState
@@ -348,7 +321,7 @@ export function OccurrenceTable({ occurrences, failedDates, isLoading, onRetryDa
                         viewBox="0 0 24 24"
                         fill="none"
                         stroke="currentColor"
-                        strokeWidth="1.5"
+                        strokeWidth={1.5}
                         strokeLinecap="round"
                         strokeLinejoin="round"
                         aria-hidden="true"
@@ -365,6 +338,16 @@ export function OccurrenceTable({ occurrences, failedDates, isLoading, onRetryDa
             )}
           </tbody>
         </table>
+      </div>
+
+      <div className="mt-3 flex items-center gap-3 text-[11.5px] text-text-muted">
+        <span className="flex items-center gap-1.5">
+          <span className="h-2 w-2 rounded-full bg-[var(--edit-indicator)]" /> manually corrected
+        </span>
+        <span className="flex items-center gap-1.5">
+          <span className="h-2 w-1 rounded-sm bg-ces-red" /> failed extraction
+        </span>
+        <span className="ml-auto">Click any cell to edit · Esc cancels · Enter confirms</span>
       </div>
     </div>
   );
