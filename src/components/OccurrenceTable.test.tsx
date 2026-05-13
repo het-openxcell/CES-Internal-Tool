@@ -25,7 +25,7 @@ function makeOccurrence(overrides: Partial<OccurrenceRow> = {}): OccurrenceRow {
 function renderTable(props: Partial<React.ComponentProps<typeof OccurrenceTable>> = {}) {
   return render(
     <MemoryRouter>
-      <OccurrenceTable occurrences={[]} failedDates={[]} isLoading={false} {...props} />
+      <OccurrenceTable occurrences={[]} isLoading={false} {...props} />
     </MemoryRouter>,
   );
 }
@@ -39,12 +39,10 @@ describe("OccurrenceTable", () => {
 
   it("renders column headers", () => {
     renderTable();
-    expect(screen.getByRole("columnheader", { name: /Well Name/i })).toBeInTheDocument();
-    expect(screen.getByRole("columnheader", { name: /Surface Location/i })).toBeInTheDocument();
+    expect(screen.getByRole("columnheader", { name: /Date/i })).toBeInTheDocument();
     expect(screen.getByRole("columnheader", { name: /Type/i })).toBeInTheDocument();
     expect(screen.getByRole("columnheader", { name: /Section/i })).toBeInTheDocument();
     expect(screen.getByRole("columnheader", { name: /mMD/i })).toBeInTheDocument();
-    expect(screen.getByRole("columnheader", { name: /Density/i })).toBeInTheDocument();
     expect(screen.getByRole("columnheader", { name: /Notes/i })).toBeInTheDocument();
   });
 
@@ -61,15 +59,6 @@ describe("OccurrenceTable", () => {
   it("renders SectionBadge with correct section label", () => {
     renderTable({ occurrences: [makeOccurrence()] });
     expect(screen.getByLabelText("Main")).toBeInTheDocument();
-  });
-
-  it("renders FailedDateRow with error message", () => {
-    renderTable({
-      occurrences: [],
-      failedDates: [{ date: "20241101", error: "Tour Sheet Serial not detected" }],
-    });
-    expect(screen.getByText("Tour Sheet Serial not detected")).toBeInTheDocument();
-    expect(screen.getByLabelText("Date resolution failed. Action required.")).toBeInTheDocument();
   });
 
   it("filters rows by type dropdown", async () => {
@@ -105,7 +94,7 @@ describe("OccurrenceTable", () => {
     renderTable({
       occurrences: [
         makeOccurrence(),
-        makeOccurrence({ id: "occ-2", well_name: "Duvernay B" }),
+        makeOccurrence({ id: "occ-2", notes: "Duvernay observation" }),
       ],
     });
 
@@ -113,8 +102,8 @@ describe("OccurrenceTable", () => {
     await user.type(search, "Duvernay");
 
     const tableBody = screen.getByRole("grid").querySelector("tbody")!;
-    expect(within(tableBody).queryByText("Montney A")).not.toBeInTheDocument();
-    expect(within(tableBody).getByText("Duvernay B")).toBeInTheDocument();
+    expect(within(tableBody).queryByText("pipe stuck after connection")).not.toBeInTheDocument();
+    expect(within(tableBody).getByText("Duvernay observation")).toBeInTheDocument();
   });
 
   it("active filter shows as pill chip with x button", async () => {
@@ -150,36 +139,35 @@ describe("OccurrenceTable", () => {
   it("table has role=grid and aria-rowcount attribute", () => {
     renderTable({
       occurrences: [makeOccurrence()],
-      failedDates: [{ date: "20241101", error: "fail" }],
     });
 
     const grid = screen.getByRole("grid");
-    expect(grid).toHaveAttribute("aria-rowcount", "2");
+    expect(grid).toHaveAttribute("aria-rowcount", "1");
   });
 
   it("sorts by column header click cycling asc desc unsorted", async () => {
     const user = userEvent.setup();
     renderTable({
       occurrences: [
-        makeOccurrence({ id: "a", well_name: "Alpha" }),
-        makeOccurrence({ id: "b", well_name: "Beta" }),
+        makeOccurrence({ id: "a", type: "Alpha" }),
+        makeOccurrence({ id: "b", type: "Beta" }),
       ],
     });
 
-    const wellHeader = screen.getByRole("columnheader", { name: /Well Name/i });
-    await user.click(wellHeader);
-    expect(wellHeader).toHaveAttribute("aria-sort", "ascending");
+    const typeHeader = screen.getByRole("columnheader", { name: /Type/i });
+    await user.click(typeHeader);
+    expect(typeHeader).toHaveAttribute("aria-sort", "ascending");
 
-    await user.click(wellHeader);
-    expect(wellHeader).toHaveAttribute("aria-sort", "descending");
+    await user.click(typeHeader);
+    expect(typeHeader).toHaveAttribute("aria-sort", "descending");
 
-    await user.click(wellHeader);
-    expect(wellHeader).toHaveAttribute("aria-sort", "none");
+    await user.click(typeHeader);
+    expect(typeHeader).toHaveAttribute("aria-sort", "none");
   });
 
-  it("renders em dash for null well_name and notes", () => {
+  it("renders em dash for null notes", () => {
     renderTable({
-      occurrences: [makeOccurrence({ well_name: null, notes: null })],
+      occurrences: [makeOccurrence({ notes: null })],
     });
     const grid = screen.getByRole("grid");
     const cells = within(grid).getAllByRole("gridcell");

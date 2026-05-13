@@ -14,16 +14,12 @@ function renderSidebar() {
 }
 
 describe("CollapsibleSidebar", () => {
-  it("renders all 5 nav items by default", () => {
+  it("renders collapse toggle by default", () => {
     renderSidebar();
-    expect(screen.getByRole("link", { name: /Dashboard/i })).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: /History/i })).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: /Query/i })).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: /Monitor/i })).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: /Settings/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Collapse sidebar/i })).toBeInTheDocument();
   });
 
-  it("collapses to icon-only when toggle button clicked", async () => {
+  it("collapses when toggle button clicked", async () => {
     const user = userEvent.setup();
     renderSidebar();
     const toggle = screen.getByRole("button", { name: /Collapse sidebar/i });
@@ -31,7 +27,7 @@ describe("CollapsibleSidebar", () => {
     expect(screen.getByRole("button", { name: /Expand sidebar/i })).toBeInTheDocument();
   });
 
-  it("persists collapsed state to localStorage key ces-sidebar-collapsed", async () => {
+  it("persists collapsed state to localStorage", async () => {
     const user = userEvent.setup();
     renderSidebar();
     const toggle = screen.getByRole("button", { name: /Collapse sidebar/i });
@@ -43,13 +39,5 @@ describe("CollapsibleSidebar", () => {
     localStorage.setItem("ces-sidebar-collapsed", "true");
     renderSidebar();
     expect(screen.getByRole("button", { name: /Expand sidebar/i })).toBeInTheDocument();
-  });
-
-  it("toggle button has correct aria-label based on state", async () => {
-    const user = userEvent.setup();
-    renderSidebar();
-    expect(screen.getByRole("button", { name: "Collapse sidebar" })).toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: "Collapse sidebar" }));
-    expect(screen.getByRole("button", { name: "Expand sidebar" })).toBeInTheDocument();
   });
 });

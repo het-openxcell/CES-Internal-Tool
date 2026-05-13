@@ -32,35 +32,30 @@ describe("DashboardPage", () => {
     vi.stubGlobal("XMLHttpRequest", FakeXMLHttpRequest);
   });
 
-  it("renders DDR work instead of scaffold copy", async () => {
+  it("redirects to first report when reports exist", async () => {
     vi.mocked(fetch).mockResolvedValue(
       new Response(
         JSON.stringify([
           { id: "ddr-1", file_path: "/uploads/field-1.pdf", status: "processing", created_at: 1778158800 },
           { id: "ddr-2", file_path: "/uploads/field-2.pdf", status: "complete", created_at: 1778072400 },
-          { id: "ddr-3", file_path: "/uploads/field-3.pdf", status: "failed", created_at: 1777986000 },
         ]),
         { status: 200 },
       ),
     );
 
     render(
-      <MemoryRouter>
-        <DashboardPage />
+      <MemoryRouter initialEntries={["/"]}>
+        <Routes>
+          <Route path="/" element={<DashboardPage />} />
+          <Route path="/reports/:id" element={<h1>Report Detail</h1>} />
+        </Routes>
       </MemoryRouter>,
     );
 
-    await waitFor(() => expect(screen.getByText("field-1.pdf")).toBeInTheDocument());
-    expect(screen.getByRole("heading", { name: "DDR Processing" })).toBeInTheDocument();
-    expect(screen.getByLabelText("DDR queue summary")).toHaveTextContent("Active DDRs1");
-    expect(screen.getByLabelText("Recent DDRs")).toHaveTextContent("3 DDRs");
-    expect(screen.getByLabelText("Recent DDRs")).toHaveTextContent("1 active, 1 complete, 1 failed");
-    expect(screen.queryByText("Local scaffold")).not.toBeInTheDocument();
-    expect(screen.queryByText("Extraction and reporting foundation")).not.toBeInTheDocument();
-    expect(screen.queryByText("DDR extraction work")).not.toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Report Detail" })).toBeInTheDocument();
   });
 
-  it("shows upload action when there are no DDRs", async () => {
+  it("shows empty state when there are no DDRs", async () => {
     vi.mocked(fetch).mockResolvedValue(new Response(JSON.stringify([]), { status: 200 }));
 
     render(
@@ -69,8 +64,8 @@ describe("DashboardPage", () => {
       </MemoryRouter>,
     );
 
-    expect(await screen.findByText("No DDRs uploaded yet")).toBeInTheDocument();
-    expect(screen.getByLabelText("Recent DDRs")).toHaveTextContent("No DDRs uploaded");
+    expect(await screen.findByText("No reports yet")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "DDR Processing" })).toBeInTheDocument();
     expect(screen.getAllByText("Upload DDR PDF").length).toBeGreaterThan(0);
   });
 
@@ -86,7 +81,7 @@ describe("DashboardPage", () => {
       </MemoryRouter>,
     );
 
-    await screen.findByText("No DDRs uploaded yet");
+    await screen.findByText("No reports yet");
     await userEvent.upload(
       screen.getAllByLabelText("Upload DDR PDF")[0],
       new File(["%PDF-1.7"], "field.pdf", { type: "application/pdf" }),
