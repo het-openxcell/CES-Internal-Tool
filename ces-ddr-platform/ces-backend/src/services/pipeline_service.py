@@ -9,7 +9,7 @@ from src.models.schemas.ddr import DDRDateStatus, DDRStatus
 from src.repository.crud.ddr import PipelineRunCRUDRepository
 
 logger = logging.getLogger(__name__)
-from src.services.occurrence.generate import OccurrenceGenerationService
+from src.services.occurrence.llm_generate import LLMOccurrenceGenerationService
 from src.services.pipeline.cost import ExtractionCostService
 from src.services.pipeline.embedding import TimeLogEmbeddingService
 from src.services.pipeline.extract import (
@@ -280,7 +280,7 @@ class PreSplitPipelineService:
     ) -> int:
         if self.occurrence_repository is None:
             return 0
-        service = OccurrenceGenerationService(
+        service = LLMOccurrenceGenerationService(
             ddr_date_repository=self.ddr_date_repository,
             occurrence_repository=self.occurrence_repository,
         )
