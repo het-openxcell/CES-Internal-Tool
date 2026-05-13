@@ -1,4 +1,5 @@
 import asyncio
+import json
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -458,14 +459,20 @@ def test_pipeline_service_generate_occurrences_returns_zero_when_no_repo():
     asyncio.run(run())
 
 
-@patch.object(KeywordLoader, "get_keywords", return_value={"stuck": "Stuck Pipe"})
-def test_pipeline_service_generate_occurrences_runs_service(mock_keywords):
+def test_pipeline_service_generate_occurrences_runs_service():
     from src.services.pipeline_service import PreSplitPipelineService
+
+    fake_response_json = json.dumps({
+        "occurrences": [
+            {"date": "20240115", "type": "Stuck Pipe", "mmd": 1500.0, "notes": "stuck pipe"},
+        ]
+    })
 
     async def run():
         ddr_repo = MagicMock()
         date_repo = AsyncMock()
         occurrence_repo = AsyncMock()
+        occurrence_repo.get_by_ddr_id_filtered.return_value = []
         date_repo.read_dates_by_ddr_id.return_value = [
             _make_date_row(
                 "dd1",
@@ -474,13 +481,26 @@ def test_pipeline_service_generate_occurrences_runs_service(mock_keywords):
                 time_logs=[_tl("stuck pipe", 1500.0)],
             ),
         ]
-        service = PreSplitPipelineService(
-            ddr_repository=ddr_repo,
-            ddr_date_repository=date_repo,
-            occurrence_repository=occurrence_repo,
-        )
-        ddr = SimpleNamespace(well_name="Well-X")
-        count = await service._generate_occurrences("d1", ddr)
+
+        fake_llm_response = MagicMock()
+        fake_llm_response.text = fake_response_json
+
+        fake_models = MagicMock()
+        fake_models.generate_content = AsyncMock(return_value=fake_llm_response)
+
+        fake_aio = MagicMock()
+        fake_aio.models = fake_models
+
+        fake_client = MagicMock()
+        fake_client.aio = fake_aio
+
+        with patch("src.services.occurrence.llm_generate.genai.Client", return_value=fake_client):
+            service = PreSplitPipelineService(
+                ddr_repository=ddr_repo,
+                ddr_date_repository=date_repo,
+                occurrence_repository=occurrence_repo,
+            )
+            count = await service._generate_occurrences("d1", "Well-X", None)
         assert count == 1
         occurrence_repo.replace_for_ddr.assert_awaited_once()
 
