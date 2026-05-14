@@ -19,6 +19,7 @@ class OccurrenceInCreate(BaseSchemaModel):
     density: float | None = None
     notes: str | None = None
     date: str | None = None
+    page_number: int | None = None
     is_exported: bool = False
 
     @field_validator("section")
@@ -56,4 +57,5 @@ class OccurrenceInResponse(BaseSchemaModel):
     density: float | None = None
     notes: str | None = None
     date: str | None = None
+    page_number: int | None = None
     is_exported: bool

@@ -87,7 +87,12 @@ class PreSplitPipelineService:
             await self.storage_service.upload_chunk(ddr_id, date, chunk_bytes)
 
         if self.extract_after_split:
-            await self._extract_all_dates(ddr_id=ddr_id, ddr=ddr, date_chunks=result.date_chunks)
+            await self._extract_all_dates(
+                ddr_id=ddr_id,
+                ddr=ddr,
+                date_chunks=result.date_chunks,
+                date_page_numbers=self._date_page_numbers_from_split(getattr(result, "page_dates", {})),
+            )
         return result
 
     async def retry_date(self, ddr_id: str, date: str) -> DDRDate:
@@ -101,8 +106,15 @@ class PreSplitPipelineService:
         await self.ddr_date_repository.update_status(row, DDRDateStatus.QUEUED)
 
         chunk_bytes = await self.storage_service.download_chunk(ddr_id, date)
+        date_page_numbers = await self._original_page_numbers_for_ddr(ddr_id)
         extractor = self.extractor or GeminiDDRExtractor()
-        await self._process_one_date(extractor, row, date, chunk_bytes)
+        await self._process_one_date(
+            extractor,
+            row,
+            date,
+            chunk_bytes,
+            original_page_numbers=date_page_numbers.get(date),
+        )
 
         rows = await self.ddr_date_repository.read_dates_by_ddr_id(ddr_id)
         well_name, surface_location = self._metadata_from_rows(rows)
@@ -127,7 +139,124 @@ class PreSplitPipelineService:
         await self._publish_processing_complete(ddr_id, total_occurrences=total_occurrences)
         return refreshed
 
-    async def _extract_all_dates(self, *, ddr_id: str, ddr: Any, date_chunks: dict[str, bytes]) -> None:
+    async def regenerate_occurrences(self, ddr_id: str) -> int:
+        rows = await self.ddr_date_repository.read_dates_by_ddr_id(ddr_id)
+        well_name, surface_location = self._metadata_from_rows(rows)
+        return await self._generate_occurrences(
+            ddr_id=ddr_id,
+            well_name=well_name,
+            surface_location=surface_location,
+        )
+
+    async def reprocess_dates(self, ddr_id: str, dates: list[str] | None) -> int:
+        ddr = await self.ddr_repository.read_ddr_by_id(ddr_id)
+        rows = await self.ddr_date_repository.read_dates_by_ddr_id(ddr_id)
+
+        if not dates:
+            target_set = {r.date for r in rows}
+        else:
+            target_set = set(dates)
+        date_to_row = {r.date: r for r in rows if r.date in target_set}
+        if not date_to_row:
+            await self.ddr_repository.finalize_status_from_dates(ddr, [r.status for r in rows])
+            await self._publish_processing_complete(ddr_id)
+            return 0
+
+        for row in date_to_row.values():
+            await self.ddr_date_repository.update_status(row, DDRDateStatus.QUEUED)
+
+        await self.ddr_repository.update_status(ddr, DDRStatus.PROCESSING)
+
+        extractor = self.extractor or GeminiDDRExtractor()
+        semaphore = asyncio.Semaphore(self.max_concurrent)
+        date_page_numbers = await self._original_page_numbers_for_ddr(ddr_id)
+
+        async def run_one(date: str) -> str:
+            row = date_to_row[date]
+            try:
+                chunk_bytes = await self.storage_service.download_chunk(ddr_id, date)
+            except Exception as exc:
+                async with self._write_lock:
+                    updated_row = await self.ddr_date_repository.mark_failed_preserve(
+                        row,
+                        error_log={"code": "CHUNK_MISSING", "detail": str(exc)},
+                    )
+                    await self._publish_date_failed(updated_row)
+                return DDRDateStatus.FAILED
+            async with semaphore:
+                return await self._process_one_date_preserve(
+                    extractor,
+                    row,
+                    date,
+                    chunk_bytes,
+                    original_page_numbers=date_page_numbers.get(date),
+                )
+
+        await asyncio.gather(*[run_one(d) for d in date_to_row.keys()], return_exceptions=True)
+
+        all_rows = await self.ddr_date_repository.read_dates_by_ddr_id(ddr_id)
+        well_name, surface_location = self._metadata_from_rows(all_rows)
+        await self.ddr_repository.update_well_metadata(ddr, well_name, surface_location)
+        await self.ddr_repository.finalize_status_from_dates(ddr, [r.status for r in all_rows])
+
+        try:
+            total = await self._generate_occurrences(
+                ddr_id=ddr_id, well_name=well_name, surface_location=surface_location
+            )
+        except Exception:
+            logger.warning("Occurrence generation failed during reprocess for DDR %s", ddr_id)
+            total = 0
+        await self._publish_processing_complete(ddr_id, total_occurrences=total)
+        return total
+
+    async def reprocess_full(self, ddr_id: str) -> int:
+        ddr = await self.ddr_repository.read_ddr_by_id(ddr_id)
+        pdf_bytes = await self.pdf_loader(ddr_id)
+        result = await self.pre_splitter.split_async(pdf_bytes)
+
+        if not result.has_boundaries:
+            await self.ddr_repository.update_status(ddr, DDRStatus.FAILED)
+            await self._publish_processing_complete(ddr_id)
+            return 0
+
+        new_dates = set(result.date_chunks.keys())
+        existing_rows = await self.ddr_date_repository.read_dates_by_ddr_id(ddr_id)
+        existing_dates = {r.date for r in existing_rows}
+
+        obsolete = sorted(existing_dates - new_dates)
+
+        for row in existing_rows:
+            if row.date in new_dates:
+                await self.ddr_date_repository.update_status(row, DDRDateStatus.QUEUED)
+
+        new_only = sorted(new_dates - existing_dates)
+        for date in new_only:
+            await self.ddr_date_repository.create_ddr_date(ddr_id, date)
+
+        await self.ddr_repository.update_status(ddr, DDRStatus.PROCESSING)
+
+        for date, chunk_bytes in result.date_chunks.items():
+            await self.storage_service.upload_chunk(ddr_id, date, chunk_bytes)
+
+        await self._extract_all_dates_preserve(
+            ddr_id=ddr_id,
+            ddr=ddr,
+            date_chunks=result.date_chunks,
+            obsolete_dates=obsolete,
+            date_page_numbers=self._date_page_numbers_from_split(result.page_dates),
+        )
+        rows = await self.ddr_date_repository.read_dates_by_ddr_id(ddr_id)
+        return sum(1 for r in rows if r.status == DDRDateStatus.SUCCESS)
+
+    async def _extract_all_dates_preserve(
+        self,
+        *,
+        ddr_id: str,
+        ddr: Any,
+        date_chunks: dict[str, bytes],
+        obsolete_dates: list[str] | None = None,
+        date_page_numbers: dict[str, list[int]] | None = None,
+    ) -> None:
         rows = await self.ddr_date_repository.read_dates_by_ddr_id(ddr_id)
         date_to_row = {row.date: row for row in rows if row.status == DDRDateStatus.QUEUED}
         if not date_to_row:
@@ -143,7 +272,143 @@ class PreSplitPipelineService:
             if row is None:
                 return DDRDateStatus.FAILED
             async with semaphore:
-                return await self._process_one_date(extractor, row, date, chunk_bytes)
+                return await self._process_one_date_preserve(
+                    extractor,
+                    row,
+                    date,
+                    chunk_bytes,
+                    original_page_numbers=(date_page_numbers or {}).get(date),
+                )
+
+        coroutines = [run_one(date, chunk) for date, chunk in date_chunks.items() if date in date_to_row]
+        await asyncio.gather(*coroutines, return_exceptions=True)
+
+        if obsolete_dates:
+            await self.ddr_date_repository.delete_by_ddr_id_and_dates(ddr_id, obsolete_dates)
+        all_rows = await self.ddr_date_repository.read_dates_by_ddr_id(ddr_id)
+        well_name, surface_location = self._metadata_from_rows(all_rows)
+        await self.ddr_repository.update_well_metadata(ddr, well_name, surface_location)
+        await self.ddr_repository.finalize_status_from_dates(ddr, [r.status for r in all_rows])
+
+        try:
+            total = await self._generate_occurrences(
+                ddr_id=ddr_id, well_name=well_name, surface_location=surface_location
+            )
+        except Exception:
+            logger.warning("Occurrence generation failed during full reprocess for DDR %s", ddr_id)
+            total = 0
+        await self._publish_processing_complete(ddr_id, total_occurrences=total)
+
+    async def _process_one_date_preserve(
+        self,
+        extractor: GeminiDDRExtractor,
+        row: Any,
+        date: str,
+        chunk_bytes: bytes,
+        original_page_numbers: list[int] | None = None,
+    ) -> str:
+        await self._publish_date_started(row.ddr_id, date)
+        try:
+            extraction = await self._extract_with_page_context(
+                extractor,
+                date=date,
+                pdf_bytes=chunk_bytes,
+                original_page_numbers=original_page_numbers,
+            )
+        except RateLimitError:
+            async with self._write_lock:
+                updated_row = await self.ddr_date_repository.mark_warning_preserve(
+                    row,
+                    error_log={"code": "RATE_LIMITED"},
+                )
+                await self._publish_date_complete(updated_row)
+            return DDRDateStatus.WARNING
+        except ExtractionError as exc:
+            async with self._write_lock:
+                updated_row = await self.ddr_date_repository.mark_failed_preserve(
+                    row,
+                    error_log={"code": "EXTRACTION_FAILED", "detail": str(exc.detail)},
+                )
+                await self._publish_date_failed(updated_row)
+            return DDRDateStatus.FAILED
+
+        raw_response = {"text": extraction.text}
+        try:
+            validation = self.validator.validate(extraction.text)
+            if validation.is_valid:
+                async with self._write_lock:
+                    cost_service = self._resolve_cost_service()
+                    updated_row = await self.ddr_date_repository.mark_success(
+                        row,
+                        raw_response=raw_response,
+                        final_json=validation.final_json,
+                        commit=False,
+                    )
+                    await cost_service.record_extraction_run(
+                        ddr_date_id=updated_row.id,
+                        input_tokens=extraction.input_tokens,
+                        output_tokens=extraction.output_tokens,
+                        commit=False,
+                    )
+                    snapshot = SimpleNamespace(
+                        id=updated_row.id,
+                        ddr_id=updated_row.ddr_id,
+                        date=updated_row.date,
+                        status=updated_row.status,
+                        final_json=updated_row.final_json,
+                    )
+                    await self._commit_outcome()
+                    await self._publish_date_complete(snapshot)
+                await self._resolve_embedding_service().embed_successful_date(snapshot)
+                return DDRDateStatus.SUCCESS
+
+            async with self._write_lock:
+                updated_row = await self.ddr_date_repository.mark_failed_preserve(
+                    row,
+                    error_log={"code": "VALIDATION_FAILED", "errors": validation.errors},
+                    raw_response=raw_response,
+                )
+                await self._publish_date_failed(updated_row)
+        except Exception as exc:
+            async with self._write_lock:
+                updated_row = await self.ddr_date_repository.mark_failed_preserve(
+                    row,
+                    error_log={"code": "PROCESSING_FAILED", "detail": str(exc)},
+                    raw_response=raw_response,
+                )
+                await self._publish_date_failed(updated_row)
+        return DDRDateStatus.FAILED
+
+    async def _extract_all_dates(
+        self,
+        *,
+        ddr_id: str,
+        ddr: Any,
+        date_chunks: dict[str, bytes],
+        date_page_numbers: dict[str, list[int]] | None = None,
+    ) -> None:
+        rows = await self.ddr_date_repository.read_dates_by_ddr_id(ddr_id)
+        date_to_row = {row.date: row for row in rows if row.status == DDRDateStatus.QUEUED}
+        if not date_to_row:
+            await self.ddr_repository.finalize_status_from_dates(ddr, [])
+            await self._publish_processing_complete(ddr_id)
+            return
+
+        extractor = self.extractor or GeminiDDRExtractor()
+        semaphore = asyncio.Semaphore(self.max_concurrent)
+
+        async def run_one(date: str, chunk_bytes: bytes) -> str:
+            row = date_to_row.get(date)
+            if row is None:
+                return DDRDateStatus.FAILED
+            async with semaphore:
+                return await self._process_one_date(
+                    extractor,
+                    row,
+                    date,
+                    chunk_bytes,
+                    original_page_numbers=(date_page_numbers or {}).get(date),
+                )
 
         coroutines = [run_one(date, chunk) for date, chunk in date_chunks.items() if date in date_to_row]
         outcomes = await asyncio.gather(*coroutines, return_exceptions=True)
@@ -171,8 +436,27 @@ class PreSplitPipelineService:
             total_occurrences = 0
         await self._publish_processing_complete(ddr_id, total_occurrences=total_occurrences)
 
+    async def _original_page_numbers_for_ddr(self, ddr_id: str) -> dict[str, list[int]]:
+        try:
+            pdf_bytes = await self.pdf_loader(ddr_id)
+            result = await self.pre_splitter.split_async(pdf_bytes)
+            return self._date_page_numbers_from_split(result.page_dates)
+        except Exception as exc:
+            logger.warning("Original page number mapping failed for DDR %s: %s", ddr_id, exc)
+            return {}
+
+    def _date_page_numbers_from_split(self, page_dates: dict[int, list[str]]) -> dict[str, list[int]]:
+        date_page_numbers: dict[str, list[int]] = {}
+        for page_number, dates in page_dates.items():
+            for date in dates:
+                date_page_numbers.setdefault(date, []).append(page_number)
+        return {date: sorted(set(page_numbers)) for date, page_numbers in date_page_numbers.items()}
+
     def _has_queued_dates(self, rows: list[Any] | Any) -> bool:
         return any(row.status == DDRDateStatus.QUEUED for row in rows)
+
+    def metadata_from_rows(self, rows: list[Any] | Any) -> tuple[str | None, str | None]:
+        return self._metadata_from_rows(rows)
 
     def _metadata_from_rows(self, rows: list[Any] | Any) -> tuple[str | None, str | None]:
         well_name = next(
@@ -195,10 +479,16 @@ class PreSplitPipelineService:
         row: Any,
         date: str,
         chunk_bytes: bytes,
+        original_page_numbers: list[int] | None = None,
     ) -> str:
         await self._publish_date_started(row.ddr_id, date)
         try:
-            extraction = await extractor.extract(date=date, pdf_bytes=chunk_bytes)
+            extraction = await self._extract_with_page_context(
+                extractor,
+                date=date,
+                pdf_bytes=chunk_bytes,
+                original_page_numbers=original_page_numbers,
+            )
         except RateLimitError:
             async with self._write_lock:
                 updated_row = await self.ddr_date_repository.mark_warning(
@@ -262,6 +552,25 @@ class PreSplitPipelineService:
                 )
                 await self._publish_date_failed(updated_row)
         return DDRDateStatus.FAILED
+
+    async def _extract_with_page_context(
+        self,
+        extractor: GeminiDDRExtractor,
+        *,
+        date: str,
+        pdf_bytes: bytes,
+        original_page_numbers: list[int] | None,
+    ):
+        try:
+            return await extractor.extract(
+                date=date,
+                pdf_bytes=pdf_bytes,
+                original_page_numbers=original_page_numbers,
+            )
+        except TypeError as exc:
+            if "original_page_numbers" not in str(exc):
+                raise
+            return await extractor.extract(date=date, pdf_bytes=pdf_bytes)
 
     async def _publish_date_started(self, ddr_id: str, date: str) -> None:
         if self.status_stream_service is None:

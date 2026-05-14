@@ -4,6 +4,7 @@ from typing import Any, Callable
 
 from fastapi import UploadFile
 
+from src.models.schemas.ddr import DDRDateStatus, DDRStatus
 from src.repository.crud.ddr import DDRCRUDRepository, DDRDateCRUDRepository, ProcessingQueueCRUDRepository
 from src.repository.crud.occurrence import OccurrenceCRUDRepository
 from src.services.pipeline_service import PreSplitPipelineService
@@ -71,6 +72,109 @@ class DDRProcessingTask:
             occurrence_repository=OccurrenceCRUDRepository(async_session=session),
             storage_service=self.storage_service,
         )
+
+
+class DDRReprocessTask:
+    def __init__(
+        self,
+        session_factory: Callable[[], Any] | None = None,
+        pipeline_service_factory: Callable[[Any], PreSplitPipelineService] | None = None,
+        status_stream_service: ProcessingStatusStreamService | None = None,
+        storage_service: StorageService | None = None,
+    ) -> None:
+        self._session_factory = session_factory
+        self.status_stream_service = status_stream_service
+        self.storage_service = storage_service or StorageService()
+        self.pipeline_service_factory = pipeline_service_factory or self._default_pipeline_service_factory
+
+    async def full(self, ddr_id: str) -> None:
+        await self._run(ddr_id, "full")
+
+    async def dates(self, ddr_id: str, dates: list[str] | None) -> None:
+        await self._run(ddr_id, "dates", dates)
+
+    async def _run(self, ddr_id: str, mode: str, dates: list[str] | None = None) -> None:
+        session_factory = self._session_factory or self._default_session_factory()
+        async with session_factory() as session:
+            try:
+                service = self.pipeline_service_factory(session)
+                if self.status_stream_service is not None:
+                    service.status_stream_service = self.status_stream_service
+                if mode == "full":
+                    await service.reprocess_full(ddr_id)
+                else:
+                    await service.reprocess_dates(ddr_id, dates)
+            except Exception as exc:
+                await session.rollback()
+                await self._mark_failed(session, ddr_id)
+                logger.error(f"DDR reprocess failed for {ddr_id}: {exc}")
+
+    async def _mark_failed(self, session: Any, ddr_id: str) -> None:
+        try:
+            repository = DDRCRUDRepository(async_session=session)
+            ddr = await repository.read_ddr_by_id(ddr_id)
+            await repository.update_status(ddr, DDRStatus.FAILED)
+        except Exception as exc:
+            await session.rollback()
+            logger.error(f"DDR reprocess failure finalization failed for {ddr_id}: {exc}")
+
+    @staticmethod
+    def _default_session_factory() -> Callable[[], Any]:
+        from src.repository.database import async_db
+
+        return async_db.async_session_factory
+
+    def _default_pipeline_service_factory(self, session: Any) -> PreSplitPipelineService:
+        return PreSplitPipelineService(
+            ddr_repository=DDRCRUDRepository(async_session=session),
+            ddr_date_repository=DDRDateCRUDRepository(async_session=session),
+            occurrence_repository=OccurrenceCRUDRepository(async_session=session),
+            storage_service=self.storage_service,
+        )
+
+
+class DDRReprocessService:
+    def __init__(
+        self,
+        ddr_repository: Any,
+        ddr_date_repository: Any,
+        occurrence_repository: Any,
+        storage_service: StorageService | None = None,
+    ) -> None:
+        self.ddr_repository = ddr_repository
+        self.ddr_date_repository = ddr_date_repository
+        self.occurrence_repository = occurrence_repository
+        self.storage_service = storage_service or StorageService()
+
+    async def prepare_full(self, ddr_id: str) -> None:
+        ddr = await self.ddr_repository.read_ddr_by_id(ddr_id)
+        await self.ddr_repository.update_status(ddr, DDRStatus.PROCESSING)
+
+    async def prepare_dates(self, ddr_id: str, dates: list[str] | None) -> None:
+        ddr = await self.ddr_repository.read_ddr_by_id(ddr_id)
+        rows = await self.ddr_date_repository.read_dates_by_ddr_id(ddr_id)
+        target_dates = {row.date for row in rows} if dates is None else set(dates)
+        target_rows = [row for row in rows if row.date in target_dates]
+        if not target_rows:
+            raise BadRequestException("date_not_found")
+        for row in target_rows:
+            await self.ddr_date_repository.update_status(row, DDRDateStatus.QUEUED)
+        await self.ddr_repository.update_status(ddr, DDRStatus.PROCESSING)
+
+    async def regenerate_occurrences(self, ddr_id: str) -> int:
+        ddr = await self.ddr_repository.read_ddr_by_id(ddr_id)
+        service = PreSplitPipelineService(
+            ddr_repository=self.ddr_repository,
+            ddr_date_repository=self.ddr_date_repository,
+            occurrence_repository=self.occurrence_repository,
+            storage_service=self.storage_service,
+            status_stream_service=None,
+        )
+        total = await service.regenerate_occurrences(ddr_id)
+        rows = await self.ddr_date_repository.read_dates_by_ddr_id(ddr_id)
+        well_name, surface_location = service.metadata_from_rows(rows)
+        await self.ddr_repository.update_well_metadata(ddr, well_name, surface_location)
+        return total
 
 
 class DDRUploadService:

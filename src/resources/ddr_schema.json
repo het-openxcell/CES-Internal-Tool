@@ -19,7 +19,8 @@
           "duration_hours": {"type": "number"},
           "activity": {"type": "string"},
           "depth_md": {"type": ["number", "null"]},
-          "comment": {"type": ["string", "null"]}
+          "comment": {"type": ["string", "null"]},
+          "page_number": {"type": ["integer", "null"]}
         }
       }
     },

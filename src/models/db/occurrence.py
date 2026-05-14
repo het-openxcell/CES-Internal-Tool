@@ -36,6 +36,7 @@ class Occurrence(Base):
     density: Mapped[float | None] = mapped_column(sqlalchemy.Float(), nullable=True)
     notes: Mapped[str | None] = mapped_column(sqlalchemy.Text(), nullable=True)
     date: Mapped[str | None] = mapped_column(sqlalchemy.String(8), nullable=True)
+    page_number: Mapped[int | None] = mapped_column(sqlalchemy.Integer(), nullable=True)
     is_exported: Mapped[bool] = mapped_column(sqlalchemy.Boolean(), nullable=False, server_default=text("false"))
     created_at: Mapped[int] = mapped_column(sqlalchemy.BigInteger(), nullable=False)
     updated_at: Mapped[int] = mapped_column(sqlalchemy.BigInteger(), nullable=False)
