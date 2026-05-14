@@ -32,9 +32,9 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
       <DDRUploadModal
         open={open}
         onClose={() => setOpen(false)}
-        onUploaded={(created) => {
+        onUploaded={() => {
           setOpen(false);
-          navigate(`/reports/${created.id}`);
+          navigate("/monitor");
         }}
       />
     </div>

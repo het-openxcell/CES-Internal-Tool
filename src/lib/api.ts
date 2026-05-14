@@ -73,6 +73,24 @@ export type OccurrenceEditResponse = {
   created_at: number;
 };
 
+export type HistoryOccurrenceRow = OccurrenceRow & {
+  ddr_date_id: string;
+  is_exported: boolean;
+  operator: string | null;
+  area: string | null;
+  start_time: string | null;
+  end_time: string | null;
+  from_mmd: number | null;
+  to_mmd: number | null;
+};
+
+export type HistoryOccurrenceFilters = {
+  types?: string[];
+  sections?: string[];
+  depth_from?: number;
+  depth_to?: number;
+};
+
 export type MonitorMetrics = {
   ddrs_this_week: number;
   occurrences_extracted: number;
@@ -230,6 +248,16 @@ class ApiClient {
   async getMonitorCorrections(field?: string) {
     const params = field ? `?field=${encodeURIComponent(field)}` : "";
     return this.request<OccurrenceEditResponse[]>(`/monitor/corrections${params}`);
+  }
+
+  async searchHistoryOccurrences(filters?: HistoryOccurrenceFilters, signal?: AbortSignal) {
+    const params = new URLSearchParams();
+    filters?.types?.forEach((type) => params.append("type", type));
+    filters?.sections?.forEach((section) => params.append("section", section));
+    if (filters?.depth_from !== undefined) params.set("depth_from", String(filters.depth_from));
+    if (filters?.depth_to !== undefined) params.set("depth_to", String(filters.depth_to));
+    const query = params.toString() ? `?${params.toString()}` : "";
+    return this.request<HistoryOccurrenceRow[]>(`/history/occurrences${query}`, { signal });
   }
 
   async getKeywords() {
