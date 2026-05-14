@@ -47,6 +47,7 @@ def test_ddr_date_model_matches_table_contract() -> None:
         "raw_response",
         "final_json",
         "error_log",
+        "source_page_numbers",
         "created_at",
         "updated_at",
     }
@@ -57,6 +58,8 @@ def test_ddr_date_model_matches_table_contract() -> None:
     assert isinstance(table.c.raw_response.type, postgresql.JSONB)
     assert isinstance(table.c.final_json.type, postgresql.JSONB)
     assert isinstance(table.c.error_log.type, postgresql.JSONB)
+    assert isinstance(table.c.source_page_numbers.type, postgresql.JSONB)
+    assert table.c.source_page_numbers.nullable
     assert "idx_ddr_dates_ddr_id" in {index.name for index in table.indexes}
 
 
@@ -149,6 +152,17 @@ def test_migrations_include_users_baseline_and_ddr_schema() -> None:
     assert "if_not_exists=True" in user_text
     assert "if_not_exists=True" in ddr_text
     assert "uq_processing_queue_position" in ddr_text
+
+
+def test_source_page_numbers_migration_exists() -> None:
+    migration = Path("src/repository/migrations/versions/2026_05_14_0007-007_ddr_date_source_pages.py")
+    text = migration.read_text()
+
+    assert 'revision = "007_ddr_date_source_pages"' in text
+    assert 'down_revision = "006_occurrence_page_number"' in text
+    assert 'op.add_column("ddr_dates"' in text
+    assert '"source_page_numbers"' in text
+    assert 'op.drop_column("ddr_dates", "source_page_numbers")' in text
 
 
 def test_startup_does_not_create_tables_outside_alembic() -> None:

@@ -172,6 +172,41 @@ class DDRDateCRUDRepository(BaseCRUDRepository[DDRDate]):
             await self.async_session.flush()
         return [*existing_rows, *records]
 
+    async def update_source_page_numbers(
+        self,
+        ddr_date: DDRDate,
+        source_page_numbers: list[int] | None,
+        commit: bool = True,
+    ) -> DDRDate:
+        return await self.update(
+            ddr_date,
+            {
+                "source_page_numbers": source_page_numbers,
+                "updated_at": int(time.time()),
+            },
+            commit=commit,
+        )
+
+    async def bulk_update_source_page_numbers(
+        self,
+        ddr_id: str,
+        date_page_numbers: dict[str, list[int]],
+        commit: bool = True,
+    ) -> typing.Sequence[DDRDate]:
+        rows = await self.read_dates_by_ddr_id(ddr_id)
+        for row in rows:
+            if row.date in date_page_numbers:
+                row.source_page_numbers = date_page_numbers[row.date]
+                row.updated_at = int(time.time())
+                self.async_session.add(row)
+        if commit:
+            await self.async_session.commit()
+            for row in rows:
+                await self.async_session.refresh(row)
+        else:
+            await self.async_session.flush()
+        return rows
+
     async def mark_success(
         self,
         ddr_date: DDRDate,

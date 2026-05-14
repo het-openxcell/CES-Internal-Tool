@@ -29,6 +29,7 @@ class LLMOccurrenceItem(BaseModel):
     mmd: float | None = None
     notes: str | None = None
     page_number: int | None = None
+    source_log_indexes: list[int] | None = None
 
 
 class LLMOccurrenceResponse(BaseModel):
@@ -44,6 +45,54 @@ _RATE_LIMIT_SIGNALS = (
     "too many requests",
 )
 _BACKOFF_SECONDS = (1.0, 2.0, 4.0, 8.0)
+
+
+class OccurrencePageNumberResolver:
+    def __init__(self, rows: list[Any]) -> None:
+        self._time_logs_by_date = self._build_time_logs_by_date(rows)
+        self._valid_pages_by_date = self._build_valid_pages_by_date()
+
+    def resolve(self, item: LLMOccurrenceItem) -> int | None:
+        page_from_indexes = self._from_indexes(item.date, item.source_log_indexes)
+        if page_from_indexes is not None:
+            return page_from_indexes
+        valid_pages = self._valid_pages_by_date.get(item.date, set())
+        if isinstance(item.page_number, int) and item.page_number in valid_pages:
+            return item.page_number
+        return None
+
+    def _from_indexes(self, date: str, indexes: list[int] | None) -> int | None:
+        if not indexes:
+            return None
+        time_logs = self._time_logs_by_date.get(date, [])
+        for index in indexes:
+            if not isinstance(index, int) or index < 0 or index >= len(time_logs):
+                continue
+            time_log = time_logs[index]
+            if not isinstance(time_log, dict):
+                continue
+            page_number = time_log.get("page_number")
+            if isinstance(page_number, int):
+                return page_number
+        return None
+
+    def _build_time_logs_by_date(self, rows: list[Any]) -> dict[str, list[Any]]:
+        mapped: dict[str, list[Any]] = {}
+        for row in rows:
+            final_json = row.final_json or {}
+            raw_time_logs = final_json.get("time_logs")
+            mapped[row.date] = raw_time_logs if isinstance(raw_time_logs, list) else []
+        return mapped
+
+    def _build_valid_pages_by_date(self) -> dict[str, set[int]]:
+        mapped: dict[str, set[int]] = {}
+        for date, time_logs in self._time_logs_by_date.items():
+            mapped[date] = {
+                time_log["page_number"]
+                for time_log in time_logs
+                if isinstance(time_log, dict) and isinstance(time_log.get("page_number"), int)
+            }
+        return mapped
 
 
 class LLMOccurrenceGenerationService:
@@ -87,9 +136,27 @@ class LLMOccurrenceGenerationService:
             blocks.append("\n".join(lines))
         return "\n\n".join(blocks)
 
-    def _build_prompt(self, time_logs_text: str) -> str:
+    async def _previous_occurrences_text(self, ddr_id: str) -> str:
+        reader = getattr(self.occurrence_repository, "get_by_ddr_id_filtered", None)
+        if not callable(reader):
+            return ""
+        previous = await reader(ddr_id)
+        lines = []
+        for occurrence in previous:
+            date = getattr(occurrence, "date", None) or "?"
+            occurrence_type = getattr(occurrence, "type", None) or "?"
+            mmd = getattr(occurrence, "mmd", None)
+            notes = getattr(occurrence, "notes", None) or ""
+            lines.append(f"{date} | {occurrence_type} | {mmd} | {notes}".strip())
+        return "\n".join(lines)
+
+    def _build_prompt(self, time_logs_text: str, previous_occurrences_text: str = "") -> str:
         valid_types_str = ", ".join(sorted(VALID_OCCURRENCE_TYPES))
-        return LLMPrompts.occurrence_generation(time_logs_text=time_logs_text, valid_types=valid_types_str)
+        return LLMPrompts.occurrence_generation(
+            time_logs_text=time_logs_text,
+            valid_types=valid_types_str,
+            previous_occurrences_text=previous_occurrences_text,
+        )
 
     @LangSmithTracingService.trace(
         name="ddr-occurrence-generation",
@@ -116,7 +183,8 @@ class LLMOccurrenceGenerationService:
             return 0
 
         time_logs_text = self._format_time_logs(successful_rows)
-        prompt = self._build_prompt(time_logs_text)
+        previous_occurrences_text = await self._previous_occurrences_text(ddr_id)
+        prompt = self._build_prompt(time_logs_text, previous_occurrences_text=previous_occurrences_text)
         logger.debug("LLM occurrence prompt: {prompt}")
         result_text: str | None = None
         last_error: Exception | None = None
@@ -168,6 +236,7 @@ class LLMOccurrenceGenerationService:
                     row.date,
                 )
 
+        page_number_resolver = OccurrencePageNumberResolver(successful_rows)
         all_occurrences: list[dict] = []
         for item in llm_response.occurrences:
             if item.type not in VALID_OCCURRENCE_TYPES:
@@ -200,7 +269,7 @@ class LLMOccurrenceGenerationService:
                 "surface_location": ddr_surface_location,
                 "notes": item.notes,
                 "date": item.date,
-                "page_number": item.page_number,
+                "page_number": page_number_resolver.resolve(item),
             })
 
         deduped = dedup(all_occurrences)

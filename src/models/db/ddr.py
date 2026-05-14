@@ -52,6 +52,7 @@ class DDRDate(Base):
     raw_response: Mapped[dict | None] = mapped_column(JSONB(), nullable=True)
     final_json: Mapped[dict | None] = mapped_column(JSONB(), nullable=True)
     error_log: Mapped[dict | None] = mapped_column(JSONB(), nullable=True)
+    source_page_numbers: Mapped[list[int] | None] = mapped_column(JSONB(), nullable=True)
     created_at: Mapped[int] = mapped_column(sqlalchemy.BigInteger(), nullable=False)
     updated_at: Mapped[int] = mapped_column(sqlalchemy.BigInteger(), nullable=False)
 

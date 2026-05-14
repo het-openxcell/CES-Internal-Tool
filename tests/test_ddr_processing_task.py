@@ -39,7 +39,10 @@ class StubDDRDateRepository:
     ) -> list[SimpleNamespace]:
         materialized = list(dates)
         self.bulk_calls.append({"ddr_id": ddr_id, "dates": materialized})
-        self._rows = [SimpleNamespace(ddr_id=ddr_id, date=d, status="queued") for d in materialized]
+        self._rows = [
+            SimpleNamespace(ddr_id=ddr_id, date=d, status="queued", source_page_numbers=None)
+            for d in materialized
+        ]
         return list(self._rows)
 
     async def read_dates_by_ddr_id(self, ddr_id: str) -> list[SimpleNamespace]:
@@ -56,6 +59,17 @@ class StubDDRDateRepository:
     async def mark_warning(self, row: Any, error_log: Any, raw_response: Any = None) -> Any:
         row.status = "warning"
         return row
+
+    async def bulk_update_source_page_numbers(
+        self,
+        ddr_id: str,
+        date_page_numbers: dict[str, list[int]],
+        commit: bool = True,
+    ):
+        for row in self._rows:
+            if row.date in date_page_numbers:
+                row.source_page_numbers = date_page_numbers[row.date]
+        return list(self._rows)
 
     async def create_failed_boundary(
         self, ddr_id: str, date: str, reason: str, raw_page_content: str, commit: bool = True
@@ -111,10 +125,14 @@ class FakeStorageService:
                 del self.pdfs[k]
 
 
-def _split_result(date_chunks: dict[str, bytes], raw_text_preview: str = "") -> SimpleNamespace:
+def _split_result(
+    date_chunks: dict[str, bytes],
+    raw_text_preview: str = "",
+    page_dates: dict[int, list[str]] | None = None,
+) -> SimpleNamespace:
     return SimpleNamespace(
         date_chunks=date_chunks,
-        page_dates={},
+        page_dates=page_dates or {},
         warnings=[],
         raw_text_preview=raw_text_preview,
         has_boundaries=bool(date_chunks),
@@ -126,7 +144,10 @@ def test_pipeline_service_creates_queued_dates_and_marks_processing(tmp_path) ->
         ddr = SimpleNamespace(id="ddr-1", file_path=str(tmp_path / "x.pdf"), status="queued")
         ddr_repo = StubDDRRepository(ddr)
         date_repo = StubDDRDateRepository()
-        result = _split_result({"20240115": b"%PDF-bytes-1", "20240116": b"%PDF-bytes-2"})
+        result = _split_result(
+            {"20240115": b"%PDF-bytes-1", "20240116": b"%PDF-bytes-2"},
+            page_dates={1: ["20240115"], 2: ["20240115", "20240116"]},
+        )
 
         service = PreSplitPipelineService(
             ddr_repository=ddr_repo,
@@ -142,6 +163,10 @@ def test_pipeline_service_creates_queued_dates_and_marks_processing(tmp_path) ->
         assert ddr_repo.status_updates == ["processing"]
         assert ddr_repo.finalize_calls == []
         assert date_repo.bulk_calls == [{"ddr_id": "ddr-1", "dates": ["20240115", "20240116"]}]
+        assert {row.date: row.source_page_numbers for row in date_repo._rows} == {
+            "20240115": [1, 2],
+            "20240116": [2],
+        }
         assert date_repo.failed_calls == []
 
     asyncio.run(run())

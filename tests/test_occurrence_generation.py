@@ -24,7 +24,7 @@ def _make_date_row(id_, date, status, time_logs=None, mud_records=None):
     return row
 
 
-def _tl(activity, depth=None, comment=None):
+def _tl(activity, depth=None, comment=None, page_number=None):
     return {
         "start_time": "06:00",
         "end_time": "07:00",
@@ -32,6 +32,7 @@ def _tl(activity, depth=None, comment=None):
         "activity": activity,
         "depth_md": depth,
         "comment": comment,
+        "page_number": page_number,
     }
 
 
@@ -435,7 +436,7 @@ def test_rerun_clears_existing_occurrences(mock_keywords, service, ddr_date_repo
                 "dd1",
                 "20240115",
                 DDRDateStatus.SUCCESS,
-                time_logs=[_tl("stuck pipe", 1500.0)],
+                time_logs=[_tl("normal drilling", 1500.0)],
             ),
         ]
         await service.generate_for_ddr("ddr-x")
@@ -495,6 +496,137 @@ def test_llm_generation_allows_model_to_remove_previous_occurrences():
         prompt = fake_models.generate_content.call_args.kwargs["contents"][0].text
         assert "Validate previous occurrences against current time logs" in prompt
         assert "Stuck Pipe" in prompt
+
+    asyncio.run(run())
+
+
+def test_llm_generation_derives_page_number_from_source_log_indexes():
+    from src.services.occurrence.llm_generate import LLMOccurrenceGenerationService
+
+    async def run():
+        ddr_date_repo = AsyncMock()
+        occurrence_repo = AsyncMock()
+        occurrence_repo.get_by_ddr_id_filtered.return_value = []
+        ddr_date_repo.read_dates_by_ddr_id.return_value = [
+            _make_date_row(
+                "dd1",
+                "20240115",
+                DDRDateStatus.SUCCESS,
+                time_logs=[_tl("stuck pipe", 1500.0, page_number=5), _tl("worked pipe", 1510.0, page_number=6)],
+            ),
+        ]
+        fake_llm_response = MagicMock()
+        fake_llm_response.text = json.dumps({
+            "occurrences": [
+                {
+                    "date": "20240115",
+                    "type": "Stuck Pipe",
+                    "mmd": 1500.0,
+                    "notes": "stuck pipe",
+                    "page_number": None,
+                    "source_log_indexes": [1],
+                }
+            ]
+        })
+        fake_models = MagicMock()
+        fake_models.generate_content = AsyncMock(return_value=fake_llm_response)
+        fake_aio = MagicMock()
+        fake_aio.models = fake_models
+        fake_client = MagicMock()
+        fake_client.aio = fake_aio
+
+        with patch("src.services.occurrence.llm_generate.genai.Client", return_value=fake_client):
+            service = LLMOccurrenceGenerationService(ddr_date_repo, occurrence_repo)
+            count = await service.generate_for_ddr("d1")
+
+        assert count == 1
+        assert occurrence_repo.replace_for_ddr.call_args[0][1][0]["page_number"] == 6
+
+    asyncio.run(run())
+
+
+def test_llm_generation_source_log_indexes_match_original_time_log_positions():
+    from src.services.occurrence.llm_generate import LLMOccurrenceGenerationService
+
+    async def run():
+        ddr_date_repo = AsyncMock()
+        occurrence_repo = AsyncMock()
+        occurrence_repo.get_by_ddr_id_filtered.return_value = []
+        ddr_date_repo.read_dates_by_ddr_id.return_value = [
+            _make_date_row(
+                "dd1",
+                "20240115",
+                DDRDateStatus.SUCCESS,
+                time_logs=["bad-row", _tl("stuck pipe", 1500.0, page_number=7)],
+            ),
+        ]
+        fake_llm_response = MagicMock()
+        fake_llm_response.text = json.dumps({
+            "occurrences": [
+                {
+                    "date": "20240115",
+                    "type": "Stuck Pipe",
+                    "mmd": 1500.0,
+                    "notes": "stuck pipe",
+                    "source_log_indexes": [1],
+                }
+            ]
+        })
+        fake_models = MagicMock()
+        fake_models.generate_content = AsyncMock(return_value=fake_llm_response)
+        fake_aio = MagicMock()
+        fake_aio.models = fake_models
+        fake_client = MagicMock()
+        fake_client.aio = fake_aio
+
+        with patch("src.services.occurrence.llm_generate.genai.Client", return_value=fake_client):
+            service = LLMOccurrenceGenerationService(ddr_date_repo, occurrence_repo)
+            await service.generate_for_ddr("d1")
+
+        assert occurrence_repo.replace_for_ddr.call_args[0][1][0]["page_number"] == 7
+
+    asyncio.run(run())
+
+
+def test_llm_generation_rejects_page_number_not_in_source_logs():
+    from src.services.occurrence.llm_generate import LLMOccurrenceGenerationService
+
+    async def run():
+        ddr_date_repo = AsyncMock()
+        occurrence_repo = AsyncMock()
+        occurrence_repo.get_by_ddr_id_filtered.return_value = []
+        ddr_date_repo.read_dates_by_ddr_id.return_value = [
+            _make_date_row(
+                "dd1",
+                "20240115",
+                DDRDateStatus.SUCCESS,
+                time_logs=[_tl("stuck pipe", 1500.0, page_number=5)],
+            ),
+        ]
+        fake_llm_response = MagicMock()
+        fake_llm_response.text = json.dumps({
+            "occurrences": [
+                {
+                    "date": "20240115",
+                    "type": "Stuck Pipe",
+                    "mmd": 1500.0,
+                    "notes": "stuck pipe",
+                    "page_number": 99,
+                }
+            ]
+        })
+        fake_models = MagicMock()
+        fake_models.generate_content = AsyncMock(return_value=fake_llm_response)
+        fake_aio = MagicMock()
+        fake_aio.models = fake_models
+        fake_client = MagicMock()
+        fake_client.aio = fake_aio
+
+        with patch("src.services.occurrence.llm_generate.genai.Client", return_value=fake_client):
+            service = LLMOccurrenceGenerationService(ddr_date_repo, occurrence_repo)
+            await service.generate_for_ddr("d1")
+
+        assert occurrence_repo.replace_for_ddr.call_args[0][1][0]["page_number"] is None
 
     asyncio.run(run())
 
