@@ -12,11 +12,11 @@ async def get_async_session() -> AsyncGenerator[SQLAlchemyAsyncSession, None]:
     async_session_factory = async_db.async_session_factory
     async with async_session_factory() as session:
         try:
-            logger.info("Opening database session")
+            logger.info("Opening session")
             yield session
         except Exception as exc:
             logger.error(f"Exception caught: {str(exc)}")
             await session.rollback()
             raise
         finally:
-            logger.info("Closing database session")
+            logger.info("Closing session")

@@ -17,7 +17,7 @@ def test_occurrence_model_columns_present() -> None:
     table = Occurrence.__table__
     expected = {
         "id", "ddr_id", "ddr_date_id", "well_name", "surface_location",
-        "type", "section", "mmd", "density", "notes", "date",
+        "type", "section", "mmd", "density", "notes", "date", "page_number",
         "is_exported", "created_at", "updated_at",
     }
     assert set(table.c.keys()) == expected
@@ -66,6 +66,9 @@ def test_occurrence_model_column_types_and_nullability() -> None:
     assert table.c.surface_location.nullable
     assert table.c.notes.nullable
     assert table.c.date.nullable
+
+    assert isinstance(table.c.page_number.type, sqlalchemy.Integer)
+    assert table.c.page_number.nullable
 
 
 def test_occurrence_model_indexes_present() -> None:

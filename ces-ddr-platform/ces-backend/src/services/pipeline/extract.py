@@ -3,6 +3,7 @@ from dataclasses import dataclass
 from typing import Any, Protocol
 
 from src.config.manager import settings
+from src.constants.prompts import LLMPrompts
 from src.resources.ddr_schema import DDRExtractionSchema, load_ddr_extraction_schema
 from src.services.langsmith_tracing import LangSmithTracingService
 
@@ -117,24 +118,28 @@ class GeminiDDRExtractor:
 
     _METADATA_KEYS: frozenset[str] = frozenset({"well_name", "surface_location"})
 
-    def build_prompt(self, date: str) -> str:
+    def build_prompt(self, date: str, original_page_numbers: list[int] | None = None) -> str:
         data_sections = [k for k in self._schema.section_names() if k not in self._METADATA_KEYS]
         sections = ", ".join(data_sections)
         time_log_fields = ", ".join(
             self._schema.raw["properties"]["time_logs"]["items"]["properties"].keys()
         )
-        return (
-            "You are extracting structured data from a Daily Drilling Report (DDR) PDF for date "
-            f"{date}. Return JSON with sections: {sections}. "
-            "Also extract well_name (string or null) and surface_location (string or null) "
-            "from the report header — these are DDR-level fields, not per-section data. "
-            "For 'time_logs', preserve the original row order from the report and emit fields in this "
-            f"exact order per row: {time_log_fields}. Use null for missing optional values."
+        return LLMPrompts.ddr_extraction(
+            date=date,
+            sections=sections,
+            time_log_fields=time_log_fields,
+            original_page_numbers=original_page_numbers,
         )
 
-    async def extract(self, *, date: str, pdf_bytes: bytes) -> ExtractionResult:
+    async def extract(
+        self,
+        *,
+        date: str,
+        pdf_bytes: bytes,
+        original_page_numbers: list[int] | None = None,
+    ) -> ExtractionResult:
         client = self._resolve_client()
-        prompt = self.build_prompt(date)
+        prompt = self.build_prompt(date, original_page_numbers=original_page_numbers)
         response_schema = self._schema.gemini_response_schema()
 
         last_error: Exception | None = None

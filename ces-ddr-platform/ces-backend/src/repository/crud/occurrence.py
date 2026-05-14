@@ -21,6 +21,7 @@ class OccurrenceCRUDRepository(BaseCRUDRepository[Occurrence]):
         density: float | None = None,
         notes: str | None = None,
         date: str | None = None,
+        page_number: int | None = None,
         commit: bool = True,
     ) -> Occurrence:
         now = int(time.time())
@@ -36,6 +37,7 @@ class OccurrenceCRUDRepository(BaseCRUDRepository[Occurrence]):
                 "density": density,
                 "notes": notes,
                 "date": date,
+                "page_number": page_number,
                 "is_exported": False,
                 "created_at": now,
                 "updated_at": now,
@@ -65,6 +67,7 @@ class OccurrenceCRUDRepository(BaseCRUDRepository[Occurrence]):
                     density=occ.get("density"),
                     notes=occ.get("notes"),
                     date=occ.get("date"),
+                    page_number=occ.get("page_number"),
                     is_exported=False,
                     created_at=now,
                     updated_at=now,
@@ -90,6 +93,7 @@ class OccurrenceCRUDRepository(BaseCRUDRepository[Occurrence]):
                 density=occ.get("density"),
                 notes=occ.get("notes"),
                 date=occ.get("date"),
+                page_number=occ.get("page_number"),
                 is_exported=False,
                 created_at=now,
                 updated_at=now,

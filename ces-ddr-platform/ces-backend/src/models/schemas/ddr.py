@@ -84,6 +84,30 @@ class DDRUploadResponse(BaseSchemaModel):
         return DDRStatus.validate(value)
 
 
+class DDRReprocessDatesRequest(BaseSchemaModel):
+    dates: list[str] | str | None = None
+
+    def selected_dates(self) -> list[str] | None:
+        if self.dates is None or self.dates == "all":
+            return None
+        if isinstance(self.dates, list):
+            return [str(date) for date in self.dates]
+        return None
+
+
+class DDRReprocessAcceptedResponse(BaseSchemaModel):
+    status: str
+    mode: str
+    dates: list[str] | None = None
+
+
+class DDRReprocessOccurrencesResponse(BaseSchemaModel):
+    status: str
+    mode: str
+    total_occurrences: int | None = None
+    error: str | None = None
+
+
 class DDRListItemResponse(BaseSchemaModel):
     id: str
     file_path: str
@@ -203,6 +227,7 @@ class DDRExtractionTimeLog(DDRExtractionSchemaModel):
     activity: str
     depth_md: float | None = None
     comment: str | None = None
+    page_number: int | None = None
 
 
 class DDRExtractionMudRecord(DDRExtractionSchemaModel):

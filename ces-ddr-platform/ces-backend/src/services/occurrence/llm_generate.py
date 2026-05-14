@@ -8,6 +8,7 @@ from google.genai import types
 from pydantic import BaseModel
 
 from src.config.manager import settings
+from src.constants.prompts import LLMPrompts
 from src.models.schemas.ddr import DDRDateStatus
 from src.services.langsmith_tracing import LangSmithTracingService
 from src.services.occurrence.classify import (
@@ -27,6 +28,7 @@ class LLMOccurrenceItem(BaseModel):
     type: str
     mmd: float | None = None
     notes: str | None = None
+    page_number: int | None = None
 
 
 class LLMOccurrenceResponse(BaseModel):
@@ -74,55 +76,20 @@ class LLMOccurrenceGenerationService:
                 end = tl.get("end_time") or "?"
                 duration = tl.get("duration_hours")
                 depth = tl.get("depth_md")
+                page_number = tl.get("page_number")
                 activity = tl.get("activity") or ""
                 comment = tl.get("comment") or ""
                 text = f"{activity} {comment}".strip() if comment else activity
                 depth_str = f"{depth}m" if depth is not None else "-"
                 duration_str = f"{duration}h" if duration is not None else "?"
-                lines.append(f"[{i}] {start}-{end} ({duration_str}) | {depth_str} | {text}")
+                page_str = f"pg.{page_number}" if page_number is not None else "pg.?"
+                lines.append(f"[{i}] {start}-{end} ({duration_str}) | {depth_str} | {page_str} | {text}")
             blocks.append("\n".join(lines))
         return "\n\n".join(blocks)
 
-    def _format_existing(self, occurrences: list[Any]) -> str:
-        if not occurrences:
-            return ""
-        lines: list[str] = []
-        for occ in occurrences:
-            if isinstance(occ, dict):
-                date = occ.get("date", "")
-                occ_type = occ.get("type", "")
-                mmd = occ.get("mmd")
-                notes = occ.get("notes")
-            else:
-                date = getattr(occ, "date", "")
-                occ_type = getattr(occ, "type", "")
-                mmd = getattr(occ, "mmd", None)
-                notes = getattr(occ, "notes", None)
-            lines.append(f"- {date} | {occ_type} | {mmd} | {notes}")
-        return "\n".join(lines)
-
-    def _build_prompt(self, time_logs_text: str, existing_text: str) -> str:
+    def _build_prompt(self, time_logs_text: str) -> str:
         valid_types_str = ", ".join(sorted(VALID_OCCURRENCE_TYPES))
-        prompt = (
-            "You are a drilling engineering expert. From current time logs below, identify final occurrence set —\n"
-            "drilling events or problems. Use ONLY the valid types listed.\n\n"
-            f"VALID TYPES: {valid_types_str}\n\n"
-            f"CURRENT TIME LOGS:\n{time_logs_text}"
-        )
-        if existing_text:
-            prompt += (
-                "\n\nPREVIOUSLY GENERATED OCCURRENCES:\n"
-                f"{existing_text}\n\n"
-                "Validate previous occurrences against current time logs. Keep valid occurrences, "
-                "remove invalid or stale ones, update changed date/type/mmd/notes values, and add missing occurrences."
-            )
-        prompt += (
-            "\n\nReturn one final JSON object with key 'occurrences'. "
-            "Do not return actions or explanations. "
-            "Each occurrence must have: date (YYYYMMDD string), type (from valid types), "
-            "mmd (float or null), notes (string or null)."
-        )
-        return prompt
+        return LLMPrompts.occurrence_generation(time_logs_text=time_logs_text, valid_types=valid_types_str)
 
     @LangSmithTracingService.trace(
         name="ddr-occurrence-generation",
@@ -148,13 +115,8 @@ class LLMOccurrenceGenerationService:
         if not successful_rows:
             return 0
 
-        existing = await self.occurrence_repository.get_by_ddr_id_filtered(
-            ddr_id, None, None, None, None
-        )
-
         time_logs_text = self._format_time_logs(successful_rows)
-        existing_text = self._format_existing(existing)
-        prompt = self._build_prompt(time_logs_text, existing_text)
+        prompt = self._build_prompt(time_logs_text)
         logger.debug("LLM occurrence prompt: {prompt}")
         result_text: str | None = None
         last_error: Exception | None = None
@@ -238,6 +200,7 @@ class LLMOccurrenceGenerationService:
                 "surface_location": ddr_surface_location,
                 "notes": item.notes,
                 "date": item.date,
+                "page_number": item.page_number,
             })
 
         deduped = dedup(all_occurrences)

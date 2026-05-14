@@ -18,6 +18,7 @@ function makeOccurrence(overrides: Partial<OccurrenceRow> = {}): OccurrenceRow {
     density: 1.35,
     notes: "pipe stuck after connection",
     date: "20241031",
+    page_number: null,
     ...overrides,
   };
 }
@@ -39,7 +40,7 @@ describe("OccurrenceTable", () => {
 
   it("renders column headers", () => {
     renderTable();
-    expect(screen.getByRole("columnheader", { name: /Date/i })).toBeInTheDocument();
+    expect(screen.getByRole("columnheader", { name: /Incident Date/i })).toBeInTheDocument();
     expect(screen.getByRole("columnheader", { name: /Type/i })).toBeInTheDocument();
     expect(screen.getByRole("columnheader", { name: /Section/i })).toBeInTheDocument();
     expect(screen.getByRole("columnheader", { name: /mMD/i })).toBeInTheDocument();

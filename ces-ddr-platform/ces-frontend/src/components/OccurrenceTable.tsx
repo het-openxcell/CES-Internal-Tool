@@ -38,7 +38,7 @@ const ALL_TYPES = [
 const ALL_SECTIONS = ["Surface", "Int.", "Main"];
 
 const columns: ColumnDef<OccurrenceRow>[] = [
-  { accessorKey: "date", header: "Date", enableHiding: true },
+  { accessorKey: "date", header: "Incident Date", enableHiding: true },
   {
     accessorKey: "type",
     header: "Type",
@@ -58,13 +58,18 @@ const columns: ColumnDef<OccurrenceRow>[] = [
     cell: ({ getValue }) => (getValue() != null ? (getValue() as number).toFixed(1) : "—"),
   },
   {
+    accessorKey: "page_number",
+    header: "Page",
+    cell: ({ getValue }) => (getValue() != null ? (getValue() as number) : "—"),
+  },
+  {
     accessorKey: "notes",
     header: "Notes",
     cell: ({ getValue }) => (getValue() as string | null) ?? "—",
   },
 ];
 
-const VISIBLE_COLUMN_KEYS = ["date", "type", "section", "mmd", "notes"];
+const VISIBLE_COLUMN_KEYS = ["date", "type", "section", "mmd", "page_number", "notes"];
 
 export type OccurrenceTableProps = {
   occurrences: OccurrenceRow[];
@@ -126,7 +131,7 @@ export function OccurrenceTable({ occurrences, isLoading }: OccurrenceTableProps
       .filter((row) => {
         if (!globalFilter) return true;
         const q = globalFilter.toLowerCase();
-        return [row.well_name, row.surface_location, row.type, row.section, row.notes].some((v) =>
+        return [row.well_name, row.surface_location, row.type, row.section, row.notes, row.page_number?.toString()].some((v) =>
           v?.toLowerCase().includes(q),
         );
       });
@@ -260,10 +265,11 @@ export function OccurrenceTable({ occurrences, isLoading }: OccurrenceTableProps
         >
           <thead>
             <tr className="text-[10.5px] uppercase tracking-wider font-semibold text-text-muted border-b border-border-default">
-              <th className="py-2 px-3 text-left font-semibold w-[88px]">Date</th>
+              <th className="py-2 px-3 text-left font-semibold w-[88px]">Incident Date</th>
               <th className="py-2 px-3 text-left font-semibold w-[130px]">Type</th>
               <th className="py-2 px-3 text-left font-semibold w-[90px]">Section</th>
               <th className="py-2 px-3 text-right font-semibold w-[88px]">MMD</th>
+              <th className="py-2 px-3 text-right font-semibold w-[72px]">Page</th>
               <th className="py-2 px-3 text-left font-semibold">Notes</th>
             </tr>
           </thead>
@@ -290,7 +296,7 @@ export function OccurrenceTable({ occurrences, isLoading }: OccurrenceTableProps
                     if (!VISIBLE_COLUMN_KEYS.includes(cell.column.id)) return null;
                     const isFocused =
                       focusedCell?.row === rowIndex && focusedCell?.col === colIndex;
-                    const isNumeric = cell.column.id === "mmd";
+                    const isNumeric = cell.column.id === "mmd" || cell.column.id === "page_number";
                     const isDate = cell.column.id === "date";
                     return (
                       <td

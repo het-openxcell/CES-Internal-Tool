@@ -4,6 +4,7 @@ import { Link, Navigate, useParams } from "react-router";
 import { OccurrenceMetrics } from "@/components/OccurrenceMetrics";
 import { OccurrenceTable } from "@/components/OccurrenceTable";
 import ReportListSidebar from "@/components/ReportListSidebar";
+import ReprocessModal from "@/components/ReprocessModal";
 import { TypeBadge } from "@/components/TypeBadge";
 import { useOccurrences } from "@/hooks/useOccurrences";
 import { useProcessingStatus } from "@/hooks/useProcessingStatus";
@@ -15,6 +16,7 @@ export default function ReportDetailPage() {
   const { id } = useParams();
   const [tab, setTab] = useState<"occurrences" | "failed" | "history">("occurrences");
   const [ddr, setDdr] = useState<DDRDetail | null>(null);
+  const [reprocessOpen, setReprocessOpen] = useState(false);
   const [editHistory] = useState([
     { id: "edit-1", field: "Type", original: "Ream", corrected: "Back Ream", date: "2026-04-22", when: "2 min ago" },
     { id: "edit-2", field: "Type", original: "Washout", corrected: "Lost Circulation", date: "2026-04-23", when: "15 min ago" },
@@ -23,7 +25,7 @@ export default function ReportDetailPage() {
   if (!id) return <Navigate to="/" replace />;
 
   const status = useProcessingStatus(id);
-  const { data: occurrences, isLoading: occurrencesLoading } = useOccurrences(id);
+  const { data: occurrences, isLoading: occurrencesLoading, refetch: refetchOccurrences } = useOccurrences(id);
   const { retryingDate, handleRetryDate } = useRetryDate(id, status.refresh);
 
   useEffect(() => {
@@ -78,7 +80,11 @@ export default function ReportDetailPage() {
                   {editHistory.length} {editHistory.length === 1 ? "correction" : "corrections"} pending
                 </span>
               )}
-              <button className="inline-flex items-center gap-1.5 h-9 px-3 rounded-md text-[13px] font-medium bg-white border border-border-default text-text-secondary hover:bg-surface transition-colors">
+              <button
+                type="button"
+                onClick={() => setReprocessOpen(true)}
+                className="inline-flex items-center gap-1.5 h-9 px-3 rounded-md text-[13px] font-medium bg-white border border-border-default text-text-secondary hover:bg-surface transition-colors"
+              >
                 <RefreshIcon className="w-3.5 h-3.5" />
                 Reprocess
               </button>
@@ -225,6 +231,18 @@ export default function ReportDetailPage() {
 
         </div>
       </main>
+      <ReprocessModal
+        open={reprocessOpen}
+        ddrId={id}
+        availableDates={status.rows.map((r) => r.date)}
+        onClose={() => setReprocessOpen(false)}
+        onSubmitted={(mode) => {
+          if (mode !== "occurrences") status.reconnect();
+        }}
+        onOccurrencesRegenerated={() => {
+          void refetchOccurrences();
+        }}
+      />
     </>
   );
 }

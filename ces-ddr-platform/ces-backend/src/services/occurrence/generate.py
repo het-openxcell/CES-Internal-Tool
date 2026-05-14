@@ -62,6 +62,7 @@ class OccurrenceGenerationService:
                     "surface_location": ddr_surface_location,
                     "notes": text if text else None,
                     "date": row.date,
+                    "page_number": tl.get("page_number"),
                 })
 
         deduped = dedup(all_occurrences)

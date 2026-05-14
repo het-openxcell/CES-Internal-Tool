@@ -1,15 +1,23 @@
 from typing import Annotated
 
-from fastapi import APIRouter, BackgroundTasks, Depends, Path, Query, Request, UploadFile, status
+from fastapi import APIRouter, BackgroundTasks, Body, Depends, Path, Query, Request, UploadFile, status
 from fastapi.responses import JSONResponse, StreamingResponse
 
 from src.api.dependencies.repository import get_repository
-from src.models.schemas.ddr import DDRDateInResponse, DDRDetailResponse, DDRListItemResponse, DDRUploadResponse
+from src.models.schemas.ddr import (
+    DDRDateInResponse,
+    DDRDetailResponse,
+    DDRListItemResponse,
+    DDRReprocessAcceptedResponse,
+    DDRReprocessDatesRequest,
+    DDRReprocessOccurrencesResponse,
+    DDRUploadResponse,
+)
 from src.models.schemas.occurrence import OccurrenceInResponse
 from src.repository.crud.ddr import DDRCRUDRepository, DDRDateCRUDRepository, ProcessingQueueCRUDRepository
 from src.repository.crud.occurrence import OccurrenceCRUDRepository
 from src.securities.authorizations.jwt_authentication import jwt_authentication, stream_query_token_authentication
-from src.services.ddr import DDRProcessingTask, DDRUploadService
+from src.services.ddr import DDRProcessingTask, DDRReprocessService, DDRReprocessTask, DDRUploadService
 from src.services.pipeline_service import PreSplitPipelineService
 from src.services.processing_status import ProcessingStatusStreamService
 from src.services.storage_service import StorageService
@@ -165,3 +173,73 @@ async def retry_ddr_date(
     )
     row = await service.retry_date(ddr_id, date)
     return DDRDateInResponse.model_validate(row)
+
+
+@router.post(
+    "/{ddr_id}/reprocess/full",
+    response_model=DDRReprocessAcceptedResponse,
+    status_code=status.HTTP_202_ACCEPTED,
+)
+async def reprocess_full(
+    ddr_id: str,
+    background_tasks: BackgroundTasks,
+    current_user = Depends(jwt_authentication),
+    ddr_repository: DDRCRUDRepository = Depends(get_repository(DDRCRUDRepository)),
+    ddr_date_repository: DDRDateCRUDRepository = Depends(get_repository(DDRDateCRUDRepository)),
+    occurrence_repository: OccurrenceCRUDRepository = Depends(get_repository(OccurrenceCRUDRepository)),
+    storage_service: StorageService = Depends(get_storage_service),
+    status_stream_service: ProcessingStatusStreamService = Depends(get_processing_status_stream_service),
+) -> DDRReprocessAcceptedResponse:
+    service = DDRReprocessService(ddr_repository, ddr_date_repository, occurrence_repository, storage_service)
+    await service.prepare_full(ddr_id)
+    task = DDRReprocessTask(status_stream_service=status_stream_service, storage_service=storage_service)
+    background_tasks.add_task(task.full, ddr_id)
+    return DDRReprocessAcceptedResponse(status="accepted", mode="full")
+
+
+@router.post(
+    "/{ddr_id}/reprocess/dates",
+    response_model=DDRReprocessAcceptedResponse,
+    status_code=status.HTTP_202_ACCEPTED,
+)
+async def reprocess_dates(
+    ddr_id: str,
+    background_tasks: BackgroundTasks,
+    payload: DDRReprocessDatesRequest = Body(default_factory=DDRReprocessDatesRequest),
+    current_user = Depends(jwt_authentication),
+    ddr_repository: DDRCRUDRepository = Depends(get_repository(DDRCRUDRepository)),
+    ddr_date_repository: DDRDateCRUDRepository = Depends(get_repository(DDRDateCRUDRepository)),
+    occurrence_repository: OccurrenceCRUDRepository = Depends(get_repository(OccurrenceCRUDRepository)),
+    storage_service: StorageService = Depends(get_storage_service),
+    status_stream_service: ProcessingStatusStreamService = Depends(get_processing_status_stream_service),
+) -> DDRReprocessAcceptedResponse:
+    dates = payload.selected_dates()
+    service = DDRReprocessService(ddr_repository, ddr_date_repository, occurrence_repository, storage_service)
+    await service.prepare_dates(ddr_id, dates)
+    task = DDRReprocessTask(status_stream_service=status_stream_service, storage_service=storage_service)
+    background_tasks.add_task(task.dates, ddr_id, dates)
+    return DDRReprocessAcceptedResponse(status="accepted", mode="dates", dates=dates)
+
+
+@router.post("/{ddr_id}/reprocess/occurrences", response_model=DDRReprocessOccurrencesResponse)
+async def reprocess_occurrences(
+    ddr_id: str,
+    current_user = Depends(jwt_authentication),
+    ddr_repository: DDRCRUDRepository = Depends(get_repository(DDRCRUDRepository)),
+    ddr_date_repository: DDRDateCRUDRepository = Depends(get_repository(DDRDateCRUDRepository)),
+    occurrence_repository: OccurrenceCRUDRepository = Depends(get_repository(OccurrenceCRUDRepository)),
+    storage_service: StorageService = Depends(get_storage_service),
+) -> DDRReprocessOccurrencesResponse | JSONResponse:
+    service = DDRReprocessService(ddr_repository, ddr_date_repository, occurrence_repository, storage_service)
+    try:
+        total = await service.regenerate_occurrences(ddr_id)
+        return DDRReprocessOccurrencesResponse(status="success", mode="occurrences", total_occurrences=total)
+    except Exception as exc:
+        return JSONResponse(
+            status_code=500,
+            content=DDRReprocessOccurrencesResponse(
+                status="failed",
+                mode="occurrences",
+                error=str(exc),
+            ).model_dump(),
+        )

@@ -229,6 +229,52 @@ class DDRDateCRUDRepository(BaseCRUDRepository[DDRDate]):
             commit=commit,
         )
 
+    async def mark_failed_preserve(
+        self,
+        ddr_date: DDRDate,
+        error_log: dict,
+        raw_response: dict | None = None,
+        commit: bool = True,
+    ) -> DDRDate:
+        return await self.update(
+            ddr_date,
+            {
+                "status": DDRDateStatus.FAILED,
+                "raw_response": raw_response,
+                "error_log": error_log,
+                "updated_at": int(time.time()),
+            },
+            commit=commit,
+        )
+
+    async def mark_warning_preserve(
+        self,
+        ddr_date: DDRDate,
+        error_log: dict,
+        raw_response: dict | None = None,
+        commit: bool = True,
+    ) -> DDRDate:
+        return await self.update(
+            ddr_date,
+            {
+                "status": DDRDateStatus.WARNING,
+                "raw_response": raw_response,
+                "error_log": error_log,
+                "updated_at": int(time.time()),
+            },
+            commit=commit,
+        )
+
+    async def delete_by_ddr_id_and_dates(self, ddr_id: str, dates: list[str]) -> None:
+        if not dates:
+            return
+        stmt = sqlalchemy.delete(DDRDate).where(
+            DDRDate.ddr_id == ddr_id,
+            DDRDate.date.in_(dates),
+        )
+        await self.async_session.execute(stmt)
+        await self.async_session.commit()
+
     async def create_failed_boundary(
         self,
         ddr_id: str,

@@ -117,6 +117,7 @@ export function useProcessingStatus(ddrId?: string) {
   const [totalDates, setTotalDates] = useState(0);
   const [finalSummary, setFinalSummary] = useState<ProcessingCompleteSummary | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [reconnectKey, setReconnectKey] = useState(0);
   const completedRef = useRef(false);
   const rowsRef = useRef<ProcessingStatusRow[]>([]);
   const totalDatesRef = useRef(0);
@@ -280,7 +281,7 @@ export function useProcessingStatus(ddrId?: string) {
       source?.close();
       stopPolling();
     };
-  }, [applyDetail, ddrId]);
+  }, [applyDetail, ddrId, reconnectKey]);
 
   const counts = useMemo(() => {
     const queuedCount = rows.filter((row) => row.status === "queued").length;
@@ -324,6 +325,10 @@ export function useProcessingStatus(ddrId?: string) {
     }
   };
 
+  const reconnect = () => {
+    setReconnectKey((k) => k + 1);
+  };
+
   return {
     connectionMode,
     ddrStatus,
@@ -333,5 +338,6 @@ export function useProcessingStatus(ddrId?: string) {
     finalSummary,
     error,
     refresh,
+    reconnect,
   };
 }
