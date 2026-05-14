@@ -52,7 +52,7 @@ export default function ReportsPage() {
   const { id } = useParams();
   const [filter, setFilter] = useState<DateFilter>("all");
   const status = useProcessingStatus(id);
-  const { retryingDate, handleRetryDate } = useRetryDate(id, status.refresh);
+  const { retryingDate, handleRetryDate } = useRetryDate(id, status.refresh, status.reconnect);
   const processedLabel = `Processing date ${status.currentProcessedCount} of ${status.totalDates || status.currentProcessedCount}`;
   const extractedCount = status.finalSummary
     ? Math.max(status.finalSummary.total_dates - status.finalSummary.failed_dates, 0)

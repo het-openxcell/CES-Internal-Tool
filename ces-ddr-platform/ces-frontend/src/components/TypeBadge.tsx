@@ -24,7 +24,7 @@ export function TypeBadge({ type }: { type: string }) {
   const colors = TYPE_COLOURS[label] ?? FALLBACK;
   return (
     <span
-      className={`inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold ${colors.bg} ${colors.text}`}
+      className={`inline-flex items-center px-3 py-1 rounded text-[13px] font-semibold ${colors.bg} ${colors.text}`}
       aria-label={label}
     >
       {label}

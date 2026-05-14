@@ -61,6 +61,44 @@ export type OccurrenceFilters = {
   date_to?: string;
 };
 
+export type OccurrenceEditResponse = {
+  id: string;
+  occurrence_id: string;
+  ddr_id: string;
+  field: string;
+  original_value: string | null;
+  corrected_value: string | null;
+  reason: string | null;
+  created_by: string | null;
+  created_at: number;
+};
+
+export type MonitorMetrics = {
+  ddrs_this_week: number;
+  occurrences_extracted: number;
+  ai_cost_weekly: number;
+  failed_dates: number;
+  corrections_this_week: number;
+  avg_processing_seconds: number;
+  exports_this_week: number;
+  uptime_month: number;
+};
+
+export type QueueItem = {
+  id: string;
+  file_path: string;
+  well_name: string | null;
+  operator: string | null;
+  area: string | null;
+  status: DDRStatus;
+  date_total: number;
+  date_success: number;
+  date_failed: number;
+  date_warning: number;
+  created_at: number;
+  updated_at: number;
+};
+
 export type ApiErrorCode = "UNAUTHORIZED" | "API_ERROR";
 
 export class ApiError extends Error {
@@ -172,6 +210,37 @@ class ApiClient {
     if (filters?.date_to) params.set("date_to", filters.date_to);
     const query = params.toString() ? `?${params.toString()}` : "";
     return this.request<OccurrenceRow[]>(`/ddrs/${encodeURIComponent(ddrId)}/occurrences${query}`, { signal });
+  }
+
+  async patchOccurrence(ddrId: string, occurrenceId: string, field: string, value: string | null, reason?: string) {
+    return this.request<OccurrenceEditResponse>(
+      `/ddrs/${encodeURIComponent(ddrId)}/occurrences/${encodeURIComponent(occurrenceId)}`,
+      { method: "PATCH", body: JSON.stringify({ field, value, reason }) },
+    );
+  }
+
+  async getMonitorMetrics() {
+    return this.request<MonitorMetrics>("/monitor/metrics");
+  }
+
+  async getMonitorQueue() {
+    return this.request<QueueItem[]>("/monitor/queue");
+  }
+
+  async getMonitorCorrections(field?: string) {
+    const params = field ? `?field=${encodeURIComponent(field)}` : "";
+    return this.request<OccurrenceEditResponse[]>(`/monitor/corrections${params}`);
+  }
+
+  async getKeywords() {
+    return this.request<Record<string, string>>("/keywords");
+  }
+
+  async updateKeywords(keywords: Record<string, string>) {
+    return this.request<{ updated: number }>("/keywords", {
+      method: "PUT",
+      body: JSON.stringify(keywords),
+    });
   }
 
   async request<TResponse>(path: string, options: RequestInit & { skipAuth?: boolean } = {}) {

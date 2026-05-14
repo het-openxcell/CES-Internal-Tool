@@ -7,6 +7,13 @@ from src.services.occurrence.classify import VALID_OCCURRENCE_TYPES
 router = APIRouter(prefix="/keywords", tags=["Keywords"])
 
 
+@router.get("", status_code=status.HTTP_200_OK)
+async def get_keywords(
+    current_user=Depends(jwt_authentication),
+) -> dict[str, str]:
+    return KeywordLoader.get_keywords()
+
+
 @router.put("", status_code=status.HTTP_200_OK)
 async def update_keywords(
     keywords: dict[str, str],

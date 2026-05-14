@@ -13,9 +13,11 @@ from src.models.schemas.ddr import (
     DDRReprocessOccurrencesResponse,
     DDRUploadResponse,
 )
+from src.models.schemas.monitor import OccurrenceEditResponse, OccurrencePatchRequest
 from src.models.schemas.occurrence import OccurrenceInResponse
 from src.repository.crud.ddr import DDRCRUDRepository, DDRDateCRUDRepository, ProcessingQueueCRUDRepository
 from src.repository.crud.occurrence import OccurrenceCRUDRepository
+from src.repository.crud.occurrence_edit import OccurrenceEditCRUDRepository
 from src.securities.authorizations.jwt_authentication import jwt_authentication, stream_query_token_authentication
 from src.services.ddr import DDRProcessingTask, DDRReprocessService, DDRReprocessTask, DDRUploadService
 from src.services.pipeline_service import PreSplitPipelineService
@@ -157,6 +159,7 @@ async def get_ddr(
 async def retry_ddr_date(
     ddr_id: str,
     date: Annotated[str, Path(pattern=r"^\d{8}$")],
+    background_tasks: BackgroundTasks,
     current_user = Depends(jwt_authentication),
     ddr_repository: DDRCRUDRepository = Depends(get_repository(DDRCRUDRepository)),
     ddr_date_repository: DDRDateCRUDRepository = Depends(get_repository(DDRDateCRUDRepository)),
@@ -171,7 +174,8 @@ async def retry_ddr_date(
         storage_service=storage_service,
         status_stream_service=status_stream_service,
     )
-    row = await service.retry_date(ddr_id, date)
+    row = await service.prepare_retry(ddr_id, date)
+    background_tasks.add_task(service.execute_retry, ddr_id, date)
     return DDRDateInResponse.model_validate(row)
 
 
@@ -243,3 +247,52 @@ async def reprocess_occurrences(
                 error=str(exc),
             ).model_dump(),
         )
+
+
+@router.patch(
+    "/{ddr_id}/occurrences/{occurrence_id}",
+    response_model=OccurrenceEditResponse,
+    status_code=status.HTTP_200_OK,
+)
+async def patch_occurrence(
+    ddr_id: str,
+    occurrence_id: str,
+    payload: OccurrencePatchRequest,
+    current_user=Depends(jwt_authentication),
+    ddr_repository: DDRCRUDRepository = Depends(get_repository(DDRCRUDRepository)),
+    occurrence_repository: OccurrenceCRUDRepository = Depends(get_repository(OccurrenceCRUDRepository)),
+    edit_repository: OccurrenceEditCRUDRepository = Depends(get_repository(OccurrenceEditCRUDRepository)),
+) -> OccurrenceEditResponse:
+    import time as _time
+
+    ddr = await ddr_repository.read_by_id(ddr_id)
+    if ddr is None:
+        raise EntityDoesNotExist("ddr_not_found")
+
+    occurrence = await occurrence_repository.read_by_id(occurrence_id)
+    if occurrence is None or occurrence.ddr_id != ddr_id:
+        raise EntityDoesNotExist("occurrence_not_found")
+
+    allowed_fields = {"type", "section", "mmd", "notes", "density"}
+    if payload.field not in allowed_fields:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=422, detail=f"field must be one of {sorted(allowed_fields)}")
+
+    original_value = str(getattr(occurrence, payload.field, None) or "") or None
+
+    await occurrence_repository.update(
+        occurrence,
+        {payload.field: payload.value, "updated_at": int(_time.time())},
+    )
+
+    username = getattr(current_user, "username", None) or getattr(current_user, "email", None)
+    edit = await edit_repository.create_edit(
+        occurrence_id=occurrence_id,
+        ddr_id=ddr_id,
+        field=payload.field,
+        original_value=original_value,
+        corrected_value=payload.value,
+        reason=payload.reason,
+        created_by=username,
+    )
+    return OccurrenceEditResponse.model_validate(edit)
