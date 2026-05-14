@@ -37,8 +37,19 @@ const ALL_TYPES = [
 
 const ALL_SECTIONS = ["Surface", "Int.", "Main"];
 
+function formatIncidentDate(date: string | null) {
+  if (!date) return "—";
+  if (/^\d{8}$/.test(date)) return `${date.slice(0, 4)}-${date.slice(4, 6)}-${date.slice(6)}`;
+  return date;
+}
+
 const columns: ColumnDef<OccurrenceRow>[] = [
-  { accessorKey: "date", header: "Incident Date", enableHiding: true },
+  {
+    accessorKey: "date",
+    header: "Incident Date",
+    enableHiding: true,
+    cell: ({ getValue }) => formatIncidentDate(getValue() as string | null),
+  },
   {
     accessorKey: "type",
     header: "Type",

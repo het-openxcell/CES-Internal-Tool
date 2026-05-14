@@ -52,6 +52,11 @@ describe("OccurrenceTable", () => {
     expect(screen.getByText("No occurrences found for this DDR")).toBeInTheDocument();
   });
 
+  it("formats compact incident dates", () => {
+    renderTable({ occurrences: [makeOccurrence()] });
+    expect(screen.getByText("2024-10-31")).toBeInTheDocument();
+  });
+
   it("renders occurrence row with TypeBadge", () => {
     renderTable({ occurrences: [makeOccurrence()] });
     expect(screen.getByLabelText("Stuck Pipe")).toBeInTheDocument();
