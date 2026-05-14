@@ -99,15 +99,25 @@ class PreSplitPipelineService:
             )
         return result
 
-    async def retry_date(self, ddr_id: str, date: str) -> DDRDate:
+    async def prepare_retry(self, ddr_id: str, date: str) -> DDRDate:
+        """Validate + set statuses immediately; caller dispatches execute_retry as background task."""
         ddr = await self.ddr_repository.read_ddr_by_id(ddr_id)
-
         row = await self.ddr_date_repository.read_date_for_update(ddr_id, date)
         if row is None:
             raise EntityDoesNotExist("date_not_found")
         if row.status not in (DDRDateStatus.FAILED, DDRDateStatus.WARNING):
             raise BadRequestException("date_not_retryable")
         await self.ddr_date_repository.update_status(row, DDRDateStatus.QUEUED)
+        await self.ddr_repository.update_status(ddr, DDRStatus.PROCESSING)
+        return row
+
+    async def execute_retry(self, ddr_id: str, date: str) -> None:
+        """Background task: process the queued date and finalize DDR status."""
+        ddr = await self.ddr_repository.read_ddr_by_id(ddr_id)
+        rows_all = await self.ddr_date_repository.read_dates_by_ddr_id(ddr_id)
+        row = next((r for r in rows_all if r.date == date), None)
+        if row is None:
+            return
 
         chunk_bytes = await self.storage_service.download_chunk(ddr_id, date)
         date_page_numbers = await self._page_numbers_for_rows(ddr_id, [row])
@@ -124,10 +134,8 @@ class PreSplitPipelineService:
         well_name, surface_location = self._metadata_from_rows(rows)
         await self.ddr_repository.update_well_metadata(ddr, well_name, surface_location)
 
-        refreshed = next((r for r in rows if r.date == date), row)
         if self._has_queued_dates(rows):
-            await self.ddr_repository.update_status(ddr, DDRStatus.PROCESSING)
-            return refreshed
+            return
 
         ddr = await self.ddr_repository.read_ddr_by_id(ddr_id)
         await self.ddr_repository.finalize_status_from_dates(ddr, [r.status for r in rows])
@@ -141,7 +149,11 @@ class PreSplitPipelineService:
             total_occurrences = 0
 
         await self._publish_processing_complete(ddr_id, total_occurrences=total_occurrences)
-        return refreshed
+
+    async def retry_date(self, ddr_id: str, date: str) -> DDRDate:
+        row = await self.prepare_retry(ddr_id, date)
+        await self.execute_retry(ddr_id, date)
+        return row
 
     async def regenerate_occurrences(self, ddr_id: str) -> int:
         rows = await self.ddr_date_repository.read_dates_by_ddr_id(ddr_id)
