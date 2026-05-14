@@ -59,3 +59,12 @@ class OccurrenceInResponse(BaseSchemaModel):
     date: str | None = None
     page_number: int | None = None
     is_exported: bool
+
+
+class HistoryOccurrenceInResponse(OccurrenceInResponse):
+    operator: str | None = None
+    area: str | None = None
+    start_time: str | None = None
+    end_time: str | None = None
+    from_mmd: float | None = None
+    to_mmd: float | None = None
