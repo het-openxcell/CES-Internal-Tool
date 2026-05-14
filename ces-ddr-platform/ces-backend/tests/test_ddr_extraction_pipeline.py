@@ -42,6 +42,7 @@ class FakeDDRDateRow:
         self.raw_response = None
         self.final_json = None
         self.error_log = None
+        self.source_page_numbers = None
         self.updated_at = 0
 
 
@@ -87,6 +88,12 @@ class FakeDDRDateRepository:
         return row
 
     async def bulk_create_queued(self, ddr_id, dates, commit=True):
+        return self._rows
+
+    async def bulk_update_source_page_numbers(self, ddr_id, date_page_numbers, commit=True):
+        for row in self._rows:
+            if row.date in date_page_numbers:
+                row.source_page_numbers = date_page_numbers[row.date]
         return self._rows
 
     async def create_failed_boundary(self, **kwargs):
@@ -379,6 +386,49 @@ def test_pipeline_persists_success_warning_and_failure_per_date(tmp_path) -> Non
     assert final_set == {DDRDateStatus.SUCCESS, DDRDateStatus.WARNING, DDRDateStatus.FAILED}
     assert ddr.status == DDRStatus.COMPLETE
     assert [event["date"] for event in status_stream_service.started] == ["20240115", "20240116", "20240117"]
+
+
+def test_pipeline_uses_original_page_mapping_and_normalizes_time_logs() -> None:
+    payload = json.loads(FIXTURE_JSON)
+    payload["time_logs"] = [
+        {**payload["time_logs"][0], "page_number": 1},
+        {**payload["time_logs"][1], "page_number": 2},
+    ]
+    rows = [FakeDDRDateRow("20240115")]
+    date_repo = FakeDDRDateRepository(rows)
+    ddr = FakeDDR()
+    ddr_repo = FakeDDRRepository(ddr)
+    fake_client = FakeGeminiClient([ExtractionResult(text=json.dumps(payload), input_tokens=1, output_tokens=2)])
+    extractor = GeminiDDRExtractor(client=fake_client, model="m", max_retries=0, sleep=lambda _s: asyncio.sleep(0))
+
+    async def loader(_):
+        return b"%PDF-1.7"
+
+    async def fake_split(_):
+        return SimpleNamespace(
+            has_boundaries=True,
+            date_chunks={"20240115": b"a"},
+            page_dates={5: ["20240115"], 6: ["20240115"]},
+            raw_text_preview="",
+        )
+
+    service = PreSplitPipelineService(
+        ddr_repository=ddr_repo,
+        ddr_date_repository=date_repo,
+        pre_splitter=SimpleNamespace(split_async=fake_split),
+        pdf_loader=loader,
+        extractor=extractor,
+        max_concurrent=1,
+        cost_service=FakeCostService(),
+        embedding_service=FakeEmbeddingService(),
+        storage_service=FakeStorageService(),
+    )
+
+    asyncio.run(service.run("ddr-1"))
+
+    assert rows[0].source_page_numbers == [5, 6]
+    assert [row["page_number"] for row in rows[0].final_json["time_logs"]] == [5, 6]
+    assert "original whole-PDF page number(s): 5, 6" in fake_client.calls[0]["prompt"]
 
 
 def test_pipeline_marks_parent_failed_when_all_dates_fail(tmp_path) -> None:

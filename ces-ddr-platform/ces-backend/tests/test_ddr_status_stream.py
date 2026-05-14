@@ -238,7 +238,10 @@ def test_pipeline_publishes_events_after_repository_writes_and_finalizes_counts(
         )
 
         assert date_repository.success_calls == ["20241031", "20241101"]
-        assert [event[0] for event in events] == ["date_complete", "date_complete", "processing_complete"]
+        event_names = [event[0] for event in events]
+        assert event_names.count("date_started") == 2
+        assert event_names.count("date_complete") == 2
+        assert event_names[-1] == "processing_complete"
         assert events[-1][1] == {
             "total_dates": 2,
             "failed_dates": 0,

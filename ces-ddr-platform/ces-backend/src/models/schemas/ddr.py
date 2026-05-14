@@ -129,6 +129,7 @@ class DDRDateBase(BaseSchemaModel):
     raw_response: dict[str, Any] | None = None
     final_json: dict[str, Any] | None = None
     error_log: dict[str, Any] | None = None
+    source_page_numbers: list[int] | None = None
 
     @pydantic.field_validator("status")
     @classmethod

@@ -15,6 +15,7 @@ from src.services.pipeline.extract import (
     GeminiDDRExtractor,
     RateLimitError,
 )
+from src.services.pipeline.page_numbers import TimeLogPageNumberNormalizer
 from src.services.pipeline.pre_split import PDFPreSplitter, PreSplitResult
 from src.services.pipeline.validate import DDRExtractionValidator
 from src.services.processing_status import ProcessingStatusStreamService
@@ -57,6 +58,7 @@ class PreSplitPipelineService:
         self.status_stream_service = status_stream_service
         self.cost_service = cost_service
         self.embedding_service = embedding_service
+        self.page_number_normalizer = TimeLogPageNumberNormalizer()
         self._write_lock = asyncio.Lock()
 
     async def run(self, ddr_id: str) -> PreSplitResult:
@@ -79,7 +81,9 @@ class PreSplitPipelineService:
             return result
 
         ordered_dates = sorted(result.date_chunks.keys())
-        await self.ddr_date_repository.bulk_create_queued(ddr_id=ddr_id, dates=ordered_dates, commit=False)
+        date_page_numbers = self._date_page_numbers_from_split(getattr(result, "page_dates", {}))
+        rows = await self.ddr_date_repository.bulk_create_queued(ddr_id=ddr_id, dates=ordered_dates, commit=False)
+        await self._persist_source_page_numbers(ddr_id, date_page_numbers, rows=rows, commit=False)
         await self.ddr_repository.update_status(ddr, DDRStatus.PROCESSING, commit=False)
         await self._commit_outcome()
 
@@ -91,7 +95,7 @@ class PreSplitPipelineService:
                 ddr_id=ddr_id,
                 ddr=ddr,
                 date_chunks=result.date_chunks,
-                date_page_numbers=self._date_page_numbers_from_split(getattr(result, "page_dates", {})),
+                date_page_numbers=date_page_numbers,
             )
         return result
 
@@ -106,7 +110,7 @@ class PreSplitPipelineService:
         await self.ddr_date_repository.update_status(row, DDRDateStatus.QUEUED)
 
         chunk_bytes = await self.storage_service.download_chunk(ddr_id, date)
-        date_page_numbers = await self._original_page_numbers_for_ddr(ddr_id)
+        date_page_numbers = await self._page_numbers_for_rows(ddr_id, [row])
         extractor = self.extractor or GeminiDDRExtractor()
         await self._process_one_date(
             extractor,
@@ -169,7 +173,7 @@ class PreSplitPipelineService:
 
         extractor = self.extractor or GeminiDDRExtractor()
         semaphore = asyncio.Semaphore(self.max_concurrent)
-        date_page_numbers = await self._original_page_numbers_for_ddr(ddr_id)
+        date_page_numbers = await self._page_numbers_for_rows(ddr_id, rows)
 
         async def run_one(date: str) -> str:
             row = date_to_row[date]
@@ -233,6 +237,8 @@ class PreSplitPipelineService:
         for date in new_only:
             await self.ddr_date_repository.create_ddr_date(ddr_id, date)
 
+        date_page_numbers = self._date_page_numbers_from_split(result.page_dates)
+        await self._persist_source_page_numbers(ddr_id, date_page_numbers)
         await self.ddr_repository.update_status(ddr, DDRStatus.PROCESSING)
 
         for date, chunk_bytes in result.date_chunks.items():
@@ -243,7 +249,7 @@ class PreSplitPipelineService:
             ddr=ddr,
             date_chunks=result.date_chunks,
             obsolete_dates=obsolete,
-            date_page_numbers=self._date_page_numbers_from_split(result.page_dates),
+            date_page_numbers=date_page_numbers,
         )
         rows = await self.ddr_date_repository.read_dates_by_ddr_id(ddr_id)
         return sum(1 for r in rows if r.status == DDRDateStatus.SUCCESS)
@@ -336,12 +342,13 @@ class PreSplitPipelineService:
         try:
             validation = self.validator.validate(extraction.text)
             if validation.is_valid:
+                final_json = self.page_number_normalizer.normalize(validation.final_json, original_page_numbers)
                 async with self._write_lock:
                     cost_service = self._resolve_cost_service()
                     updated_row = await self.ddr_date_repository.mark_success(
                         row,
                         raw_response=raw_response,
-                        final_json=validation.final_json,
+                        final_json=final_json,
                         commit=False,
                     )
                     await cost_service.record_extraction_run(
@@ -436,6 +443,42 @@ class PreSplitPipelineService:
             total_occurrences = 0
         await self._publish_processing_complete(ddr_id, total_occurrences=total_occurrences)
 
+    async def _page_numbers_for_rows(self, ddr_id: str, rows: list[Any] | Any) -> dict[str, list[int]]:
+        row_list = list(rows)
+        mapping: dict[str, list[int]] = {}
+        missing_dates: set[str] = set()
+        for row in row_list:
+            pages = self._clean_page_numbers(getattr(row, "source_page_numbers", None))
+            if pages:
+                mapping[row.date] = pages
+            else:
+                missing_dates.add(row.date)
+        if missing_dates:
+            fallback = await self._original_page_numbers_for_ddr(ddr_id)
+            for date in missing_dates:
+                pages = fallback.get(date)
+                if pages:
+                    mapping[date] = pages
+        return mapping
+
+    async def _persist_source_page_numbers(
+        self,
+        ddr_id: str,
+        date_page_numbers: dict[str, list[int]],
+        rows: list[Any] | Any | None = None,
+        commit: bool = True,
+    ) -> None:
+        if not date_page_numbers:
+            return
+        updater = getattr(self.ddr_date_repository, "bulk_update_source_page_numbers", None)
+        if callable(updater):
+            await updater(ddr_id, date_page_numbers, commit=commit)
+            return
+        row_list = list(rows) if rows is not None else await self.ddr_date_repository.read_dates_by_ddr_id(ddr_id)
+        for row in row_list:
+            if row.date in date_page_numbers:
+                row.source_page_numbers = date_page_numbers[row.date]
+
     async def _original_page_numbers_for_ddr(self, ddr_id: str) -> dict[str, list[int]]:
         try:
             pdf_bytes = await self.pdf_loader(ddr_id)
@@ -444,6 +487,11 @@ class PreSplitPipelineService:
         except Exception as exc:
             logger.warning("Original page number mapping failed for DDR %s: %s", ddr_id, exc)
             return {}
+
+    def _clean_page_numbers(self, source_page_numbers: Any) -> list[int]:
+        if not isinstance(source_page_numbers, list):
+            return []
+        return sorted({page for page in source_page_numbers if isinstance(page, int) and page > 0})
 
     def _date_page_numbers_from_split(self, page_dates: dict[int, list[str]]) -> dict[str, list[int]]:
         date_page_numbers: dict[str, list[int]] = {}
@@ -510,12 +558,13 @@ class PreSplitPipelineService:
         try:
             validation = self.validator.validate(extraction.text)
             if validation.is_valid:
+                final_json = self.page_number_normalizer.normalize(validation.final_json, original_page_numbers)
                 async with self._write_lock:
                     cost_service = self._resolve_cost_service()
                     updated_row = await self.ddr_date_repository.mark_success(
                         row,
                         raw_response=raw_response,
-                        final_json=validation.final_json,
+                        final_json=final_json,
                         commit=False,
                     )
                     await cost_service.record_extraction_run(
