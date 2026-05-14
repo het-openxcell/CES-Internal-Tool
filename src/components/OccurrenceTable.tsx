@@ -272,16 +272,16 @@ export function OccurrenceTable({ occurrences, isLoading }: OccurrenceTableProps
         <table
           role="grid"
           aria-rowcount={isLoading ? -1 : totalRows}
-          className="w-full text-[12.5px] border-collapse"
+          className="w-full text-[15px] border-collapse"
         >
-          <thead>
-            <tr className="text-[10.5px] uppercase tracking-wider font-semibold text-text-muted border-b border-border-default">
-              <th className="py-2 px-3 text-left font-semibold w-[88px]">Incident Date</th>
-              <th className="py-2 px-3 text-left font-semibold w-[130px]">Type</th>
-              <th className="py-2 px-3 text-left font-semibold w-[90px]">Section</th>
-              <th className="py-2 px-3 text-right font-semibold w-[88px]">MMD</th>
-              <th className="py-2 px-3 text-right font-semibold w-[72px]">Page</th>
-              <th className="py-2 px-3 text-left font-semibold">Notes</th>
+          <thead className="bg-surface">
+            <tr className="text-[13px] uppercase tracking-wider font-bold text-text-muted border-b border-border-default">
+              <th className="py-3 px-4 text-left font-bold w-[112px]">Incident Date</th>
+              <th className="py-3 px-4 text-left font-bold w-[150px]">Type</th>
+              <th className="py-3 px-4 text-left font-bold w-[110px]">Section</th>
+              <th className="py-3 px-4 text-right font-bold w-[96px]">MMD</th>
+              <th className="py-3 px-4 text-right font-bold w-[82px]">Page</th>
+              <th className="py-3 px-4 text-left font-bold">Notes</th>
             </tr>
           </thead>
           <tbody ref={tbodyRef} onKeyDown={handleTableKeyDown}>
@@ -301,7 +301,7 @@ export function OccurrenceTable({ occurrences, isLoading }: OccurrenceTableProps
                 <tr
                   key={row.id}
                   className="border-b border-border-default hover:bg-slate-50 transition-colors"
-                  style={{ height: "40px" }}
+                  style={{ minHeight: "52px" }}
                 >
                   {row.getVisibleCells().map((cell, colIndex) => {
                     if (!VISIBLE_COLUMN_KEYS.includes(cell.column.id)) return null;
@@ -317,9 +317,9 @@ export function OccurrenceTable({ occurrences, isLoading }: OccurrenceTableProps
                         data-cell-rc={`${rowIndex}-${colIndex}`}
                         onFocus={() => setFocusedCell({ row: rowIndex, col: colIndex })}
                         className={cn(
-                          "py-2 px-3 text-[12.5px] text-text-primary focus:outline-none focus:ring-2 focus:ring-inset focus:ring-ces-red/40",
-                          isNumeric && "text-right font-mono tabular-nums text-[12px] text-text-primary",
-                          isDate && "font-mono text-[12px] text-text-primary"
+                          "py-3 px-4 text-[15px] text-text-primary leading-5 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-ces-red/40",
+                          isNumeric && "text-right font-mono tabular-nums text-[14.5px] text-text-primary",
+                          isDate && "font-mono text-[14.5px] text-text-primary"
                         )}
                       >
                         {flexRender(cell.column.columnDef.cell, cell.getContext())}

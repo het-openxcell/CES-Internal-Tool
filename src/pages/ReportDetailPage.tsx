@@ -26,7 +26,7 @@ export default function ReportDetailPage() {
 
   const status = useProcessingStatus(id);
   const { data: occurrences, isLoading: occurrencesLoading, refetch: refetchOccurrences } = useOccurrences(id);
-  const { retryingDate, handleRetryDate } = useRetryDate(id, status.refresh);
+  const { retryingDate, handleRetryDate } = useRetryDate(id, status.refresh, status.reconnect);
 
   useEffect(() => {
     let active = true;
@@ -112,12 +112,12 @@ export default function ReportDetailPage() {
           )}
 
           {showProcessingSection && !isProcessing && (
-            <div className="bg-white border border-border-default rounded-lg p-5 shadow-[0_1px_2px_rgba(0,0,0,0.04),0_4px_8px_rgba(0,0,0,0.03)] mb-4">
-              <div className="flex items-center gap-6">
+            <div className="bg-white border border-border-default rounded-lg px-5 py-4 shadow-[0_1px_2px_rgba(0,0,0,0.04),0_4px_8px_rgba(0,0,0,0.03)] mb-4">
+              <div className="flex items-center gap-5">
                 <div className="flex-1 min-w-0">
-                  <div className="text-[10.5px] uppercase tracking-wider font-semibold text-ces-red">Extraction</div>
-                  <div className="text-[20px] font-bold tracking-tight text-text-primary mt-0.5">Processing status</div>
-                  <div className="text-[12.5px] text-text-muted mt-1">
+                  <div className="text-[10px] uppercase tracking-wider font-semibold text-ces-red">Extraction</div>
+                  <div className="text-[18px] font-bold tracking-tight text-text-primary">Processing status</div>
+                  <div className="text-[12px] text-text-muted mt-0.5">
                     <span className="font-semibold text-text-primary">{extractedCount}</span> dates extracted
                     {status.failedCount > 0 && <> · <span className="text-ces-red font-semibold">{status.failedCount} failed</span></>}
                     {status.warningCount > 0 && <> · <span className="text-[#D97706] font-semibold">{status.warningCount} warning</span></>}
@@ -149,7 +149,7 @@ export default function ReportDetailPage() {
                   key={t.k}
                   onClick={() => setTab(t.k)}
                   className={cn(
-                    "relative h-9 px-3.5 flex items-center gap-1.5 text-[12.5px] font-medium transition-colors",
+                    "relative h-10 px-4 flex items-center gap-2 text-[15px] font-semibold transition-colors",
                     active ? "text-ces-red" : "text-text-muted hover:text-text-primary"
                   )}
                 >
@@ -157,7 +157,7 @@ export default function ReportDetailPage() {
                   {t.n != null && t.n > 0 && (
                     <span
                       className={cn(
-                        "px-1.5 py-0 rounded text-[10px] font-bold",
+                        "px-2 py-0.5 rounded text-[13px] font-bold",
                         active
                           ? "bg-ces-red-light/40 text-ces-red-dark"
                           : t.tone === "warning"
@@ -254,11 +254,11 @@ function ProcStat({ value, label, tone }: { value: number; label: string; tone: 
     failed: "#C41230",
   };
   return (
-    <div className="text-center min-w-[60px]">
-      <div className="text-[34px] font-bold leading-none tracking-tight tabular-nums" style={{ color: colors[tone] }}>
+    <div className="text-center min-w-[56px]">
+      <div className="text-[30px] font-bold leading-none tracking-tight tabular-nums" style={{ color: colors[tone] }}>
         {value}
       </div>
-      <div className="text-[10px] uppercase tracking-[0.12em] font-semibold mt-1.5" style={{ color: colors[tone] }}>
+      <div className="text-[9.5px] uppercase tracking-[0.12em] font-semibold mt-1" style={{ color: colors[tone] }}>
         {label}
       </div>
     </div>

@@ -114,16 +114,16 @@ export function OccurrenceMetrics({ occurrences }: OccurrenceMetricsProps) {
       </div>
 
       {metrics.topIssue && (
-        <div className="mt-3 bg-surface border border-border-default rounded-lg px-4 py-2.5 flex items-center gap-3">
-          <span className="text-[10.5px] font-bold uppercase tracking-wider text-ces-red">
+        <div className="mt-3 bg-surface border border-border-default rounded-lg px-5 py-3 flex items-center gap-3.5">
+          <span className="text-[13px] font-bold uppercase tracking-wider text-ces-red">
             Top Issue
           </span>
           <TypeBadge type={metrics.topIssue.type} />
-          <span className="text-[12.5px] text-text-muted">
+          <span className="text-[15px] text-text-muted">
             <span className="font-semibold text-text-primary">{metrics.topIssue.count}</span> occurrence
             {metrics.topIssue.count !== 1 ? "s" : ""} flagged this report
           </span>
-          <button className="ml-auto text-[12px] font-medium text-ces-red hover:underline">
+          <button className="ml-auto text-[14px] font-semibold text-ces-red hover:underline">
             Show only these →
           </button>
         </div>
