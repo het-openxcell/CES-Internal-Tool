@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
-import { Link, useLocation, useNavigate } from "react-router";
+import { Link, useLocation } from "react-router";
 
+import { useUploadModal } from "@/components/UploadModalContext";
 import { apiClient, type DDRDetail } from "@/lib/api";
 import { cn } from "@/lib/utils";
 
@@ -49,7 +50,7 @@ export default function ReportListSidebar({ selectedId, reports: propReports }: 
   const [fetchedReports, setFetchedReports] = useState<DDRDetail[]>([]);
   const [loading, setLoading] = useState(propReports === undefined);
   const [lastSync, setLastSync] = useState<string>("");
-  const navigate = useNavigate();
+  const { setOpen } = useUploadModal();
   const location = useLocation();
 
   const reports = propReports ?? fetchedReports;
@@ -99,7 +100,7 @@ export default function ReportListSidebar({ selectedId, reports: propReports }: 
   return (
     <aside
       className={cn(
-        "shrink-0 flex flex-col border-r border-border-default bg-surface transition-[width] duration-200 overflow-hidden",
+        "shrink-0 sticky top-14 flex flex-col border-r border-border-default bg-surface transition-[width] duration-200 h-[calc(100vh-3.5rem)]",
         collapsed ? "w-12" : "w-[260px]"
       )}
     >
@@ -107,7 +108,7 @@ export default function ReportListSidebar({ selectedId, reports: propReports }: 
         {!collapsed && (
           <div className="p-3">
             <button
-              onClick={() => navigate("/")}
+              onClick={() => setOpen(true)}
               className="inline-flex items-center justify-center gap-1.5 w-full h-8 px-3 rounded-md text-[12px] font-semibold bg-white border border-ces-red text-ces-red hover:bg-ces-red-light/20 transition-colors"
               aria-label="New upload"
             >
@@ -124,7 +125,7 @@ export default function ReportListSidebar({ selectedId, reports: propReports }: 
         {collapsed && (
           <div className="pt-2 flex justify-center">
             <button
-              onClick={() => navigate("/")}
+              onClick={() => setOpen(true)}
               className="h-8 w-8 grid place-items-center rounded-md bg-white border border-ces-red text-ces-red hover:bg-ces-red-light/20 transition-colors"
               title="New upload"
             >
@@ -216,9 +217,9 @@ export default function ReportListSidebar({ selectedId, reports: propReports }: 
         </div>
       </div>
 
-      <div className={cn("border-t border-border-default flex items-center px-2 py-2", collapsed ? "justify-center" : "")}>
+      <div className="border-t border-border-default flex items-center px-2 py-2">
         {!collapsed && (
-          <div className="text-[10.5px] text-text-muted px-1 whitespace-nowrap">
+          <div className="text-[10.5px] text-text-muted px-1">
             <span className="font-semibold text-text-secondary">{reports.length}</span> reports
             {lastSync && <span className="ml-1">· {lastSync}</span>}
           </div>
@@ -226,10 +227,10 @@ export default function ReportListSidebar({ selectedId, reports: propReports }: 
         <button
           onClick={toggle}
           aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-          className={cn("h-9 w-9 grid place-items-center text-text-muted hover:text-text-primary hover:bg-white rounded-md transition-colors shrink-0", !collapsed && "ml-auto")}
+          className="ml-auto h-9 w-9 grid place-items-center text-text-muted hover:text-text-primary hover:bg-white rounded-md transition-colors shrink-0"
         >
           <ChevronIcon
-            className={cn("w-4 h-4 transition-transform", collapsed ? "rotate-180" : "")}
+            className={cn("w-4 h-4 transition-transform", collapsed ? "" : "rotate-180")}
           />
         </button>
       </div>

@@ -101,7 +101,7 @@ class ApiClient {
     return url.toString();
   }
 
-  async uploadDDR(file: File, onProgress?: (progress: number) => void) {
+  async uploadDDR(file: File, operator?: string, area?: string, onProgress?: (progress: number) => void) {
     return new Promise<DDRUploadResponse>((resolve, reject) => {
       const request = new XMLHttpRequest();
       request.open("POST", this.url("/ddrs/upload"));
@@ -130,6 +130,8 @@ class ApiClient {
       request.onerror = () => reject(new ApiError("Request failed", "API_ERROR", request.status || 0));
       const form = new FormData();
       form.append("file", file);
+      if (operator) form.append("operator", operator);
+      if (area) form.append("area", area);
       request.send(form);
     });
   }
