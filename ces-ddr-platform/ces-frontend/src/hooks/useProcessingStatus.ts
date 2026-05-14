@@ -1,10 +1,12 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { apiClient, type DDRDateStatus, type DDRDetail, type DDRStatus } from "@/lib/api";
 
+export type ProcessingDateStatus = DDRDateStatus | "processing";
+
 export type ProcessingStatusRow = {
   date: string;
-  status: DDRDateStatus;
+  status: ProcessingDateStatus;
   error?: string;
   rawResponseId?: string;
 };
@@ -16,7 +18,11 @@ export type ProcessingCompleteSummary = {
   total_occurrences: number;
 };
 
-export type ProcessingConnectionMode = "idle" | "sse" | "polling" | "closed";
+export type ProcessingConnectionMode = "idle" | "sse" | "polling" | "closed" | "error";
+
+type DateStartedPayload = {
+  date: string;
+};
 
 type DateCompletePayload = {
   date: string;
@@ -31,15 +37,31 @@ type DateFailedPayload = {
 };
 
 function rowsFromDetail(detail: DDRDetail) {
-  return (detail.dates ?? [])
-    .filter((row) => row.status !== "queued")
+  const rows = (detail.dates ?? [])
     .map((row) => ({
       date: row.date,
-      status: row.status,
+      status: row.status as ProcessingDateStatus,
       error: errorFromLog(row.error_log),
       rawResponseId: rawResponseId(row),
     }))
     .sort((left, right) => left.date.localeCompare(right.date));
+
+  if (detail.status !== "processing") {
+    return rows;
+  }
+
+  let promoted = false;
+  return rows.map((row) => {
+    if (promoted || row.status !== "queued") {
+      return row;
+    }
+    promoted = true;
+    return { ...row, status: "processing" as ProcessingDateStatus };
+  });
+}
+
+function needsLiveConnection(detail: DDRDetail) {
+  return detail.status === "processing" || (detail.dates ?? []).some((row) => row.status === "queued");
 }
 
 function errorFromLog(errorLog: Record<string, unknown> | null | undefined) {
@@ -74,7 +96,18 @@ function upsertRow(rows: ProcessingStatusRow[], next: ProcessingStatusRow) {
   if (index === -1) {
     return [...rows, next].sort((left, right) => left.date.localeCompare(right.date));
   }
-  return rows.map((row, rowIndex) => (rowIndex === index ? next : row));
+  return rows.map((row, rowIndex) => (rowIndex === index ? { ...row, ...next } : row));
+}
+
+function summaryFromRows(detail: DDRDetail, currentRows: ProcessingStatusRow[], totalDates: number) {
+  const failedDates = currentRows.filter((row) => row.status === "failed").length;
+  const warningDates = currentRows.filter((row) => row.status === "warning").length;
+  return {
+    total_dates: detail.dates?.length ?? (totalDates || currentRows.length),
+    failed_dates: failedDates,
+    warning_dates: warningDates,
+    total_occurrences: 0,
+  };
 }
 
 export function useProcessingStatus(ddrId?: string) {
@@ -87,10 +120,19 @@ export function useProcessingStatus(ddrId?: string) {
   const completedRef = useRef(false);
   const rowsRef = useRef<ProcessingStatusRow[]>([]);
   const totalDatesRef = useRef(0);
+
   useEffect(() => {
     rowsRef.current = rows;
     totalDatesRef.current = totalDates;
   }, [rows, totalDates]);
+
+  const applyDetail = useCallback((detail: DDRDetail) => {
+    const detailRows = rowsFromDetail(detail);
+    setDdrStatus(detail.status);
+    setRows(detailRows);
+    setTotalDates(detail.dates?.length ?? detailRows.length);
+    return detailRows;
+  }, []);
 
   useEffect(() => {
     if (!ddrId) {
@@ -105,10 +147,9 @@ export function useProcessingStatus(ddrId?: string) {
     }
 
     let active = true;
+    let source: EventSource | null = null;
     let pollInterval: ReturnType<typeof setInterval> | null = null;
-    const source = new EventSource(apiClient.ddrStatusStreamUrl(ddrId));
-    setConnectionMode("sse");
-    setDdrStatus("processing");
+    setConnectionMode("idle");
     setRows([]);
     setTotalDates(0);
     setFinalSummary(null);
@@ -126,23 +167,21 @@ export function useProcessingStatus(ddrId?: string) {
 
     const poll = async () => {
       try {
-        const detail: DDRDetail = await apiClient.getDDR(ddrId);
+        const detail = await apiClient.getDDR(ddrId);
         if (!active) {
           return;
         }
-        const detailRows = rowsFromDetail(detail);
-        setDdrStatus(detail.status);
-        setRows(detailRows);
-        setTotalDates(detail.dates?.length ?? detailRows.length);
+        const detailRows = applyDetail(detail);
         if (detail.status === "complete" || detail.status === "failed") {
           completedRef.current = true;
           setConnectionMode("closed");
-          setFinalSummary(summaryFromRows(detail, detailRows));
+          setFinalSummary(summaryFromRows(detail, detailRows, totalDatesRef.current));
           stopPolling();
         }
       } catch {
         if (active) {
           setError("Status polling failed");
+          setConnectionMode("error");
         }
       }
     };
@@ -153,6 +192,12 @@ export function useProcessingStatus(ddrId?: string) {
       }
       setConnectionMode("polling");
       pollInterval = setInterval(poll, 3000);
+    };
+
+    const handleDateStarted = (event: MessageEvent<string>) => {
+      const payload = JSON.parse(event.data) as DateStartedPayload;
+      setRows((current) => upsertRow(current, { date: payload.date, status: "processing" }));
+      setDdrStatus("processing");
     };
 
     const handleDateComplete = (event: MessageEvent<string>) => {
@@ -181,46 +226,71 @@ export function useProcessingStatus(ddrId?: string) {
       setTotalDates(payload.total_dates);
       setDdrStatus(payload.failed_dates === payload.total_dates ? "failed" : "complete");
       setConnectionMode("closed");
-      source.close();
+      source?.close();
       stopPolling();
     };
 
-    source.addEventListener("date_complete", handleDateComplete);
-    source.addEventListener("date_failed", handleDateFailed);
-    source.addEventListener("processing_complete", handleProcessingComplete);
-    source.onerror = () => {
-      if (!completedRef.current) {
-        source.close();
-        startPolling();
-      }
+    const openStream = () => {
+      source = new EventSource(apiClient.ddrStatusStreamUrl(ddrId));
+      setConnectionMode("sse");
+      source.addEventListener("date_started", handleDateStarted);
+      source.addEventListener("date_complete", handleDateComplete);
+      source.addEventListener("date_failed", handleDateFailed);
+      source.addEventListener("processing_complete", handleProcessingComplete);
+      source.onerror = () => {
+        if (!completedRef.current) {
+          source?.close();
+          startPolling();
+        }
+      };
     };
 
-    function summaryFromRows(detail: DDRDetail, currentRows: ProcessingStatusRow[]): ProcessingCompleteSummary {
-      const failedDates = currentRows.filter((row) => row.status === "failed").length;
-      const warningDates = currentRows.filter((row) => row.status === "warning").length;
-      return {
-        total_dates: detail.dates?.length ?? (totalDatesRef.current || currentRows.length),
-        failed_dates: failedDates,
-        warning_dates: warningDates,
-        total_occurrences: 0,
-      };
-    }
+    void (async () => {
+      try {
+        const detail = await apiClient.getDDR(ddrId);
+        if (!active) {
+          return;
+        }
+        const detailRows = applyDetail(detail);
+        if (detail.status === "complete" || detail.status === "failed") {
+          completedRef.current = true;
+          setConnectionMode("closed");
+          setFinalSummary(summaryFromRows(detail, detailRows, detail.dates?.length ?? detailRows.length));
+          return;
+        }
+        if (needsLiveConnection(detail)) {
+          openStream();
+          return;
+        }
+        setConnectionMode("closed");
+      } catch {
+        if (active) {
+          setError("Status load failed");
+          setConnectionMode("error");
+        }
+      }
+    })();
 
     return () => {
       active = false;
-      source.removeEventListener("date_complete", handleDateComplete);
-      source.removeEventListener("date_failed", handleDateFailed);
-      source.removeEventListener("processing_complete", handleProcessingComplete);
-      source.close();
+      source?.removeEventListener("date_started", handleDateStarted);
+      source?.removeEventListener("date_complete", handleDateComplete);
+      source?.removeEventListener("date_failed", handleDateFailed);
+      source?.removeEventListener("processing_complete", handleProcessingComplete);
+      source?.close();
       stopPolling();
     };
-  }, [ddrId]);
+  }, [applyDetail, ddrId]);
 
   const counts = useMemo(() => {
+    const queuedCount = rows.filter((row) => row.status === "queued").length;
+    const processingCount = rows.filter((row) => row.status === "processing").length;
     const successCount = rows.filter((row) => row.status === "success").length;
     const warningCount = rows.filter((row) => row.status === "warning").length;
     const failedCount = rows.filter((row) => row.status === "failed").length;
     return {
+      queuedCount,
+      processingCount,
       successCount,
       warningCount,
       failedCount,
@@ -231,11 +301,8 @@ export function useProcessingStatus(ddrId?: string) {
   const refresh = async () => {
     if (!ddrId) return;
     try {
-      const detail: DDRDetail = await apiClient.getDDR(ddrId);
-      const detailRows = rowsFromDetail(detail);
-      setDdrStatus(detail.status);
-      setRows(detailRows);
-      setTotalDates(detail.dates?.length ?? detailRows.length);
+      const detail = await apiClient.getDDR(ddrId);
+      const detailRows = applyDetail(detail);
       if (detail.status === "complete" || detail.status === "failed") {
         completedRef.current = true;
         setConnectionMode("closed");

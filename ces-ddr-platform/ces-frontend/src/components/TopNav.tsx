@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { Link, useLocation, useNavigate } from "react-router";
 
+import { useUploadModal } from "@/components/UploadModalContext";
 import { cn } from "@/lib/utils";
 
 function ReportsIcon({ className }: { className?: string }) {
@@ -90,6 +91,7 @@ const TABS = [
 export default function TopNav({ onLogout }: { onLogout: () => void }) {
   const location = useLocation();
   const navigate = useNavigate();
+  const { setOpen } = useUploadModal();
   const [profileOpen, setProfileOpen] = useState(false);
   const profileRef = useRef<HTMLDivElement>(null);
 
@@ -113,11 +115,6 @@ export default function TopNav({ onLogout }: { onLogout: () => void }) {
         <Link to="/" aria-label="CES Home" className="shrink-0">
           <img src="/logo.png" alt="" className="h-7 w-auto block" width={120} height={28} loading="eager" />
         </Link>
-        <div className="leading-tight hidden sm:block">
-          <div className="text-[13px] font-bold text-text-primary tracking-tight">
-            CES Energy Solutions
-          </div>
-        </div>
       </div>
 
       <nav className="flex items-center gap-0.5 ml-1" aria-label="Primary">
@@ -156,13 +153,14 @@ export default function TopNav({ onLogout }: { onLogout: () => void }) {
           />
         </div>
 
-        <Link
-          to="/"
+        <button
+          type="button"
+          onClick={() => setOpen(true)}
           className="inline-flex items-center justify-center gap-1.5 h-9 px-3 rounded-md text-[13px] font-semibold bg-ces-red text-white hover:bg-ces-red-dark transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ces-red focus-visible:ring-offset-2 shrink-0"
         >
           <UploadIcon className="w-3.5 h-3.5" />
           <span className="hidden sm:inline">Upload DDR</span>
-        </Link>
+        </button>
 
         <div ref={profileRef} className="relative hidden md:block">
           <button

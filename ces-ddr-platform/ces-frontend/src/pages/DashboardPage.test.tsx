@@ -66,28 +66,5 @@ describe("DashboardPage", () => {
 
     expect(await screen.findByText("No reports yet")).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "DDR Processing" })).toBeInTheDocument();
-    expect(screen.getAllByText("Upload DDR PDF").length).toBeGreaterThan(0);
-  });
-
-  it("uploads a DDR from the dashboard and opens the created report", async () => {
-    vi.mocked(fetch).mockResolvedValue(new Response(JSON.stringify([]), { status: 200 }));
-
-    render(
-      <MemoryRouter initialEntries={["/"]}>
-        <Routes>
-          <Route path="/" element={<DashboardPage />} />
-          <Route path="/reports/:id" element={<h1>Created report</h1>} />
-        </Routes>
-      </MemoryRouter>,
-    );
-
-    await screen.findByText("No reports yet");
-    await userEvent.upload(
-      screen.getAllByLabelText("Upload DDR PDF")[0],
-      new File(["%PDF-1.7"], "field.pdf", { type: "application/pdf" }),
-    );
-
-    expect(await screen.findByRole("heading", { name: "Created report" })).toBeInTheDocument();
-    expect(FakeXMLHttpRequest.instances[0].open).toHaveBeenCalledWith("POST", "http://localhost:8000/api/ddrs/upload");
   });
 });

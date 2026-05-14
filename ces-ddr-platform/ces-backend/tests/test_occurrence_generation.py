@@ -459,6 +459,46 @@ def test_pipeline_service_generate_occurrences_returns_zero_when_no_repo():
     asyncio.run(run())
 
 
+def test_llm_generation_allows_model_to_remove_previous_occurrences():
+    from src.services.occurrence.llm_generate import LLMOccurrenceGenerationService
+
+    async def run():
+        ddr_date_repo = AsyncMock()
+        occurrence_repo = AsyncMock()
+        occurrence_repo.get_by_ddr_id_filtered.return_value = [
+            SimpleNamespace(date="20240115", type="Stuck Pipe", mmd=1500.0, notes="old")
+        ]
+        ddr_date_repo.read_dates_by_ddr_id.return_value = [
+            _make_date_row(
+                "dd1",
+                "20240115",
+                DDRDateStatus.SUCCESS,
+                time_logs=[_tl("normal drilling", 1500.0)],
+            ),
+        ]
+
+        fake_llm_response = MagicMock()
+        fake_llm_response.text = json.dumps({"occurrences": []})
+        fake_models = MagicMock()
+        fake_models.generate_content = AsyncMock(return_value=fake_llm_response)
+        fake_aio = MagicMock()
+        fake_aio.models = fake_models
+        fake_client = MagicMock()
+        fake_client.aio = fake_aio
+
+        with patch("src.services.occurrence.llm_generate.genai.Client", return_value=fake_client):
+            service = LLMOccurrenceGenerationService(ddr_date_repo, occurrence_repo)
+            count = await service.generate_for_ddr("d1")
+
+        assert count == 0
+        occurrence_repo.replace_for_ddr.assert_awaited_once_with("d1", [])
+        prompt = fake_models.generate_content.call_args.kwargs["contents"][0].text
+        assert "Validate previous occurrences against current time logs" in prompt
+        assert "Stuck Pipe" in prompt
+
+    asyncio.run(run())
+
+
 def test_pipeline_service_generate_occurrences_runs_service():
     from src.services.pipeline_service import PreSplitPipelineService
 

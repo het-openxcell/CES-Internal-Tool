@@ -2,6 +2,7 @@ import asyncio
 import json
 from pathlib import Path
 from types import SimpleNamespace
+from unittest.mock import AsyncMock
 
 from src.models.schemas.ddr import DDRDateStatus, DDRStatus
 from src.services.pipeline.extract import (
@@ -53,6 +54,13 @@ class FakeDDRDateRepository:
 
     async def read_dates_by_ddr_id(self, ddr_id):
         return list(self._rows)
+
+    async def read_date_for_update(self, ddr_id, date):
+        return next((row for row in self._rows if row.ddr_id == ddr_id and row.date == date), None)
+
+    async def update_status(self, row, status):
+        row.status = status
+        return row
 
     async def mark_success(self, row, raw_response, final_json, commit=True):
         row.status = DDRDateStatus.SUCCESS
@@ -144,6 +152,23 @@ class FakeEmbeddingService:
         self.rows.append(row)
 
 
+class FakeStatusStreamService:
+    def __init__(self):
+        self.started = []
+
+    async def publish_date_started(self, ddr_id, date):
+        self.started.append({"ddr_id": ddr_id, "date": date})
+
+    async def publish_date_complete(self, *args, **kwargs):
+        pass
+
+    async def publish_date_failed(self, *args, **kwargs):
+        pass
+
+    async def publish_processing_complete(self, *args, **kwargs):
+        pass
+
+
 class FakeStorageService:
     def __init__(self):
         self.chunks: dict[str, bytes] = {}
@@ -165,6 +190,9 @@ class FakeStorageService:
     async def download_original(self, ddr_id: str) -> bytes:
         key = f"ces/ddrs/{ddr_id}/original.pdf"
         return self.pdfs.get(key, b"")
+
+    async def download_chunk(self, ddr_id: str, date: str) -> bytes:
+        return self.chunks.get(f"ces/ddrs/{ddr_id}/chunks/{date}.pdf", b"%PDF-1.7")
 
     async def delete_ddr(self, ddr_id: str) -> None:
         prefix = f"ces/ddrs/{ddr_id}/"
@@ -305,6 +333,7 @@ def test_pipeline_persists_success_warning_and_failure_per_date(tmp_path) -> Non
     splitter = SimpleNamespace(split_async=fake_split)
     cost_service = FakeCostService()
     embedding_service = FakeEmbeddingService()
+    status_stream_service = FakeStatusStreamService()
 
     service = PreSplitPipelineService(
         ddr_repository=ddr_repo,
@@ -316,6 +345,7 @@ def test_pipeline_persists_success_warning_and_failure_per_date(tmp_path) -> Non
         extract_after_split=True,
         cost_service=cost_service,
         embedding_service=embedding_service,
+        status_stream_service=status_stream_service,
         storage_service=FakeStorageService(),
     )
 
@@ -348,6 +378,7 @@ def test_pipeline_persists_success_warning_and_failure_per_date(tmp_path) -> Non
     final_set = set(ddr_repo.finalize_calls[-1])
     assert final_set == {DDRDateStatus.SUCCESS, DDRDateStatus.WARNING, DDRDateStatus.FAILED}
     assert ddr.status == DDRStatus.COMPLETE
+    assert [event["date"] for event in status_stream_service.started] == ["20240115", "20240116", "20240117"]
 
 
 def test_pipeline_marks_parent_failed_when_all_dates_fail(tmp_path) -> None:
@@ -388,6 +419,35 @@ def test_pipeline_marks_parent_failed_when_all_dates_fail(tmp_path) -> None:
 
     assert all(row.status == DDRDateStatus.FAILED for row in rows)
     assert ddr.status == DDRStatus.FAILED
+
+
+def test_retry_date_waits_when_any_date_remains_queued() -> None:
+    retry_row = FakeDDRDateRow("20240115")
+    retry_row.status = DDRDateStatus.FAILED
+    queued_row = FakeDDRDateRow("20240116")
+    date_repo = FakeDDRDateRepository([retry_row, queued_row])
+    ddr = FakeDDR()
+    ddr_repo = FakeDDRRepository(ddr)
+    fake_client = FakeGeminiClient([ExtractionResult(text=FIXTURE_JSON, input_tokens=1, output_tokens=2)])
+    extractor = GeminiDDRExtractor(client=fake_client, model="m", max_retries=0, sleep=lambda _s: asyncio.sleep(0))
+    service = PreSplitPipelineService(
+        ddr_repository=ddr_repo,
+        ddr_date_repository=date_repo,
+        extractor=extractor,
+        cost_service=FakeCostService(),
+        embedding_service=FakeEmbeddingService(),
+        occurrence_repository=SimpleNamespace(),
+        storage_service=FakeStorageService(),
+    )
+    service._generate_occurrences = AsyncMock(return_value=1)
+
+    row = asyncio.run(service.retry_date("ddr-1", "20240115"))
+
+    assert row.status == DDRDateStatus.SUCCESS
+    assert queued_row.status == DDRDateStatus.QUEUED
+    assert ddr.status == DDRStatus.PROCESSING
+    assert ddr_repo.finalize_calls == []
+    service._generate_occurrences.assert_not_awaited()
 
 
 def test_repository_finalize_is_complete_when_at_least_one_date_succeeds() -> None:
@@ -473,6 +533,9 @@ def test_settings_load_gemini_api_key_through_settings_class() -> None:
     assert hasattr(s, "QDRANT_URL")
     assert hasattr(s, "QDRANT_API_KEY")
     assert hasattr(s, "QDRANT_COLLECTION_DDR_TIME_LOGS")
+    assert hasattr(s, "LANGSMITH_TRACING")
+    assert hasattr(s, "LANGSMITH_API_KEY")
+    assert hasattr(s, "LANGSMITH_PROJECT")
     assert s.GEMINI_MODEL
 
 

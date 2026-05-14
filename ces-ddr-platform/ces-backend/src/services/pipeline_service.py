@@ -7,8 +7,6 @@ from src.config.manager import settings
 from src.models.db.ddr import DDRDate
 from src.models.schemas.ddr import DDRDateStatus, DDRStatus
 from src.repository.crud.ddr import PipelineRunCRUDRepository
-
-logger = logging.getLogger(__name__)
 from src.services.occurrence.llm_generate import LLMOccurrenceGenerationService
 from src.services.pipeline.cost import ExtractionCostService
 from src.services.pipeline.embedding import TimeLogEmbeddingService
@@ -17,11 +15,13 @@ from src.services.pipeline.extract import (
     GeminiDDRExtractor,
     RateLimitError,
 )
-from src.utilities.exceptions import BadRequestException, EntityDoesNotExist
 from src.services.pipeline.pre_split import PDFPreSplitter, PreSplitResult
 from src.services.pipeline.validate import DDRExtractionValidator
 from src.services.processing_status import ProcessingStatusStreamService
 from src.services.storage_service import StorageService
+from src.utilities.exceptions import BadRequestException, EntityDoesNotExist
+
+logger = logging.getLogger(__name__)
 
 
 class PreSplitPipelineService:
@@ -93,7 +93,6 @@ class PreSplitPipelineService:
     async def retry_date(self, ddr_id: str, date: str) -> DDRDate:
         ddr = await self.ddr_repository.read_ddr_by_id(ddr_id)
 
-        # SELECT FOR UPDATE: atomically claim the retry, preventing concurrent retries (D1 + P2)
         row = await self.ddr_date_repository.read_date_for_update(ddr_id, date)
         if row is None:
             raise EntityDoesNotExist("date_not_found")
@@ -106,31 +105,26 @@ class PreSplitPipelineService:
         await self._process_one_date(extractor, row, date, chunk_bytes)
 
         rows = await self.ddr_date_repository.read_dates_by_ddr_id(ddr_id)
-        all_statuses = [r.status for r in rows]
-
-        well_name = next(
-            (r.final_json.get("well_name") for r in rows if r.final_json and r.final_json.get("well_name")),
-            None,
-        )
-        surface_location = next(
-            (r.final_json.get("surface_location") for r in rows if r.final_json and r.final_json.get("surface_location")),
-            None,
-        )
+        well_name, surface_location = self._metadata_from_rows(rows)
         await self.ddr_repository.update_well_metadata(ddr, well_name, surface_location)
-        ddr = await self.ddr_repository.read_ddr_by_id(ddr_id)  # P3: re-read after mutation
-        await self.ddr_repository.finalize_status_from_dates(ddr, all_statuses)
+
+        refreshed = next((r for r in rows if r.date == date), row)
+        if self._has_queued_dates(rows):
+            await self.ddr_repository.update_status(ddr, DDRStatus.PROCESSING)
+            return refreshed
+
+        ddr = await self.ddr_repository.read_ddr_by_id(ddr_id)
+        await self.ddr_repository.finalize_status_from_dates(ddr, [r.status for r in rows])
 
         try:
             total_occurrences = await self._generate_occurrences(
                 ddr_id=ddr_id, well_name=well_name, surface_location=surface_location
             )
-        except Exception:  # noqa: BLE001
+        except Exception:
             logger.warning("Occurrence generation failed during retry for DDR %s", ddr_id)
             total_occurrences = 0
 
         await self._publish_processing_complete(ddr_id, total_occurrences=total_occurrences)
-
-        refreshed = next((r for r in rows if r.date == date), row)
         return refreshed
 
     async def _extract_all_dates(self, *, ddr_id: str, ddr: Any, date_chunks: dict[str, bytes]) -> None:
@@ -154,33 +148,46 @@ class PreSplitPipelineService:
         coroutines = [run_one(date, chunk) for date, chunk in date_chunks.items() if date in date_to_row]
         outcomes = await asyncio.gather(*coroutines, return_exceptions=True)
 
-        final_statuses: list[str] = []
         for outcome in outcomes:
             if isinstance(outcome, BaseException):
-                final_statuses.append(DDRDateStatus.FAILED)
-            else:
-                final_statuses.append(outcome)
+                logger.warning("Date extraction task failed for DDR %s", ddr_id)
 
         all_rows = await self.ddr_date_repository.read_dates_by_ddr_id(ddr_id)
-        well_name = next(
-            (r.final_json.get("well_name") for r in all_rows if r.final_json and r.final_json.get("well_name")),
-            None,
-        )
-        surface_location = next(
-            (r.final_json.get("surface_location") for r in all_rows if r.final_json and r.final_json.get("surface_location")),
-            None,
-        )
+        well_name, surface_location = self._metadata_from_rows(all_rows)
         await self.ddr_repository.update_well_metadata(ddr, well_name, surface_location)
-        await self.ddr_repository.finalize_status_from_dates(ddr, final_statuses)  # D3: before generation
+
+        if self._has_queued_dates(all_rows):
+            await self.ddr_repository.update_status(ddr, DDRStatus.PROCESSING)
+            return
+
+        await self.ddr_repository.finalize_status_from_dates(ddr, [r.status for r in all_rows])
 
         try:
             total_occurrences = await self._generate_occurrences(
                 ddr_id=ddr_id, well_name=well_name, surface_location=surface_location
             )
-        except Exception:  # noqa: BLE001
+        except Exception:
             logger.warning("Occurrence generation failed for DDR %s", ddr_id)
             total_occurrences = 0
         await self._publish_processing_complete(ddr_id, total_occurrences=total_occurrences)
+
+    def _has_queued_dates(self, rows: list[Any] | Any) -> bool:
+        return any(row.status == DDRDateStatus.QUEUED for row in rows)
+
+    def _metadata_from_rows(self, rows: list[Any] | Any) -> tuple[str | None, str | None]:
+        well_name = next(
+            (r.final_json.get("well_name") for r in rows if r.final_json and r.final_json.get("well_name")),
+            None,
+        )
+        surface_location = next(
+            (
+                r.final_json.get("surface_location")
+                for r in rows
+                if r.final_json and r.final_json.get("surface_location")
+            ),
+            None,
+        )
+        return well_name, surface_location
 
     async def _process_one_date(
         self,
@@ -189,6 +196,7 @@ class PreSplitPipelineService:
         date: str,
         chunk_bytes: bytes,
     ) -> str:
+        await self._publish_date_started(row.ddr_id, date)
         try:
             extraction = await extractor.extract(date=date, pdf_bytes=chunk_bytes)
         except RateLimitError:
@@ -254,6 +262,11 @@ class PreSplitPipelineService:
                 )
                 await self._publish_date_failed(updated_row)
         return DDRDateStatus.FAILED
+
+    async def _publish_date_started(self, ddr_id: str, date: str) -> None:
+        if self.status_stream_service is None:
+            return
+        await self.status_stream_service.publish_date_started(ddr_id, date)
 
     async def _publish_date_complete(self, row: Any) -> None:
         if self.status_stream_service is None:

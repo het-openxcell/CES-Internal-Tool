@@ -30,6 +30,10 @@ class FakeEventSource {
   }
 }
 
+function ddrDetail(status = "processing", dates = [{ id: "d1", ddr_id: "ddr-1", date: "20241031", status: "queued", created_at: 1, updated_at: 1 }]) {
+  return { id: "ddr-1", file_path: "/tmp/a.pdf", status, created_at: 1, dates };
+}
+
 describe("useProcessingStatus", () => {
   beforeEach(() => {
     FakeEventSource.instances = [];
@@ -38,13 +42,18 @@ describe("useProcessingStatus", () => {
     authToken.store(TestJwtFactory.tokenWithExpiration(Math.floor(Date.now() / 1000) + 3600));
   });
 
-  it("opens EventSource, applies date events, closes on completion, and cleans up", async () => {
+  it("loads queued rows, opens EventSource only when work remains, applies date events, and closes", async () => {
+    vi.mocked(fetch).mockResolvedValue(new Response(JSON.stringify(ddrDetail()), { status: 200 }));
+
     const { result, unmount } = renderHook(() => useProcessingStatus("ddr-1"));
 
+    await waitFor(() => expect(FakeEventSource.instances).toHaveLength(1));
     const source = FakeEventSource.instances[0];
     expect(source.url).toContain("/ddrs/ddr-1/status/stream?access_token=");
+    expect(result.current.rows[0].status).toBe("processing");
 
     act(() => {
+      source.emit("date_started", { date: "20241101" });
       source.emit("date_complete", { date: "20241031", status: "success", occurrences_count: 0 });
       source.emit("date_failed", { date: "20241101", error: "Tour Sheet Serial not detected", raw_response_id: "r1" });
       source.emit("processing_complete", {
@@ -66,15 +75,45 @@ describe("useProcessingStatus", () => {
     expect(source.close).toHaveBeenCalledTimes(2);
   });
 
-  it("falls back to 3 second polling after SSE error before completion", async () => {
-    vi.useFakeTimers();
+  it("does not open EventSource when no queued work remains", async () => {
     vi.mocked(fetch).mockResolvedValue(
-      new Response(JSON.stringify({ id: "ddr-1", file_path: "/tmp/a.pdf", status: "complete", created_at: 1 }), {
-        status: 200,
-      }),
+      new Response(
+        JSON.stringify(
+          ddrDetail("complete", [
+            { id: "d1", ddr_id: "ddr-1", date: "20241031", status: "success", created_at: 1, updated_at: 1 },
+          ]),
+        ),
+        { status: 200 },
+      ),
     );
 
     const { result } = renderHook(() => useProcessingStatus("ddr-1"));
+
+    await waitFor(() => expect(result.current.connectionMode).toBe("closed"));
+    expect(FakeEventSource.instances).toHaveLength(0);
+    expect(result.current.successCount).toBe(1);
+  });
+
+  it("falls back to 3 second polling after SSE error before completion", async () => {
+    vi.useFakeTimers();
+    vi.mocked(fetch)
+      .mockResolvedValueOnce(new Response(JSON.stringify(ddrDetail()), { status: 200 }))
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify(
+            ddrDetail("complete", [
+              { id: "d1", ddr_id: "ddr-1", date: "20241031", status: "success", created_at: 1, updated_at: 1 },
+            ]),
+          ),
+          { status: 200 },
+        ),
+      );
+
+    const { result } = renderHook(() => useProcessingStatus("ddr-1"));
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(FakeEventSource.instances).toHaveLength(1);
     const source = FakeEventSource.instances[0];
 
     act(() => {

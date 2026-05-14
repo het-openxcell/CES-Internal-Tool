@@ -4,6 +4,7 @@ from typing import Any, Protocol
 
 from src.config.manager import settings
 from src.resources.ddr_schema import DDRExtractionSchema, load_ddr_extraction_schema
+from src.services.langsmith_tracing import LangSmithTracingService
 
 
 class ExtractionError(Exception):
@@ -46,6 +47,12 @@ class GoogleGenAIClient:
 
         self._client = genai.Client(api_key=api_key)
 
+    @LangSmithTracingService.trace(
+        name="gemini-ddr-extraction",
+        run_type="llm",
+        process_inputs=LangSmithTracingService.safe_inputs,
+        process_outputs=LangSmithTracingService.safe_outputs,
+    )
     async def generate_content(
         self,
         *,
