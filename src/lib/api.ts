@@ -51,6 +51,7 @@ export type OccurrenceRow = {
   density: number | null;
   notes: string | null;
   date: string | null;
+  page_number: number | null;
 };
 
 export type OccurrenceFilters = {
@@ -140,6 +141,27 @@ class ApiClient {
     return this.request<DDRDateDetail>(`/ddrs/${encodeURIComponent(ddrId)}/dates/${encodeURIComponent(date)}/retry`, {
       method: "POST",
     });
+  }
+
+  async reprocessFull(ddrId: string) {
+    return this.request<{ status: string; mode: string }>(
+      `/ddrs/${encodeURIComponent(ddrId)}/reprocess/full`,
+      { method: "POST", body: JSON.stringify({}) },
+    );
+  }
+
+  async reprocessDates(ddrId: string, dates: string[] | "all") {
+    return this.request<{ status: string; mode: string; dates: string[] | null }>(
+      `/ddrs/${encodeURIComponent(ddrId)}/reprocess/dates`,
+      { method: "POST", body: JSON.stringify({ dates }) },
+    );
+  }
+
+  async reprocessOccurrences(ddrId: string) {
+    return this.request<{ status: string; mode: string; total_occurrences?: number; error?: string }>(
+      `/ddrs/${encodeURIComponent(ddrId)}/reprocess/occurrences`,
+      { method: "POST", body: JSON.stringify({}) },
+    );
   }
 
   async getOccurrences(ddrId: string, filters?: OccurrenceFilters, signal?: AbortSignal) {
