@@ -7,6 +7,7 @@ from pydantic import BaseModel
 from src.models.schemas.ddr import (
     DDRDateCompleteEvent,
     DDRDateFailedEvent,
+    DDRDateStartedEvent,
     DDRDateStatus,
     DDRProcessingCompleteEvent,
     DDRStatus,
@@ -23,6 +24,7 @@ class ProcessingStatusEvent:
 
 
 class ProcessingStatusStreamService:
+    date_started_event = "date_started"
     date_complete_event = "date_complete"
     date_failed_event = "date_failed"
     processing_complete_event = "processing_complete"
@@ -91,6 +93,10 @@ class ProcessingStatusStreamService:
                         ),
                     )
                 )
+        if ddr.status == DDRStatus.PROCESSING:
+            queued = next((row for row in rows if row.status == DDRDateStatus.QUEUED), None)
+            if queued is not None:
+                events.append(ProcessingStatusEvent(self.date_started_event, DDRDateStartedEvent(date=queued.date)))
         if ddr.status in (DDRStatus.COMPLETE, DDRStatus.FAILED):
             events.append(
                 ProcessingStatusEvent(
@@ -118,6 +124,9 @@ class ProcessingStatusStreamService:
         event = ProcessingStatusEvent(event_name, payload)
         for queue in list(self._subscribers.get(ddr_id, set())):
             await queue.put(event)
+
+    async def publish_date_started(self, ddr_id: str, date: str) -> None:
+        await self.publish(ddr_id, self.date_started_event, DDRDateStartedEvent(date=date))
 
     async def publish_date_complete(
         self,

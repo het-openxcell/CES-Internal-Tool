@@ -27,6 +27,8 @@ class DDR(Base):
     )
     well_name: Mapped[str | None] = mapped_column(sqlalchemy.Text(), nullable=True)
     surface_location: Mapped[str | None] = mapped_column(sqlalchemy.Text(), nullable=True)
+    operator: Mapped[str | None] = mapped_column(sqlalchemy.Text(), nullable=True)
+    area: Mapped[str | None] = mapped_column(sqlalchemy.Text(), nullable=True)
     created_at: Mapped[int] = mapped_column(sqlalchemy.BigInteger(), nullable=False)
     updated_at: Mapped[int] = mapped_column(sqlalchemy.BigInteger(), nullable=False)
 

@@ -34,6 +34,8 @@ def get_processing_status_stream_service(request: Request) -> ProcessingStatusSt
 async def upload_ddr(
     file: UploadFile,
     background_tasks: BackgroundTasks,
+    operator: str | None = None,
+    area: str | None = None,
     current_user = Depends(jwt_authentication),
     ddr_repository: DDRCRUDRepository = Depends(get_repository(DDRCRUDRepository)),
     processing_queue_repository: ProcessingQueueCRUDRepository = Depends(get_repository(ProcessingQueueCRUDRepository)),
@@ -50,7 +52,7 @@ async def upload_ddr(
         storage_service=storage_service,
         processing_task=processing_task,
     )
-    ddr = await service.upload(file)
+    ddr = await service.upload(file, operator=operator, area=area)
     background_tasks.add_task(service.dispatch_background, ddr.id)
     return DDRUploadResponse(id=ddr.id, status=ddr.status)
 

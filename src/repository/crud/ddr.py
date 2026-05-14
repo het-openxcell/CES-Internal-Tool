@@ -87,6 +87,8 @@ class DDRCRUDRepository(BaseCRUDRepository[DDR]):
         ddr_id: str,
         file_path: str,
         processing_queue_repository: "ProcessingQueueCRUDRepository",
+        operator: str | None = None,
+        area: str | None = None,
     ) -> DDR:
         now = int(time.time())
         position = await processing_queue_repository.next_position()
@@ -94,6 +96,8 @@ class DDRCRUDRepository(BaseCRUDRepository[DDR]):
             id=ddr_id,
             file_path=file_path,
             status=DDRStatus.QUEUED,
+            operator=operator,
+            area=area,
             created_at=now,
             updated_at=now,
         )

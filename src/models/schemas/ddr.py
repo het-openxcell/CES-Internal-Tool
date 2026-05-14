@@ -46,6 +46,8 @@ class DDRBase(BaseSchemaModel):
     status: str = DDRStatus.QUEUED
     well_name: str | None = None
     surface_location: str | None = None
+    operator: str | None = None
+    area: str | None = None
 
     @pydantic.field_validator("status")
     @classmethod
@@ -121,6 +123,10 @@ class DDRDateStatusUpdate(BaseSchemaModel):
     @classmethod
     def validate_status(cls, value: str) -> str:
         return DDRDateStatus.validate(value)
+
+
+class DDRDateStartedEvent(BaseSchemaModel):
+    date: str
 
 
 class DDRDateCompleteEvent(BaseSchemaModel):

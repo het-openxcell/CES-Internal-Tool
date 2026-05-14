@@ -9,6 +9,7 @@ from pydantic import BaseModel
 
 from src.config.manager import settings
 from src.models.schemas.ddr import DDRDateStatus
+from src.services.langsmith_tracing import LangSmithTracingService
 from src.services.occurrence.classify import (
     DEFAULT_INTERMEDIATE_SHOE_DEPTH,
     DEFAULT_SURFACE_SHOE_DEPTH,
@@ -103,22 +104,32 @@ class LLMOccurrenceGenerationService:
     def _build_prompt(self, time_logs_text: str, existing_text: str) -> str:
         valid_types_str = ", ".join(sorted(VALID_OCCURRENCE_TYPES))
         prompt = (
-            "You are a drilling engineering expert. From the time logs below, identify occurrences —\n"
+            "You are a drilling engineering expert. From current time logs below, identify final occurrence set —\n"
             "drilling events or problems. Use ONLY the valid types listed.\n\n"
             f"VALID TYPES: {valid_types_str}\n\n"
-            f"TIME LOGS:\n{time_logs_text}"
+            f"CURRENT TIME LOGS:\n{time_logs_text}"
         )
         if existing_text:
             prompt += (
-                f"\n\nPREVIOUSLY GENERATED OCCURRENCES (context for refinement):\n{existing_text}"
+                "\n\nPREVIOUSLY GENERATED OCCURRENCES:\n"
+                f"{existing_text}\n\n"
+                "Validate previous occurrences against current time logs. Keep valid occurrences, "
+                "remove invalid or stale ones, update changed date/type/mmd/notes values, and add missing occurrences."
             )
         prompt += (
-            "\n\nReturn a JSON object with key 'occurrences' containing a list of occurrences. "
+            "\n\nReturn one final JSON object with key 'occurrences'. "
+            "Do not return actions or explanations. "
             "Each occurrence must have: date (YYYYMMDD string), type (from valid types), "
             "mmd (float or null), notes (string or null)."
         )
         return prompt
 
+    @LangSmithTracingService.trace(
+        name="ddr-occurrence-generation",
+        run_type="chain",
+        process_inputs=LangSmithTracingService.safe_inputs,
+        process_outputs=LangSmithTracingService.safe_outputs,
+    )
     async def generate_for_ddr(
         self,
         ddr_id: str,
@@ -144,7 +155,7 @@ class LLMOccurrenceGenerationService:
         time_logs_text = self._format_time_logs(successful_rows)
         existing_text = self._format_existing(existing)
         prompt = self._build_prompt(time_logs_text, existing_text)
-
+        logger.debug("LLM occurrence prompt: {prompt}")
         result_text: str | None = None
         last_error: Exception | None = None
         for attempt, backoff in enumerate(_BACKOFF_SECONDS):
@@ -230,12 +241,5 @@ class LLMOccurrenceGenerationService:
             })
 
         deduped = dedup(all_occurrences)
-        if not deduped and existing:
-            logger.error(
-                "ddr_id=%s: LLM returned 0 valid occurrences but %d existed — skipping replace to preserve data",
-                ddr_id,
-                len(existing),
-            )
-            return 0
         await self.occurrence_repository.replace_for_ddr(ddr_id, deduped)
         return len(deduped)

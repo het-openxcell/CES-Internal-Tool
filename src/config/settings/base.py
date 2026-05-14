@@ -103,6 +103,13 @@ class BackendBaseSettings(BaseSettings):
     GEMINI_EMBEDDING_MODEL: str = config("GEMINI_EMBEDDING_MODEL", cast=str, default="gemini-embedding-2")
     GEMINI_EMBEDDING_DIMENSION: int = config("GEMINI_EMBEDDING_DIMENSION", cast=int, default=3072)
 
+    LANGSMITH_TRACING: bool = config("LANGSMITH_TRACING", cast=bool, default=False)
+    LANGSMITH_API_KEY: str = config("LANGSMITH_API_KEY", cast=str, default="")
+    LANGSMITH_PROJECT: str = config("LANGSMITH_PROJECT", cast=str, default="ces-ddr-platform")
+    LANGSMITH_ENDPOINT: str = config("LANGSMITH_ENDPOINT", cast=str, default="https://api.smith.langchain.com")
+    LANGSMITH_TAGS: str = config("LANGSMITH_TAGS", cast=str, default="ces,ddr")
+    LANGSMITH_MAX_STRING_LENGTH: int = config("LANGSMITH_MAX_STRING_LENGTH", cast=int, default=4000)
+
     QDRANT_URL: str = config("QDRANT_URL", cast=str, default="http://localhost:6333")
     QDRANT_API_KEY: SecretStr | None = config("QDRANT_API_KEY", cast=str, default=None)
     QDRANT_COLLECTION_DDR_TIME_LOGS: str = config(
