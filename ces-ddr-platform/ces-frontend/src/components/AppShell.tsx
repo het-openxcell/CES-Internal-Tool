@@ -8,6 +8,7 @@ import { authToken } from "@/lib/auth";
 function AppShellInner({ children }: { children: React.ReactNode }) {
   const navigate = useNavigate();
   const { open, setOpen } = useUploadModal();
+  const username = authToken.getUsername();
 
   function handleLogout() {
     authToken.clear();
@@ -23,7 +24,7 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
         Skip to main content
       </a>
 
-      <TopNav onLogout={handleLogout} />
+      <TopNav onLogout={handleLogout} username={username} />
 
       <div className="flex flex-1 min-h-0 overflow-hidden">
         {children}

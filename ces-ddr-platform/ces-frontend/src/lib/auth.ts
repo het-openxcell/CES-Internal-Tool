@@ -2,6 +2,7 @@ const TOKEN_KEY = "ces.auth.token";
 
 type JwtPayload = {
   exp?: unknown;
+  username?: unknown;
 };
 
 class AuthToken {
@@ -18,6 +19,13 @@ class AuthToken {
     }
 
     return token;
+  }
+
+  getUsername(): string | null {
+    const token = this.get();
+    if (!token) return null;
+    const payload = this.decodePayload(token);
+    return typeof payload?.username === "string" ? payload.username : null;
   }
 
   clear() {

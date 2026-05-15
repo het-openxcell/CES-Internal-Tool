@@ -60,6 +60,7 @@ export default function ReportDetailPage() {
 
   const reportName = ddr?.file_path.split("/").at(-1) ?? `DDR ${id}`;
   const uploadedAt = ddr ? new Date(ddr.created_at * 1000).toLocaleDateString() : "—";
+  const uploadedBy = ddr?.uploaded_by_username ?? "—";
 
   const showProcessingSection = status.totalDates > 0 || isProcessing;
 
@@ -78,7 +79,7 @@ export default function ReportDetailPage() {
               </div>
               <h1 className="text-[20px] font-bold tracking-tight text-text-primary truncate">{ddr?.well_name ?? "—"}</h1>
               <div className="flex items-center gap-3 mt-1 text-[12px] text-text-muted flex-wrap">
-                <span>Uploaded {uploadedAt} by Ryan Cordell</span>
+                <span>Uploaded {uploadedAt} by {uploadedBy}</span>
               </div>
             </div>
             <div className="flex items-center gap-2 shrink-0">
