@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException
+from src.utilities.logging.logger import logger
 
 from src.models.schemas.query import NLQueryRequest, NLQueryResponse, TimeLogSource
 from src.securities.authorizations.jwt_authentication import jwt_authentication
@@ -15,7 +16,13 @@ async def natural_language_query(
     if not body.query.strip():
         raise HTTPException(status_code=422, detail="Query cannot be empty")
 
-    answer, hits, expanded = await NaturalLanguageQueryService().answer(body.query)
+    try:
+        answer, hits, expanded = await NaturalLanguageQueryService().answer(body.query)
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.error(f"nl_query_unexpected_error error={exc}")
+        raise HTTPException(status_code=500, detail="An unexpected error occurred. Please try again.")
     sources = [
         TimeLogSource(
             ddr_id=(hit.get("payload") or {}).get("ddr_id"),

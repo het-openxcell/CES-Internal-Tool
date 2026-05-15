@@ -1,7 +1,9 @@
 import json
 from typing import Any
 
+from fastapi import HTTPException
 from google import genai
+from google.genai import errors as genai_errors
 from google.genai import types
 
 from src.config.manager import settings
@@ -44,14 +46,18 @@ class NaturalLanguageQueryService:
             "might use in a time log. Return a JSON array of exactly 5 strings, nothing else.\n\n"
             f"User question: {query}"
         )
-        response = await self.gemini_client.aio.models.generate_content(
-            model=settings.GEMINI_MODEL,
-            contents=prompt,
-            config=types.GenerateContentConfig(
-                response_mime_type="application/json",
-                temperature=0.7,
-            ),
-        )
+        try:
+            response = await self.gemini_client.aio.models.generate_content(
+                model=settings.GEMINI_MODEL,
+                contents=prompt,
+                config=types.GenerateContentConfig(
+                    response_mime_type="application/json",
+                    temperature=0.7,
+                ),
+            )
+        except genai_errors.APIError as exc:
+            logger.warning(f"query_expansion_gemini_error code={exc.code} status={exc.status}")
+            return [query]
         raw = response.text or "[]"
         try:
             queries = json.loads(raw)
@@ -73,11 +79,21 @@ class NaturalLanguageQueryService:
             f"Time log entries:\n{context}\n\n"
             f"Question: {query}"
         )
-        response = await self.gemini_client.aio.models.generate_content(
-            model=settings.GEMINI_MODEL,
-            contents=prompt,
-            config=types.GenerateContentConfig(temperature=0.2),
-        )
+        try:
+            response = await self.gemini_client.aio.models.generate_content(
+                model=settings.GEMINI_MODEL,
+                contents=prompt,
+                config=types.GenerateContentConfig(temperature=0.2),
+            )
+        except genai_errors.ServerError as exc:
+            logger.error(f"gemini_server_error code={exc.code} status={exc.status} message={exc.message}")
+            raise HTTPException(
+                status_code=503,
+                detail="AI service is temporarily unavailable due to high demand. Please try again shortly.",
+            )
+        except genai_errors.ClientError as exc:
+            logger.error(f"gemini_client_error code={exc.code} status={exc.status} message={exc.message}")
+            raise HTTPException(status_code=502, detail="AI service returned an error. Please try again.")
         return response.text or "Could not generate an answer."
 
     def hits_to_context(self, hits: list[dict[str, Any]]) -> str:
