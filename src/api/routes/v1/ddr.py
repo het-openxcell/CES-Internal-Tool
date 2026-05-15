@@ -62,7 +62,7 @@ async def upload_ddr(
             storage_service=storage_service,
         ),
     )
-    ddr = await service.upload(file, operator=operator, area=area)
+    ddr = await service.upload(file, operator=operator, area=area, user_id=current_user.id)
     background_tasks.add_task(service.dispatch_background, ddr.id)
     return DDRUploadResponse(id=ddr.id, status=ddr.status)
 
@@ -150,6 +150,7 @@ async def get_ddr(
         status=ddr.status,
         well_name=ddr.well_name,
         created_at=ddr.created_at,
+        uploaded_by_username=ddr.uploaded_by_username,
         dates=[DDRDateInResponse.model_validate(row) for row in rows],
     )
 

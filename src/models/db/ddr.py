@@ -7,6 +7,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 if TYPE_CHECKING:
     from src.models.db.occurrence import Occurrence
+    from src.models.db.user import User
 
 from src.repository.table import Base
 
@@ -29,12 +30,23 @@ class DDR(Base):
     surface_location: Mapped[str | None] = mapped_column(sqlalchemy.Text(), nullable=True)
     operator: Mapped[str | None] = mapped_column(sqlalchemy.Text(), nullable=True)
     area: Mapped[str | None] = mapped_column(sqlalchemy.Text(), nullable=True)
+    uploaded_by_user_id: Mapped[str | None] = mapped_column(
+        UUID(as_uuid=False),
+        sqlalchemy.ForeignKey("users.id"),
+        nullable=True,
+        index=True,
+    )
     created_at: Mapped[int] = mapped_column(sqlalchemy.BigInteger(), nullable=False)
     updated_at: Mapped[int] = mapped_column(sqlalchemy.BigInteger(), nullable=False)
 
     dates: Mapped[list["DDRDate"]] = relationship(back_populates="ddr")
     queue_entries: Mapped[list["ProcessingQueue"]] = relationship(back_populates="ddr")
     occurrences: Mapped[list["Occurrence"]] = relationship(back_populates="ddr")
+    uploaded_by: Mapped["User | None"] = relationship("User", lazy="selectin")
+
+    @property
+    def uploaded_by_username(self) -> str | None:
+        return self.uploaded_by.username if self.uploaded_by else None
 
 
 class DDRDate(Base):

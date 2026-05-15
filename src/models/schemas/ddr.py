@@ -115,6 +115,7 @@ class DDRListItemResponse(BaseSchemaModel):
     well_name: str | None = None
     surface_location: str | None = None
     created_at: int
+    uploaded_by_username: str | None = None
 
     @pydantic.field_validator("status")
     @classmethod

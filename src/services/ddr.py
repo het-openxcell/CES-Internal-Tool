@@ -222,7 +222,13 @@ class DDRUploadService:
         self.storage_service = storage_service or StorageService()
         self.processing_task = processing_task or DDRProcessingTask(storage_service=self.storage_service)
 
-    async def upload(self, file: UploadFile, operator: str | None = None, area: str | None = None) -> Any:
+    async def upload(
+        self,
+        file: UploadFile,
+        operator: str | None = None,
+        area: str | None = None,
+        user_id: str | None = None,
+    ) -> Any:
         await self.validate_pdf(file)
         ddr_id = str(uuid.uuid4())
         data = await self.read_upload(file)
@@ -235,6 +241,7 @@ class DDRUploadService:
                 processing_queue_repository=self.processing_queue_repository,
                 operator=operator,
                 area=area,
+                user_id=user_id,
             )
         except Exception:
             await self.storage_service.delete_ddr(ddr_id)
