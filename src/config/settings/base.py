@@ -110,13 +110,19 @@ class BackendBaseSettings(BaseSettings):
     LANGSMITH_TAGS: str = config("LANGSMITH_TAGS", cast=str, default="ces,ddr")
     LANGSMITH_MAX_STRING_LENGTH: int = config("LANGSMITH_MAX_STRING_LENGTH", cast=int, default=4000)
 
-    QDRANT_URL: str = config("QDRANT_URL", cast=str, default="http://localhost:6333")
+    QDRANT_HOST: str = config("QDRANT_HOST", cast=str, default="http://localhost")
+    QDRANT_PORT: int = config("QDRANT_PORT", cast=int, default=6333)
     QDRANT_API_KEY: SecretStr | None = config("QDRANT_API_KEY", cast=str, default=None)
     QDRANT_COLLECTION_DDR_TIME_LOGS: str = config(
         "QDRANT_COLLECTION_DDR_TIME_LOGS",
         cast=str,
         default="ddr_time_logs",
     )
+
+    @property
+    def QDRANT_URL(self) -> str:
+        host = self.QDRANT_HOST.rstrip("/")
+        return f"{host}:{self.QDRANT_PORT}"
 
     @property
     def set_backend_app_attributes(self) -> dict[str, str | bool | None]:
