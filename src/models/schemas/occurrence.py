@@ -2,10 +2,8 @@ import re
 
 from pydantic import ConfigDict, field_validator
 
+from src.constants.occurrence import VALID_SECTIONS
 from src.models.schemas.base import BaseSchemaModel
-from src.services.occurrence.classify import VALID_SECTIONS
-
-_YYYYMMDD = re.compile(r"^\d{8}$")
 
 
 class OccurrenceInCreate(BaseSchemaModel):
@@ -32,15 +30,9 @@ class OccurrenceInCreate(BaseSchemaModel):
     @field_validator("date")
     @classmethod
     def validate_date_format(cls, v: str | None) -> str | None:
-        if v is not None and not _YYYYMMDD.match(v):
+        if v is not None and not re.compile(r"^\d{8}$").match(v):
             raise ValueError("date must be YYYYMMDD (8 digits)")
         return v
-
-
-class OccurrenceInDB(OccurrenceInCreate):
-    id: str
-    created_at: int
-    updated_at: int
 
 
 class OccurrenceInResponse(BaseSchemaModel):

@@ -4,6 +4,13 @@ from fastapi import APIRouter, BackgroundTasks, Body, Depends, Path, Query, Requ
 from fastapi.responses import JSONResponse, StreamingResponse
 
 from src.api.dependencies.repository import get_repository
+from src.api.dependencies.services import (
+    get_ddr_reprocess_service,
+    get_ddr_reprocess_task,
+    get_occurrence_correction_service,
+    get_pipeline_service,
+    get_processing_status_stream_service,
+)
 from src.models.schemas.ddr import (
     DDRDateInResponse,
     DDRDetailResponse,
@@ -17,27 +24,21 @@ from src.models.schemas.monitor import OccurrenceEditResponse, OccurrencePatchRe
 from src.models.schemas.occurrence import OccurrenceInResponse
 from src.repository.crud.ddr import DDRCRUDRepository, DDRDateCRUDRepository, ProcessingQueueCRUDRepository
 from src.repository.crud.occurrence import OccurrenceCRUDRepository
-from src.repository.crud.occurrence_edit import OccurrenceEditCRUDRepository
 from src.securities.authorizations.jwt_authentication import jwt_authentication, stream_query_token_authentication
-from src.services.ddr import DDRProcessingTask, DDRReprocessService, DDRReprocessTask, DDRUploadService
+from src.services.ddr import (
+    DDRProcessingTask,
+    DDRReprocessService,
+    DDRReprocessTask,
+    DDRUploadService,
+    OccurrenceCorrectionService,
+)
+from src.services.ddr_status import DDRStatusSnapshotFactory
 from src.services.pipeline_service import PreSplitPipelineService
 from src.services.processing_status import ProcessingStatusStreamService
 from src.services.storage_service import StorageService
 from src.utilities.exceptions import EntityDoesNotExist
 
 router = APIRouter(prefix="/ddrs", tags=["DDRs"])
-
-
-def get_storage_service() -> StorageService:
-    return StorageService()
-
-
-def get_processing_status_stream_service(request: Request) -> ProcessingStatusStreamService:
-    service = getattr(request.app.state, "processing_status_stream_service", None)
-    if service is None:
-        service = ProcessingStatusStreamService()
-        request.app.state.processing_status_stream_service = service
-    return service
 
 
 @router.post("/upload", response_model=DDRUploadResponse, status_code=status.HTTP_201_CREATED)
@@ -52,15 +53,14 @@ async def upload_ddr(
     status_stream_service: ProcessingStatusStreamService = Depends(get_processing_status_stream_service),
 ) -> DDRUploadResponse:
     storage_service = StorageService()
-    processing_task = DDRProcessingTask(
-        status_stream_service=status_stream_service,
-        storage_service=storage_service,
-    )
     service = DDRUploadService(
         ddr_repository,
         processing_queue_repository,
         storage_service=storage_service,
-        processing_task=processing_task,
+        processing_task=DDRProcessingTask(
+            status_stream_service=status_stream_service,
+            storage_service=storage_service,
+        ),
     )
     ddr = await service.upload(file, operator=operator, area=area)
     background_tasks.add_task(service.dispatch_background, ddr.id)
@@ -91,14 +91,13 @@ async def stream_ddr_status(
             status_code=status.HTTP_404_NOT_FOUND,
             content={"error": "DDR not found", "code": "NOT_FOUND", "details": {}},
         )
-    async def snapshot_events() -> list:
-        current_ddr = await ddr_repository.read_by_id(ddr_id)
-        if current_ddr is None:
-            return []
-        rows = list(await ddr_date_repository.read_dates_by_ddr_id(ddr_id))
-        return status_stream_service.snapshot_events(current_ddr, rows)
-
-    stream = status_stream_service.stream(ddr_id, request, send_open_frame=True, initial_events_factory=snapshot_events)
+    snapshot_factory = DDRStatusSnapshotFactory(ddr_id, ddr_repository, ddr_date_repository, status_stream_service)
+    stream = status_stream_service.stream(
+        ddr_id,
+        request,
+        send_open_frame=True,
+        initial_events_factory=snapshot_factory.events,
+    )
     return StreamingResponse(
         stream,
         media_type="text/event-stream",
@@ -161,19 +160,8 @@ async def retry_ddr_date(
     date: Annotated[str, Path(pattern=r"^\d{8}$")],
     background_tasks: BackgroundTasks,
     current_user = Depends(jwt_authentication),
-    ddr_repository: DDRCRUDRepository = Depends(get_repository(DDRCRUDRepository)),
-    ddr_date_repository: DDRDateCRUDRepository = Depends(get_repository(DDRDateCRUDRepository)),
-    occurrence_repository: OccurrenceCRUDRepository = Depends(get_repository(OccurrenceCRUDRepository)),
-    storage_service: StorageService = Depends(get_storage_service),
-    status_stream_service: ProcessingStatusStreamService = Depends(get_processing_status_stream_service),
+    service: PreSplitPipelineService = Depends(get_pipeline_service),
 ) -> DDRDateInResponse:
-    service = PreSplitPipelineService(
-        ddr_repository=ddr_repository,
-        ddr_date_repository=ddr_date_repository,
-        occurrence_repository=occurrence_repository,
-        storage_service=storage_service,
-        status_stream_service=status_stream_service,
-    )
     row = await service.prepare_retry(ddr_id, date)
     background_tasks.add_task(service.execute_retry, ddr_id, date)
     return DDRDateInResponse.model_validate(row)
@@ -188,15 +176,10 @@ async def reprocess_full(
     ddr_id: str,
     background_tasks: BackgroundTasks,
     current_user = Depends(jwt_authentication),
-    ddr_repository: DDRCRUDRepository = Depends(get_repository(DDRCRUDRepository)),
-    ddr_date_repository: DDRDateCRUDRepository = Depends(get_repository(DDRDateCRUDRepository)),
-    occurrence_repository: OccurrenceCRUDRepository = Depends(get_repository(OccurrenceCRUDRepository)),
-    storage_service: StorageService = Depends(get_storage_service),
-    status_stream_service: ProcessingStatusStreamService = Depends(get_processing_status_stream_service),
+    service: DDRReprocessService = Depends(get_ddr_reprocess_service),
+    task: DDRReprocessTask = Depends(get_ddr_reprocess_task),
 ) -> DDRReprocessAcceptedResponse:
-    service = DDRReprocessService(ddr_repository, ddr_date_repository, occurrence_repository, storage_service)
     await service.prepare_full(ddr_id)
-    task = DDRReprocessTask(status_stream_service=status_stream_service, storage_service=storage_service)
     background_tasks.add_task(task.full, ddr_id)
     return DDRReprocessAcceptedResponse(status="accepted", mode="full")
 
@@ -211,16 +194,11 @@ async def reprocess_dates(
     background_tasks: BackgroundTasks,
     payload: DDRReprocessDatesRequest = Body(default_factory=DDRReprocessDatesRequest),
     current_user = Depends(jwt_authentication),
-    ddr_repository: DDRCRUDRepository = Depends(get_repository(DDRCRUDRepository)),
-    ddr_date_repository: DDRDateCRUDRepository = Depends(get_repository(DDRDateCRUDRepository)),
-    occurrence_repository: OccurrenceCRUDRepository = Depends(get_repository(OccurrenceCRUDRepository)),
-    storage_service: StorageService = Depends(get_storage_service),
-    status_stream_service: ProcessingStatusStreamService = Depends(get_processing_status_stream_service),
+    service: DDRReprocessService = Depends(get_ddr_reprocess_service),
+    task: DDRReprocessTask = Depends(get_ddr_reprocess_task),
 ) -> DDRReprocessAcceptedResponse:
     dates = payload.selected_dates()
-    service = DDRReprocessService(ddr_repository, ddr_date_repository, occurrence_repository, storage_service)
     await service.prepare_dates(ddr_id, dates)
-    task = DDRReprocessTask(status_stream_service=status_stream_service, storage_service=storage_service)
     background_tasks.add_task(task.dates, ddr_id, dates)
     return DDRReprocessAcceptedResponse(status="accepted", mode="dates", dates=dates)
 
@@ -229,12 +207,8 @@ async def reprocess_dates(
 async def reprocess_occurrences(
     ddr_id: str,
     current_user = Depends(jwt_authentication),
-    ddr_repository: DDRCRUDRepository = Depends(get_repository(DDRCRUDRepository)),
-    ddr_date_repository: DDRDateCRUDRepository = Depends(get_repository(DDRDateCRUDRepository)),
-    occurrence_repository: OccurrenceCRUDRepository = Depends(get_repository(OccurrenceCRUDRepository)),
-    storage_service: StorageService = Depends(get_storage_service),
+    service: DDRReprocessService = Depends(get_ddr_reprocess_service),
 ) -> DDRReprocessOccurrencesResponse | JSONResponse:
-    service = DDRReprocessService(ddr_repository, ddr_date_repository, occurrence_repository, storage_service)
     try:
         total = await service.regenerate_occurrences(ddr_id)
         return DDRReprocessOccurrencesResponse(status="success", mode="occurrences", total_occurrences=total)
@@ -259,40 +233,14 @@ async def patch_occurrence(
     occurrence_id: str,
     payload: OccurrencePatchRequest,
     current_user=Depends(jwt_authentication),
-    ddr_repository: DDRCRUDRepository = Depends(get_repository(DDRCRUDRepository)),
-    occurrence_repository: OccurrenceCRUDRepository = Depends(get_repository(OccurrenceCRUDRepository)),
-    edit_repository: OccurrenceEditCRUDRepository = Depends(get_repository(OccurrenceEditCRUDRepository)),
+    service: OccurrenceCorrectionService = Depends(get_occurrence_correction_service),
 ) -> OccurrenceEditResponse:
-    import time as _time
-
-    ddr = await ddr_repository.read_by_id(ddr_id)
-    if ddr is None:
-        raise EntityDoesNotExist("ddr_not_found")
-
-    occurrence = await occurrence_repository.read_by_id(occurrence_id)
-    if occurrence is None or occurrence.ddr_id != ddr_id:
-        raise EntityDoesNotExist("occurrence_not_found")
-
-    allowed_fields = {"type", "section", "mmd", "notes", "density"}
-    if payload.field not in allowed_fields:
-        from fastapi import HTTPException
-        raise HTTPException(status_code=422, detail=f"field must be one of {sorted(allowed_fields)}")
-
-    original_value = str(getattr(occurrence, payload.field, None) or "") or None
-
-    await occurrence_repository.update(
-        occurrence,
-        {payload.field: payload.value, "updated_at": int(_time.time())},
-    )
-
-    username = getattr(current_user, "username", None) or getattr(current_user, "email", None)
-    edit = await edit_repository.create_edit(
-        occurrence_id=occurrence_id,
+    edit = await service.patch_occurrence(
         ddr_id=ddr_id,
+        occurrence_id=occurrence_id,
         field=payload.field,
-        original_value=original_value,
-        corrected_value=payload.value,
+        value=payload.value,
         reason=payload.reason,
-        created_by=username,
+        current_user=current_user,
     )
     return OccurrenceEditResponse.model_validate(edit)

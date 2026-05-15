@@ -1,6 +1,5 @@
 import asyncio
 import json
-import logging
 from typing import Any
 
 from google import genai
@@ -8,19 +7,20 @@ from google.genai import types
 from pydantic import BaseModel
 
 from src.config.manager import settings
+from src.constants.occurrence import (
+    DEFAULT_INTERMEDIATE_SHOE_DEPTH,
+    DEFAULT_SURFACE_SHOE_DEPTH,
+    OCCURRENCE_BACKOFF_SECONDS,
+    OCCURRENCE_RATE_LIMIT_SIGNALS,
+    VALID_OCCURRENCE_TYPES,
+)
 from src.constants.prompts import LLMPrompts
 from src.models.schemas.ddr import DDRDateStatus
 from src.services.langsmith_tracing import LangSmithTracingService
-from src.services.occurrence.classify import (
-    DEFAULT_INTERMEDIATE_SHOE_DEPTH,
-    DEFAULT_SURFACE_SHOE_DEPTH,
-    VALID_OCCURRENCE_TYPES,
-    classify_section,
-)
-from src.services.occurrence.dedup import dedup
-from src.services.occurrence.density_join import density_join
-
-logger = logging.getLogger(__name__)
+from src.services.occurrence.classify import OccurrenceClassifier
+from src.services.occurrence.dedup import OccurrenceDeduplicator
+from src.services.occurrence.density_join import DensityJoinService
+from src.utilities.logging.logger import logger
 
 
 class LLMOccurrenceItem(BaseModel):
@@ -34,17 +34,6 @@ class LLMOccurrenceItem(BaseModel):
 
 class LLMOccurrenceResponse(BaseModel):
     occurrences: list[LLMOccurrenceItem]
-
-
-_RATE_LIMIT_SIGNALS = (
-    "429",
-    "rate limit",
-    "ratelimit",
-    "resource_exhausted",
-    "quota",
-    "too many requests",
-)
-_BACKOFF_SECONDS = (1.0, 2.0, 4.0, 8.0)
 
 
 class OccurrencePageNumberResolver:
@@ -99,17 +88,17 @@ class LLMOccurrenceGenerationService:
     def __init__(self, ddr_date_repository: Any, occurrence_repository: Any) -> None:
         self.ddr_date_repository = ddr_date_repository
         self.occurrence_repository = occurrence_repository
-        self._client = genai.Client(api_key=settings.GEMINI_API_KEY)
-        self._model = settings.GEMINI_MODEL
+        self.client = genai.Client(api_key=settings.GEMINI_API_KEY)
+        self.model = settings.GEMINI_MODEL
 
-    def _is_rate_limit(self, exc: Exception) -> bool:
+    def is_rate_limit(self, exc: Exception) -> bool:
         status_code = getattr(exc, "status_code", None)
         code = getattr(exc, "code", None)
         status = status_code if status_code is not None else code
         if status == 429:
             return True
         lowered = f"{type(exc).__name__} {exc}".lower()
-        return any(signal in lowered for signal in _RATE_LIMIT_SIGNALS)
+        return any(signal in lowered for signal in OCCURRENCE_RATE_LIMIT_SIGNALS)
 
     def _format_time_logs(self, rows: list[Any]) -> str:
         blocks: list[str] = []
@@ -137,10 +126,7 @@ class LLMOccurrenceGenerationService:
         return "\n\n".join(blocks)
 
     async def _previous_occurrences_text(self, ddr_id: str) -> str:
-        reader = getattr(self.occurrence_repository, "get_by_ddr_id_filtered", None)
-        if not callable(reader):
-            return ""
-        previous = await reader(ddr_id)
+        previous = await self.occurrence_repository.get_by_ddr_id_filtered(ddr_id)
         lines = []
         for occurrence in previous:
             date = getattr(occurrence, "date", None) or "?"
@@ -185,13 +171,12 @@ class LLMOccurrenceGenerationService:
         time_logs_text = self._format_time_logs(successful_rows)
         previous_occurrences_text = await self._previous_occurrences_text(ddr_id)
         prompt = self._build_prompt(time_logs_text, previous_occurrences_text=previous_occurrences_text)
-        logger.debug("LLM occurrence prompt: {prompt}")
         result_text: str | None = None
         last_error: Exception | None = None
-        for attempt, backoff in enumerate(_BACKOFF_SECONDS):
+        for attempt, backoff in enumerate(OCCURRENCE_BACKOFF_SECONDS):
             try:
-                response = await self._client.aio.models.generate_content(
-                    model=self._model,
+                response = await self.client.aio.models.generate_content(
+                    model=self.model,
                     contents=[types.Part.from_text(text=prompt)],
                     config=types.GenerateContentConfig(
                         response_mime_type="application/json",
@@ -201,13 +186,10 @@ class LLMOccurrenceGenerationService:
                 result_text = response.text
                 break
             except Exception as exc:
-                if self._is_rate_limit(exc):
+                if self.is_rate_limit(exc):
                     last_error = exc
                     logger.warning(
-                        "LLM occurrence rate limit (attempt %d/4): %s — retrying in %.1fs",
-                        attempt + 1,
-                        exc,
-                        backoff,
+                        f"LLM occurrence rate limit (attempt {attempt + 1}/4): {exc} - retrying in {backoff:.1f}s"
                     )
                     await asyncio.sleep(backoff)
                 else:
@@ -215,25 +197,22 @@ class LLMOccurrenceGenerationService:
         else:
             raise RuntimeError("LLM call failed after retries") from last_error
 
-        logger.debug("LLM raw occurrence response: %s", result_text)
+        logger.debug(f"LLM raw occurrence response: {result_text}")
 
         try:
             parsed = json.loads(result_text or "")
             llm_response = LLMOccurrenceResponse(**parsed)
         except Exception as exc:
-            logger.error("LLM occurrence parse failed: %s | raw: %.500s", exc, result_text)
+            logger.error(f"LLM occurrence parse failed: {exc} | raw: {(result_text or '')[:500]}")
             return 0
 
-        # Build date_map — if two rows share same date, keep first
         date_map: dict[str, tuple[Any, dict]] = {}
         for row in successful_rows:
             if row.date not in date_map:
                 date_map[row.date] = (row.id, row.final_json or {})
             else:
                 logger.warning(
-                    "ddr_id=%s: duplicate date %s in successful rows — keeping first",
-                    ddr_id,
-                    row.date,
+                    f"ddr_id={ddr_id}: duplicate date {row.date} in successful rows - keeping first"
                 )
 
         page_number_resolver = OccurrencePageNumberResolver(successful_rows)
@@ -241,23 +220,19 @@ class LLMOccurrenceGenerationService:
         for item in llm_response.occurrences:
             if item.type not in VALID_OCCURRENCE_TYPES:
                 logger.warning(
-                    "ddr_id=%s: LLM returned unknown occurrence type %r — skipping",
-                    ddr_id,
-                    item.type,
+                    f"ddr_id={ddr_id}: LLM returned unknown occurrence type {item.type!r} - skipping"
                 )
                 continue
             if item.date not in date_map:
                 logger.warning(
-                    "ddr_id=%s: LLM returned date %r not in successful rows — skipping",
-                    ddr_id,
-                    item.date,
+                    f"ddr_id={ddr_id}: LLM returned date {item.date!r} not in successful rows - skipping"
                 )
                 continue
             ddr_date_id, final_json = date_map[item.date]
             raw_mr = final_json.get("mud_records")
             mud_records = raw_mr if isinstance(raw_mr, list) else []
-            section = classify_section(item.mmd, surface_shoe, intermediate_shoe)
-            density = density_join(item.mmd, mud_records)
+            section = OccurrenceClassifier.classify_section(item.mmd, surface_shoe, intermediate_shoe)
+            density = DensityJoinService.density_join(item.mmd, mud_records)
             all_occurrences.append({
                 "ddr_id": ddr_id,
                 "ddr_date_id": ddr_date_id,
@@ -272,6 +247,6 @@ class LLMOccurrenceGenerationService:
                 "page_number": page_number_resolver.resolve(item),
             })
 
-        deduped = dedup(all_occurrences)
+        deduped = OccurrenceDeduplicator.dedup(all_occurrences)
         await self.occurrence_repository.replace_for_ddr(ddr_id, deduped)
         return len(deduped)

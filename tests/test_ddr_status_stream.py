@@ -16,6 +16,7 @@ from src.services.processing_status import ProcessingStatusStreamService
 
 class StubDDRRepository:
     def __init__(self) -> None:
+        self.async_session = None
         self.ddrs = {
             "ddr-1": SimpleNamespace(id="ddr-1", status="processing", file_path="/tmp/ddr-1.pdf", created_at=1),
             "ddr-2": SimpleNamespace(id="ddr-2", status="complete", file_path="/tmp/ddr-2.pdf", created_at=2),
@@ -37,6 +38,7 @@ class StubDDRRepository:
 
 class StubDDRDateRepository:
     def __init__(self) -> None:
+        self.async_session = None
         self.rows = [
             SimpleNamespace(id="date-1", ddr_id="ddr-1", date="20241031", status="queued", error_log=None),
             SimpleNamespace(id="date-2", ddr_id="ddr-1", date="20241101", status="queued", error_log=None),
@@ -71,7 +73,7 @@ class StubExtractor:
     def __init__(self, outcomes: dict[str, Any]) -> None:
         self.outcomes = outcomes
 
-    async def extract(self, date: str, pdf_bytes: bytes) -> Any:
+    async def extract(self, date: str, pdf_bytes: bytes, original_page_numbers: list[int] | None = None) -> Any:
         outcome = self.outcomes[date]
         if isinstance(outcome, BaseException):
             raise outcome
@@ -163,6 +165,7 @@ def test_status_stream_route_requires_auth_and_returns_not_found_shape() -> None
     backend_app.dependency_overrides[
         ddr_dependency("/api/ddrs/{ddr_id}/status/stream", "ddr_date_repository")
     ] = StubDDRDateRepository
+    backend_app.state.processing_status_stream_service = ProcessingStatusStreamService()
 
     try:
         client = TestClient(backend_app)
@@ -171,6 +174,7 @@ def test_status_stream_route_requires_auth_and_returns_not_found_shape() -> None
         missing = client.get("/api/ddrs/unknown/status/stream")
     finally:
         backend_app.dependency_overrides.clear()
+        delattr(backend_app.state, "processing_status_stream_service")
 
     assert unauthorized.status_code == 401
     assert missing.status_code == 404
@@ -201,8 +205,7 @@ def test_status_stream_route_returns_event_stream_headers() -> None:
             assert response.headers["cache-control"] == "no-cache"
     finally:
         backend_app.dependency_overrides.clear()
-        if hasattr(backend_app.state, "processing_status_stream_service"):
-            delattr(backend_app.state, "processing_status_stream_service")
+        delattr(backend_app.state, "processing_status_stream_service")
 
 
 def test_pipeline_publishes_events_after_repository_writes_and_finalizes_counts() -> None:

@@ -1,14 +1,10 @@
+from src.constants.occurrence import DEFAULT_INTERMEDIATE_SHOE_DEPTH, DEFAULT_SURFACE_SHOE_DEPTH
 from src.models.schemas.ddr import DDRDateStatus
 from src.services.keywords.loader import KeywordLoader
-from src.services.occurrence.classify import (
-    DEFAULT_INTERMEDIATE_SHOE_DEPTH,
-    DEFAULT_SURFACE_SHOE_DEPTH,
-    classify_section,
-    classify_type,
-)
-from src.services.occurrence.dedup import dedup
-from src.services.occurrence.density_join import density_join
-from src.services.occurrence.infer_mmd import infer_mmd
+from src.services.occurrence.classify import OccurrenceClassifier
+from src.services.occurrence.dedup import OccurrenceDeduplicator
+from src.services.occurrence.density_join import DensityJoinService
+from src.services.occurrence.infer_mmd import MMDInferenceService
 
 
 class OccurrenceGenerationService:
@@ -45,12 +41,12 @@ class OccurrenceGenerationService:
                 activity = tl.get("activity") or ""
                 comment = tl.get("comment") or ""
                 text = f"{activity} {comment}".strip() if comment else activity
-                occ_type = classify_type(text, keywords)
+                occ_type = OccurrenceClassifier.classify_type(text, keywords)
                 if occ_type == "Unclassified":
                     continue
-                mmd = infer_mmd(i, time_logs)
-                section = classify_section(mmd, surface_shoe, intermediate_shoe)
-                density = density_join(mmd, mud_records)
+                mmd = MMDInferenceService.infer_mmd(i, time_logs)
+                section = OccurrenceClassifier.classify_section(mmd, surface_shoe, intermediate_shoe)
+                density = DensityJoinService.density_join(mmd, mud_records)
                 all_occurrences.append({
                     "ddr_id": ddr_id,
                     "ddr_date_id": row.id,
@@ -65,6 +61,6 @@ class OccurrenceGenerationService:
                     "page_number": tl.get("page_number"),
                 })
 
-        deduped = dedup(all_occurrences)
+        deduped = OccurrenceDeduplicator.dedup(all_occurrences)
         await self.occurrence_repository.replace_for_ddr(ddr_id, deduped)
         return len(deduped)

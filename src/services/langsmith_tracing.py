@@ -5,7 +5,7 @@ from typing import Any, TypeVar, cast
 
 from src.config.manager import settings
 
-F = TypeVar("F", bound=Callable[..., Any])
+FunctionT = TypeVar("FunctionT", bound=Callable[..., Any])
 
 
 class LangSmithTracingService:
@@ -17,8 +17,8 @@ class LangSmithTracingService:
         run_type: str = "chain",
         process_inputs: Callable[[dict], dict] | None = None,
         process_outputs: Callable[[dict], dict] | None = None,
-    ) -> Callable[[F], F]:
-        def decorator(func: F) -> F:
+    ) -> Callable[[FunctionT], FunctionT]:
+        def decorator(func: FunctionT) -> FunctionT:
             if not cls.is_enabled():
                 return func
             from langsmith import Client, traceable, tracing_context
@@ -48,7 +48,7 @@ class LangSmithTracingService:
                     ):
                         return await traced(*args, **kwargs)
 
-                return cast(F, async_wrapper)
+                return cast(FunctionT, async_wrapper)
 
             @wraps(func)
             def sync_wrapper(*args: Any, **kwargs: Any) -> Any:
@@ -60,7 +60,7 @@ class LangSmithTracingService:
                 ):
                     return traced(*args, **kwargs)
 
-            return cast(F, sync_wrapper)
+            return cast(FunctionT, sync_wrapper)
 
         return decorator
 
@@ -74,22 +74,22 @@ class LangSmithTracingService:
 
     @staticmethod
     def safe_inputs(inputs: dict) -> dict:
-        return LangSmithTracingService._safe_payload(inputs)
+        return LangSmithTracingService.safe_payload(inputs)
 
     @staticmethod
     def safe_outputs(outputs: dict) -> dict:
-        return LangSmithTracingService._safe_payload(outputs)
+        return LangSmithTracingService.safe_payload(outputs)
 
     @staticmethod
-    def _safe_payload(payload: Any) -> Any:
+    def safe_payload(payload: Any) -> Any:
         if isinstance(payload, bytes):
             return {"type": "bytes", "size": len(payload)}
         if isinstance(payload, dict):
-            return {key: LangSmithTracingService._safe_payload(value) for key, value in payload.items()}
+            return {key: LangSmithTracingService.safe_payload(value) for key, value in payload.items()}
         if isinstance(payload, list):
-            return [LangSmithTracingService._safe_payload(item) for item in payload[:20]]
+            return [LangSmithTracingService.safe_payload(item) for item in payload[:20]]
         if isinstance(payload, tuple):
-            return tuple(LangSmithTracingService._safe_payload(item) for item in payload[:20])
+            return tuple(LangSmithTracingService.safe_payload(item) for item in payload[:20])
         if isinstance(payload, str) and len(payload) > settings.LANGSMITH_MAX_STRING_LENGTH:
             return f"{payload[: settings.LANGSMITH_MAX_STRING_LENGTH]}..."
         return payload

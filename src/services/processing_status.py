@@ -4,6 +4,12 @@ from typing import Any, Awaitable, Callable
 
 from pydantic import BaseModel
 
+from src.constants.processing import (
+    DATE_COMPLETE_EVENT,
+    DATE_FAILED_EVENT,
+    DATE_STARTED_EVENT,
+    PROCESSING_COMPLETE_EVENT,
+)
 from src.models.schemas.ddr import (
     DDRDateCompleteEvent,
     DDRDateFailedEvent,
@@ -24,11 +30,6 @@ class ProcessingStatusEvent:
 
 
 class ProcessingStatusStreamService:
-    date_started_event = "date_started"
-    date_complete_event = "date_complete"
-    date_failed_event = "date_failed"
-    processing_complete_event = "processing_complete"
-
     def __init__(self) -> None:
         self._subscribers: dict[str, set[asyncio.Queue[ProcessingStatusEvent]]] = defaultdict(set)
         self._lock = asyncio.Lock()
@@ -55,7 +56,7 @@ class ProcessingStatusStreamService:
                 )
                 for event in snapshot_events:
                     yield event.frame()
-                    if event.name == self.processing_complete_event:
+                    if event.name == PROCESSING_COMPLETE_EVENT:
                         return
                 while True:
                     if await request.is_disconnected():
@@ -65,7 +66,7 @@ class ProcessingStatusStreamService:
                     except TimeoutError:
                         continue
                     yield event.frame()
-                    if event.name == self.processing_complete_event:
+                    if event.name == PROCESSING_COMPLETE_EVENT:
                         break
             finally:
                 await self.unsubscribe(ddr_id, queue)
@@ -78,14 +79,14 @@ class ProcessingStatusStreamService:
             if row.status in (DDRDateStatus.SUCCESS, DDRDateStatus.WARNING):
                 events.append(
                     ProcessingStatusEvent(
-                        self.date_complete_event,
+                        DATE_COMPLETE_EVENT,
                         DDRDateCompleteEvent(date=row.date, status=row.status, occurrences_count=0),
                     )
                 )
             if row.status == DDRDateStatus.FAILED:
                 events.append(
                     ProcessingStatusEvent(
-                        self.date_failed_event,
+                        DATE_FAILED_EVENT,
                         DDRDateFailedEvent(
                             date=row.date,
                             error=self._error_message(row),
@@ -96,11 +97,11 @@ class ProcessingStatusStreamService:
         if ddr.status == DDRStatus.PROCESSING:
             queued = next((row for row in rows if row.status == DDRDateStatus.QUEUED), None)
             if queued is not None:
-                events.append(ProcessingStatusEvent(self.date_started_event, DDRDateStartedEvent(date=queued.date)))
+                events.append(ProcessingStatusEvent(DATE_STARTED_EVENT, DDRDateStartedEvent(date=queued.date)))
         if ddr.status in (DDRStatus.COMPLETE, DDRStatus.FAILED):
             events.append(
                 ProcessingStatusEvent(
-                    self.processing_complete_event,
+                    PROCESSING_COMPLETE_EVENT,
                     DDRProcessingCompleteEvent(
                         total_dates=len(rows),
                         failed_dates=sum(1 for row in rows if row.status == DDRDateStatus.FAILED),
@@ -126,7 +127,7 @@ class ProcessingStatusStreamService:
             await queue.put(event)
 
     async def publish_date_started(self, ddr_id: str, date: str) -> None:
-        await self.publish(ddr_id, self.date_started_event, DDRDateStartedEvent(date=date))
+        await self.publish(ddr_id, DATE_STARTED_EVENT, DDRDateStartedEvent(date=date))
 
     async def publish_date_complete(
         self,
@@ -137,14 +138,14 @@ class ProcessingStatusStreamService:
     ) -> None:
         await self.publish(
             ddr_id,
-            self.date_complete_event,
+            DATE_COMPLETE_EVENT,
             DDRDateCompleteEvent(date=date, status=status, occurrences_count=occurrences_count),
         )
 
     async def publish_date_failed(self, ddr_id: str, date: str, error: str, raw_response_id: str) -> None:
         await self.publish(
             ddr_id,
-            self.date_failed_event,
+            DATE_FAILED_EVENT,
             DDRDateFailedEvent(date=date, error=error, raw_response_id=raw_response_id),
         )
 
@@ -158,7 +159,7 @@ class ProcessingStatusStreamService:
     ) -> None:
         await self.publish(
             ddr_id,
-            self.processing_complete_event,
+            PROCESSING_COMPLETE_EVENT,
             DDRProcessingCompleteEvent(
                 total_dates=total_dates,
                 failed_dates=failed_dates,

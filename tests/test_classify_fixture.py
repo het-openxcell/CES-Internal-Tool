@@ -2,7 +2,7 @@ import json
 from pathlib import Path
 
 from src.services.keywords.loader import KeywordLoader
-from src.services.occurrence.classify import classify_type
+from src.services.occurrence.classify import OccurrenceClassifier
 
 
 def test_fixture_accuracy() -> None:
@@ -12,9 +12,12 @@ def test_fixture_accuracy() -> None:
     cases = json.loads(fixtures_path.read_text())
 
     failures = [
-        f"  [{c['expected_type']}] expected but got [{classify_type(c['text'], keywords)}] for: {c['text']!r}"
+        (
+            f"  [{c['expected_type']}] expected but got "
+            f"[{OccurrenceClassifier.classify_type(c['text'], keywords)}] for: {c['text']!r}"
+        )
         for c in cases
-        if classify_type(c["text"], keywords) != c["expected_type"]
+        if OccurrenceClassifier.classify_type(c["text"], keywords) != c["expected_type"]
     ]
     correct = len(cases) - len(failures)
     accuracy = correct / len(cases)

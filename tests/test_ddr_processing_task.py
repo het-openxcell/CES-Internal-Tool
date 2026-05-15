@@ -2,11 +2,13 @@ import asyncio
 from types import SimpleNamespace
 from typing import Any
 
+from src.constants.pipeline import NO_BOUNDARY_PLACEHOLDER_DATE
 from src.services.pipeline_service import PreSplitPipelineService
 
 
 class StubDDRRepository:
     def __init__(self, ddr: SimpleNamespace) -> None:
+        self.async_session = None
         self.ddr = ddr
         self.status_updates: list[str] = []
         self.finalize_calls: list[list[str]] = []
@@ -27,6 +29,7 @@ class StubDDRRepository:
 
 class StubDDRDateRepository:
     def __init__(self) -> None:
+        self.async_session = None
         self.bulk_calls: list[dict[str, Any]] = []
         self.failed_calls: list[dict[str, Any]] = []
         self._rows: list[SimpleNamespace] = []
@@ -195,7 +198,7 @@ def test_pipeline_service_records_no_boundary_failure() -> None:
         failure = date_repo.failed_calls[0]
         assert failure["reason"] == "No date boundaries detected"
         assert failure["raw_page_content"] == "non-standard contractor header"
-        assert failure["date"] == PreSplitPipelineService.no_boundary_placeholder_date
+        assert failure["date"] == NO_BOUNDARY_PLACEHOLDER_DATE
 
     asyncio.run(run())
 

@@ -48,6 +48,7 @@ class FakeDDRDateRow:
 
 class FakeDDRDateRepository:
     def __init__(self, rows: list[FakeDDRDateRow]):
+        self.async_session = None
         self._rows = rows
         self.success_calls = []
         self.failure_calls = []
@@ -110,6 +111,7 @@ class FakeDDR:
 
 class FakeDDRRepository:
     def __init__(self, ddr: FakeDDR):
+        self.async_session = None
         self._ddr = ddr
         self.finalize_calls = []
         self.update_status_calls = []

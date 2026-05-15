@@ -21,7 +21,7 @@ async def search_occurrence_history(
     date_to: Annotated[str | None, Query(pattern=r"^\d{8}$")] = None,
     limit: Annotated[int, Query(ge=1, le=10000)] = 1000,
     offset: Annotated[int, Query(ge=0)] = 0,
-    current_user = Depends(jwt_authentication),
+    _ = Depends(jwt_authentication),
     occurrence_repository: OccurrenceCRUDRepository = Depends(get_repository(OccurrenceCRUDRepository)),
 ) -> list[HistoryOccurrenceInResponse]:
     rows = await occurrence_repository.search_history(
