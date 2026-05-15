@@ -244,46 +244,57 @@ class TimeLogEmbeddingService:
         time_logs = final_json.get("time_logs")
         if not isinstance(time_logs, list):
             return []
-        points = []
-        for index, row in enumerate(time_logs):
+
+        well_name = final_json.get("well_name") or "Unknown"
+        surface_location = final_json.get("surface_location") or "Unknown"
+        date = getattr(ddr_date, "date", None) or "Unknown"
+
+        log_lines = []
+        for row in time_logs:
             if not isinstance(row, dict):
                 continue
-            text = self.embedding_text(row)
-            if not text:
+            log_text = self.row_log_text(row)
+            if not log_text:
                 continue
-            points.append(
-                {
-                    "id": str(uuid.uuid5(uuid.NAMESPACE_URL, f"{ddr_date.id}:{index}")),
-                    "text": text,
-                    "payload": self.payload(ddr_date, row, final_json=final_json),
-                }
-            )
-        return points
+            time_from = row.get("time_from") or row.get("start_time") or ""
+            time_to = row.get("time_to") or row.get("end_time") or ""
+            time_stamp = f"{time_from} : {time_to}".strip(" :") or "Unknown"
+            log_lines.append(f"    Time Stamp: {time_stamp} Logs: {log_text}")
 
-    def embedding_text(self, row: dict[str, Any]) -> str:
+        if not log_lines:
+            return []
+
+        text = (
+            f"Date: {date}\n"
+            f"Well Name: {well_name}\n"
+            f"Surface Location: {surface_location}\n"
+            + "\n".join(log_lines)
+        )
+
+        return [
+            {
+                "id": str(uuid.uuid5(uuid.NAMESPACE_URL, str(ddr_date.id))),
+                "text": text,
+                "payload": self.payload(ddr_date, final_json, text=text),
+            }
+        ]
+
+    def row_log_text(self, row: dict[str, Any]) -> str:
         parts = [
-            str(row.get("details") or "").strip(),
             str(row.get("activity") or "").strip(),
+            str(row.get("details") or "").strip(),
             str(row.get("comment") or "").strip(),
         ]
-        return " ".join(part for part in parts if part)
+        return " | ".join(part for part in parts if part)
 
-    def payload(
-        self,
-        ddr_date: Any,
-        row: dict[str, Any],
-        final_json: dict[str, Any] | None = None,
-    ) -> dict[str, Any]:
-        source_json = final_json or {}
+    def payload(self, ddr_date: Any, final_json: dict[str, Any], text: str = "") -> dict[str, Any]:
         return {
             "ddr_id": getattr(ddr_date, "ddr_id", None),
             "ddr_date_id": getattr(ddr_date, "id", None),
             "date": getattr(ddr_date, "date", None),
-            "time_from": row.get("time_from") or row.get("start_time"),
-            "time_to": row.get("time_to") or row.get("end_time"),
-            "code": row.get("code"),
-            "well_name": source_json.get("well_name"),
-            "surface_location": source_json.get("surface_location"),
+            "well_name": final_json.get("well_name"),
+            "surface_location": final_json.get("surface_location"),
+            "text": text,
         }
 
     def resolve_embedding_client(self) -> EmbeddingClientProtocol:
