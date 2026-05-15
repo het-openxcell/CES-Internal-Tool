@@ -24,7 +24,3 @@ export const APP_ROUTES: AppRoute[] = [
   { path: "/settings/keywords", protected: true, Component: KeywordsPage },
 ];
 
-export const REQUIRED_ROUTES = APP_ROUTES.map(({ path, protected: protectedRoute }) => ({
-  path,
-  protected: protectedRoute,
-}));

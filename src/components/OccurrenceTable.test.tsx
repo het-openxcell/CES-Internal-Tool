@@ -41,9 +41,12 @@ describe("OccurrenceTable", () => {
   it("renders column headers", () => {
     renderTable();
     expect(screen.getByRole("columnheader", { name: /Incident Date/i })).toBeInTheDocument();
+    expect(screen.getByRole("columnheader", { name: /Well Name/i })).toBeInTheDocument();
     expect(screen.getByRole("columnheader", { name: /Type/i })).toBeInTheDocument();
     expect(screen.getByRole("columnheader", { name: /Section/i })).toBeInTheDocument();
     expect(screen.getByRole("columnheader", { name: /mMD/i })).toBeInTheDocument();
+    expect(screen.getByRole("columnheader", { name: /Density/i })).toBeInTheDocument();
+    expect(screen.getByRole("columnheader", { name: /Surface Location/i })).toBeInTheDocument();
     expect(screen.getByRole("columnheader", { name: /Notes/i })).toBeInTheDocument();
   });
 
@@ -54,7 +57,7 @@ describe("OccurrenceTable", () => {
 
   it("formats compact incident dates", () => {
     renderTable({ occurrences: [makeOccurrence()] });
-    expect(screen.getByText("2024-10-31")).toBeInTheDocument();
+    expect(screen.getByText("10/31/2024")).toBeInTheDocument();
   });
 
   it("renders occurrence row with TypeBadge", () => {

@@ -1,4 +1,5 @@
 import { useMemo, useState, useEffect, useRef } from "react";
+import { MinusCircle, Search } from "lucide-react";
 import { useSearchParams } from "react-router";
 import {
   useReactTable,
@@ -39,7 +40,7 @@ const ALL_SECTIONS = ["Surface", "Int.", "Main"];
 
 function formatIncidentDate(date: string | null) {
   if (!date) return "—";
-  if (/^\d{8}$/.test(date)) return `${date.slice(0, 4)}-${date.slice(4, 6)}-${date.slice(6)}`;
+  if (/^\d{8}$/.test(date)) return `${date.slice(4, 6)}/${date.slice(6)}/${date.slice(0, 4)}`;
   return date;
 }
 
@@ -49,6 +50,11 @@ const columns: ColumnDef<OccurrenceRow>[] = [
     header: "Incident Date",
     enableHiding: true,
     cell: ({ getValue }) => formatIncidentDate(getValue() as string | null),
+  },
+  {
+    accessorKey: "well_name",
+    header: "Well Name",
+    cell: ({ getValue }) => (getValue() as string | null) ?? "—",
   },
   {
     accessorKey: "type",
@@ -69,6 +75,16 @@ const columns: ColumnDef<OccurrenceRow>[] = [
     cell: ({ getValue }) => (getValue() != null ? (getValue() as number).toFixed(1) : "—"),
   },
   {
+    accessorKey: "density",
+    header: "Density",
+    cell: ({ getValue }) => (getValue() != null ? (getValue() as number).toFixed(2) : "—"),
+  },
+  {
+    accessorKey: "surface_location",
+    header: "Surface Location",
+    cell: ({ getValue }) => (getValue() as string | null) ?? "—",
+  },
+  {
     accessorKey: "page_number",
     header: "Page",
     cell: ({ getValue }) => (getValue() != null ? (getValue() as number) : "—"),
@@ -80,7 +96,18 @@ const columns: ColumnDef<OccurrenceRow>[] = [
   },
 ];
 
-const VISIBLE_COLUMN_KEYS = ["date", "type", "section", "mmd", "page_number", "notes"];
+const VISIBLE_COLUMN_KEYS = ["date", "well_name", "type", "section", "mmd", "density", "surface_location", "page_number", "notes"];
+const COLUMN_LAYOUT: Record<string, string> = {
+  date: "text-left w-[112px]",
+  well_name: "text-left w-[140px]",
+  type: "text-left w-[150px]",
+  section: "text-left w-[110px]",
+  mmd: "text-right w-[96px]",
+  density: "text-right w-[96px]",
+  surface_location: "text-left w-[160px]",
+  page_number: "text-right w-[82px]",
+  notes: "text-left",
+};
 
 export type OccurrenceTableProps = {
   occurrences: OccurrenceRow[];
@@ -193,10 +220,7 @@ export function OccurrenceTable({ occurrences, isLoading }: OccurrenceTableProps
     <div className="grid gap-3">
       <div className="flex flex-wrap items-center gap-2 mb-3 p-2 bg-surface rounded-lg border border-border-default">
         <div className="relative">
-          <svg className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-text-muted pointer-events-none" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round">
-            <circle cx="11" cy="11" r="7" />
-            <path d="m20 20-3.5-3.5" />
-          </svg>
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-text-muted pointer-events-none" />
           <input
             type="text"
             value={globalFilter}
@@ -276,12 +300,25 @@ export function OccurrenceTable({ occurrences, isLoading }: OccurrenceTableProps
         >
           <thead className="bg-surface">
             <tr className="text-[13px] uppercase tracking-wider font-bold text-text-muted border-b border-border-default">
-              <th className="py-3 px-4 text-left font-bold w-[112px]">Incident Date</th>
-              <th className="py-3 px-4 text-left font-bold w-[150px]">Type</th>
-              <th className="py-3 px-4 text-left font-bold w-[110px]">Section</th>
-              <th className="py-3 px-4 text-right font-bold w-[96px]">MMD</th>
-              <th className="py-3 px-4 text-right font-bold w-[82px]">Page</th>
-              <th className="py-3 px-4 text-left font-bold">Notes</th>
+              {table.getHeaderGroups()[0].headers
+                .filter((header) => VISIBLE_COLUMN_KEYS.includes(header.column.id))
+                .map((header) => {
+                  const sort = header.column.getIsSorted();
+                  const ariaSort = sort === "asc" ? "ascending" : sort === "desc" ? "descending" : "none";
+                  return (
+                    <th
+                      key={header.id}
+                      aria-sort={ariaSort}
+                      onClick={header.column.getToggleSortingHandler()}
+                      className={cn(
+                        "py-3 px-4 font-bold cursor-pointer select-none",
+                        COLUMN_LAYOUT[header.column.id],
+                      )}
+                    >
+                      {flexRender(header.column.columnDef.header, header.getContext())}
+                    </th>
+                  );
+                })}
             </tr>
           </thead>
           <tbody ref={tbodyRef} onKeyDown={handleTableKeyDown}>
@@ -334,18 +371,7 @@ export function OccurrenceTable({ occurrences, isLoading }: OccurrenceTableProps
                 <td colSpan={VISIBLE_COLUMN_KEYS.length} className="px-4 py-2">
                   <EmptyState
                     icon={
-                      <svg
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth={1.5}
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        aria-hidden="true"
-                      >
-                        <circle cx="12" cy="12" r="10" />
-                        <line x1="8" y1="12" x2="16" y2="12" />
-                      </svg>
+                      <MinusCircle aria-hidden="true" />
                     }
                     title="No occurrences found for this DDR"
                     description="Occurrences will appear here once the DDR has been fully processed."

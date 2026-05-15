@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { apiClient } from "@/lib/api";
@@ -91,7 +92,7 @@ export default function ReprocessModal({ open, ddrId, availableDates, onClose, o
   if (!open) return null;
 
   function formatDate(d: string) {
-    if (d.length === 8) return `${d.slice(0, 4)}-${d.slice(4, 6)}-${d.slice(6, 8)}`;
+    if (d.length === 8) return `${d.slice(4, 6)}/${d.slice(6, 8)}/${d.slice(0, 4)}`;
     return d;
   }
 
@@ -115,10 +116,7 @@ export default function ReprocessModal({ open, ddrId, availableDates, onClose, o
             className="ml-auto text-text-muted hover:text-text-primary p-1 rounded transition-colors disabled:opacity-50"
             aria-label="Close"
           >
-            <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-              <line x1="18" y1="6" x2="6" y2="18" />
-              <line x1="6" y1="6" x2="18" y2="18" />
-            </svg>
+            <X className="w-4 h-4" aria-hidden="true" />
           </button>
         </div>
 
