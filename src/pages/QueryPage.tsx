@@ -1,11 +1,9 @@
 import { useEffect, useRef, useState } from "react";
 import {
-  FileText as DocIcon,
   Repeat as RepeatIcon,
   Search as SearchIcon,
   Send as SendIcon,
   Sparkles as SparkleIcon,
-  Star as StarIcon,
 } from "lucide-react";
 import { useSearchParams } from "react-router";
 
@@ -240,34 +238,6 @@ export default function QueryPage() {
                       {chip}
                     </button>
                   ))}
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="rounded-xl border border-gray-200 bg-white p-5">
-                  <div className="flex items-center gap-2.5 mb-3">
-                    <div className="h-8 w-8 rounded-lg bg-gray-100 grid place-items-center">
-                      <DocIcon className="h-4 w-4 text-gray-500" />
-                    </div>
-                    <span className="text-[14px] font-semibold text-gray-900">Indexed corpus</span>
-                  </div>
-                  <p className="text-[13px] leading-relaxed text-gray-500">
-                    <span className="font-semibold text-gray-700">487</span> DDR reports · <span className="font-semibold text-gray-700">11,294</span> occurrences across <span className="font-semibold text-gray-700">38</span> wells · last indexed 6 minutes ago.
-                  </p>
-                </div>
-
-                <div className="rounded-xl border border-gray-200 bg-white p-5">
-                  <div className="flex items-center gap-2.5 mb-3">
-                    <div className="h-8 w-8 rounded-lg bg-red-50 grid place-items-center">
-                      <StarIcon className="h-4 w-4 text-ces-red" />
-                    </div>
-                    <span className="text-[14px] font-semibold text-gray-900">Tips</span>
-                  </div>
-                  <ul className="space-y-1.5 text-[13px] text-gray-500">
-                    <li>• Mention operator, well, or area to scope results</li>
-                    <li>• Use time references like "last quarter", "Q1 2026", or "since March"</li>
-                    <li>• Combine type + depth band ("tight hole 1500–1700m")</li>
-                  </ul>
                 </div>
               </div>
             </>

@@ -12,7 +12,10 @@ const TABS = [
   { key: "monitor", label: "Monitor", path: "/monitor", Icon: Monitor },
 ];
 
-export default function TopNav({ onLogout }: { onLogout: () => void }) {
+export default function TopNav({ onLogout, username }: { onLogout: () => void; username?: string | null }) {
+  const initials = username
+    ? (username.split(/[\s._-]+/).map((w) => w[0]?.toUpperCase() ?? "").join("").slice(0, 2) || (username[0]?.toUpperCase() ?? "?"))
+    : "?";
   const location = useLocation();
   const navigate = useNavigate();
   const { setOpen } = useUploadModal();
@@ -95,11 +98,10 @@ export default function TopNav({ onLogout }: { onLogout: () => void }) {
             aria-expanded={profileOpen}
           >
             <div className="h-7 w-7 rounded-full bg-ces-red text-white grid place-items-center text-[11px] font-bold">
-              RC
+              {initials}
             </div>
             <div className="text-[11px] leading-tight pr-1 text-left">
-              <div className="font-semibold text-text-primary">Ryan Cordell</div>
-              <div className="text-text-muted">Operations</div>
+              <div className="font-semibold text-text-primary">{username ?? "—"}</div>
             </div>
           </button>
 

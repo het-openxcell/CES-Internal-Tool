@@ -32,6 +32,7 @@ export type DDRDetail = {
   status: DDRStatus;
   well_name?: string | null;
   created_at: number;
+  uploaded_by_username?: string | null;
   dates?: DDRDateDetail[];
 };
 
