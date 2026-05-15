@@ -4,19 +4,15 @@ import time
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 
-import pytest
-
-from src.models.schemas.ddr import DDRExtractionPayload
 from src.services.occurrence.generate import OccurrenceGenerationService
 from src.services.pipeline.validate import DDRExtractionValidator
-
 
 # ── DDRCRUDRepository.update_well_metadata ───────────────────────────────────
 
 def test_update_well_metadata_sets_fields():
     """update_well_metadata sets both fields and updates updated_at."""
-    from src.repository.crud.ddr import DDRCRUDRepository
     from src.models.db.ddr import DDR
+    from src.repository.crud.ddr import DDRCRUDRepository
 
     async def run():
         session = AsyncMock()
@@ -43,8 +39,8 @@ def test_update_well_metadata_sets_fields():
 
 def test_update_well_metadata_accepts_nulls():
     """update_well_metadata with None values doesn't raise."""
-    from src.repository.crud.ddr import DDRCRUDRepository
     from src.models.db.ddr import DDR
+    from src.repository.crud.ddr import DDRCRUDRepository
 
     async def run():
         session = AsyncMock()
@@ -184,7 +180,7 @@ def test_validator_accepts_null_metadata():
 def test_ddr_extraction_payload_extra_fields_still_forbidden():
     """DDRExtractionPayload still rejects truly unknown fields."""
     import json
-    import pydantic
+
 
     validator = DDRExtractionValidator()
     payload = {
@@ -231,7 +227,7 @@ def test_extract_all_dates_aggregates_well_metadata(mock_keywords):
 
         from src.services.pipeline_service import PreSplitPipelineService
 
-        service = PreSplitPipelineService(
+        PreSplitPipelineService(
             ddr_repository=ddr_repo,
             ddr_date_repository=ddr_date_repo,
             occurrence_repository=occurrence_repo,
@@ -247,7 +243,11 @@ def test_extract_all_dates_aggregates_well_metadata(mock_keywords):
             None,
         )
         surface_location = next(
-            (r.final_json.get("surface_location") for r in all_rows if r.final_json and r.final_json.get("surface_location")),
+            (
+                r.final_json.get("surface_location")
+                for r in all_rows
+                if r.final_json and r.final_json.get("surface_location")
+            ),
             None,
         )
         await ddr_repo.update_well_metadata(ddr, well_name, surface_location)
@@ -277,7 +277,11 @@ def test_extract_all_dates_uses_none_when_all_dates_fail():
             None,
         )
         surface_location = next(
-            (r.final_json.get("surface_location") for r in rows if r.final_json and r.final_json.get("surface_location")),
+            (
+                r.final_json.get("surface_location")
+                for r in rows
+                if r.final_json and r.final_json.get("surface_location")
+            ),
             None,
         )
         assert well_name is None

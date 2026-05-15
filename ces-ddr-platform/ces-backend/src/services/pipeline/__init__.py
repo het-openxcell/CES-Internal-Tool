@@ -1,7 +1,6 @@
 from src.services.pipeline.extract import (
     ExtractionError,
     ExtractionResult,
-    ExtractionValidationError,
     GeminiDDRExtractor,
     RateLimitError,
 )
@@ -15,7 +14,6 @@ __all__ = [
     "GeminiDDRExtractor",
     "ExtractionError",
     "ExtractionResult",
-    "ExtractionValidationError",
     "RateLimitError",
     "DDRExtractionValidator",
     "ValidationResult",

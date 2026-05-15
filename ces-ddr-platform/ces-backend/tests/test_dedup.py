@@ -1,6 +1,6 @@
 from unittest.mock import patch
 
-from src.services.occurrence.dedup import dedup
+from src.services.occurrence.dedup import OccurrenceDeduplicator
 
 
 def _occ(type_, mmd, ddr_date_id=None):
@@ -9,34 +9,34 @@ def _occ(type_, mmd, ddr_date_id=None):
 
 def test_no_duplicates_returns_same():
     occs = [_occ("Stuck Pipe", 1450.0), _occ("Lost Circulation", 2300.0)]
-    assert dedup(occs) == occs
+    assert OccurrenceDeduplicator.dedup(occs) == occs
 
 
 def test_removes_exact_type_mmd_duplicate():
     occs = [_occ("Stuck Pipe", 1450.0), _occ("Stuck Pipe", 1450.0)]
-    result = dedup(occs)
+    result = OccurrenceDeduplicator.dedup(occs)
     assert len(result) == 1
     assert result[0] is occs[0]
 
 
 def test_same_type_different_mmd_not_deduped():
     occs = [_occ("Stuck Pipe", 1450.0), _occ("Stuck Pipe", 1460.0)]
-    assert len(dedup(occs)) == 2
+    assert len(OccurrenceDeduplicator.dedup(occs)) == 2
 
 
 def test_same_mmd_different_type_not_deduped():
     occs = [_occ("Stuck Pipe", 1450.0), _occ("Lost Circulation", 1450.0)]
-    assert len(dedup(occs)) == 2
+    assert len(OccurrenceDeduplicator.dedup(occs)) == 2
 
 
 def test_none_mmd_deduped_by_type():
     occs = [_occ("Stuck Pipe", None), _occ("Stuck Pipe", None)]
-    assert len(dedup(occs)) == 1
+    assert len(OccurrenceDeduplicator.dedup(occs)) == 1
 
 
 def test_none_mmd_different_types_not_deduped():
     occs = [_occ("Stuck Pipe", None), _occ("Lost Circulation", None)]
-    assert len(dedup(occs)) == 2
+    assert len(OccurrenceDeduplicator.dedup(occs)) == 2
 
 
 def test_preserves_first_insertion_order():
@@ -44,35 +44,35 @@ def test_preserves_first_insertion_order():
         {"type": "Stuck Pipe", "mmd": 1450.0, "notes": "first"},
         {"type": "Stuck Pipe", "mmd": 1450.0, "notes": "second"},
     ]
-    result = dedup(occs)
+    result = OccurrenceDeduplicator.dedup(occs)
     assert result[0]["notes"] == "first"
 
 
 def test_empty_list_returns_empty():
-    assert dedup([]) == []
+    assert OccurrenceDeduplicator.dedup([]) == []
 
 
 def test_logs_removed_count():
     occs = [_occ("Stuck Pipe", 1450.0), _occ("Stuck Pipe", 1450.0), _occ("Stuck Pipe", 1450.0)]
     with patch("src.services.occurrence.dedup.logger") as mock_logger:
-        result = dedup(occs)
+        result = OccurrenceDeduplicator.dedup(occs)
     assert len(result) == 1
     mock_logger.info.assert_called_once()
     args = mock_logger.info.call_args[0]
     assert "removed" in args[0]
-    assert args[1] == 2
+    assert "2" in args[0]
 
 
 def test_no_log_when_no_duplicates():
     occs = [_occ("Stuck Pipe", 1450.0)]
     with patch("src.services.occurrence.dedup.logger") as mock_logger:
-        dedup(occs)
+        OccurrenceDeduplicator.dedup(occs)
     mock_logger.info.assert_not_called()
 
 
 def test_three_duplicates_one_kept():
     occs = [_occ("Kick", 3000.0)] * 3
-    result = dedup(occs)
+    result = OccurrenceDeduplicator.dedup(occs)
     assert len(result) == 1
 
 
@@ -84,19 +84,19 @@ def test_mixed_duplicates_and_unique():
         _occ("Kick", None),
         _occ("Kick", None),
     ]
-    result = dedup(occs)
+    result = OccurrenceDeduplicator.dedup(occs)
     assert len(result) == 3
 
 
 def test_malformed_dict_no_type_key():
     occs = [{"mmd": 1450.0, "notes": "no type"}, {"mmd": 1450.0, "notes": "no type 2"}]
-    result = dedup(occs)
+    result = OccurrenceDeduplicator.dedup(occs)
     assert len(result) == 1
 
 
 def test_malformed_dict_no_mmd_key():
     occs = [{"type": "Stuck Pipe", "notes": "no mmd"}, {"type": "Stuck Pipe", "notes": "no mmd 2"}]
-    result = dedup(occs)
+    result = OccurrenceDeduplicator.dedup(occs)
     assert len(result) == 1
 
 
@@ -105,7 +105,7 @@ def test_same_type_mmd_different_ddr_date_not_deduped():
         {"type": "Stuck Pipe", "mmd": 1450.0, "ddr_date_id": 1},
         {"type": "Stuck Pipe", "mmd": 1450.0, "ddr_date_id": 2},
     ]
-    assert len(dedup(occs)) == 2
+    assert len(OccurrenceDeduplicator.dedup(occs)) == 2
 
 
 def test_same_type_mmd_same_ddr_date_deduped():
@@ -113,9 +113,9 @@ def test_same_type_mmd_same_ddr_date_deduped():
         {"type": "Stuck Pipe", "mmd": 1450.0, "ddr_date_id": 1},
         {"type": "Stuck Pipe", "mmd": 1450.0, "ddr_date_id": 1},
     ]
-    assert len(dedup(occs)) == 1
+    assert len(OccurrenceDeduplicator.dedup(occs)) == 1
 
 
 def test_no_ddr_date_id_key_backward_compat():
     occs = [_occ("Stuck Pipe", 1450.0), _occ("Stuck Pipe", 1450.0)]
-    assert len(dedup(occs)) == 1
+    assert len(OccurrenceDeduplicator.dedup(occs)) == 1

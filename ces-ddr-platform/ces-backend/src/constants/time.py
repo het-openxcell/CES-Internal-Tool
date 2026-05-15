@@ -1,0 +1,1 @@
+SECONDS_PER_WEEK = 7 * 24 * 3600

@@ -3,8 +3,6 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
-_SCHEMA_PATH = Path(__file__).parent / "ddr_schema.json"
-
 
 class DDRExtractionSchema:
     def __init__(self, schema: dict[str, Any]):
@@ -23,5 +21,5 @@ class DDRExtractionSchema:
 
 @lru_cache(maxsize=1)
 def load_ddr_extraction_schema() -> DDRExtractionSchema:
-    schema = json.loads(_SCHEMA_PATH.read_text(encoding="utf-8"))
+    schema = json.loads((Path(__file__).parent / "ddr_schema.json").read_text(encoding="utf-8"))
     return DDRExtractionSchema(schema)

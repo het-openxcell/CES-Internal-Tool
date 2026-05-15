@@ -1,4 +1,5 @@
 import { type ReactNode, useEffect, useState } from "react";
+import { Download as DownloadIcon, Layers as LayersIcon } from "lucide-react";
 
 import { apiClient, type HistoryOccurrenceRow } from "@/lib/api";
 import { SectionBadge } from "@/components/SectionBadge";
@@ -27,28 +28,6 @@ const SECTIONS: FilterOption[] = [
   { label: "Main", tone: "bg-indigo-100 text-indigo-800 border-indigo-200" },
 ];
 
-const DEFAULT_TYPES: string[] = [];
-const DEFAULT_SECTIONS: string[] = [];
-
-function LayersIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.7} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d="m12 3 8 4-8 4-8-4 8-4Z" />
-      <path d="m4 12 8 4 8-4" />
-      <path d="m4 17 8 4 8-4" />
-    </svg>
-  );
-}
-
-function DownloadIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.7} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d="M12 3v12" />
-      <path d="m7 10 5 5 5-5" />
-      <path d="M5 21h14" />
-    </svg>
-  );
-}
 
 function FilterBadge({ option }: { option: FilterOption }) {
   return (
@@ -83,17 +62,15 @@ function FilterSection({ title, children }: { title: string; children: ReactNode
 
 function formatDate(value: string | null) {
   if (!value || value.length !== 8) return "—";
-  return `${value.slice(0, 4)}-${value.slice(4, 6)}-${value.slice(6, 8)}`;
+  return `${value.slice(4, 6)}/${value.slice(6, 8)}/${value.slice(0, 4)}`;
 }
 
 function DateCell({ value }: { value: string | null }) {
   if (!value || value.length !== 8) return <span className="text-[14px] text-gray-500">—</span>;
-  const ymd = `${value.slice(0, 4)}-${value.slice(4, 6)}-`;
-  const day = value.slice(6, 8);
+  const formatted = `${value.slice(4, 6)}/${value.slice(6, 8)}/${value.slice(0, 4)}`;
   return (
     <div className="leading-tight">
-      <div className="text-[14px] text-gray-700">{ymd}</div>
-      <div className="text-[14px] text-gray-700">{day}</div>
+      <div className="text-[14px] text-gray-700">{formatted}</div>
     </div>
   );
 }
@@ -124,8 +101,8 @@ function FilterChip({ label, value, onRemove }: { label: string; value: string; 
 }
 
 export default function HistoryPage() {
-  const [types, setTypes] = useState<string[]>(DEFAULT_TYPES);
-  const [sections, setSections] = useState<string[]>(DEFAULT_SECTIONS);
+  const [types, setTypes] = useState<string[]>([]);
+  const [sections, setSections] = useState<string[]>([]);
   const [fromDepth, setFromDepth] = useState(50);
   const [toDepth, setToDepth] = useState(6000);
   const [rows, setRows] = useState<HistoryOccurrenceRow[]>([]);

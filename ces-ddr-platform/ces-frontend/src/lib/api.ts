@@ -1,11 +1,11 @@
 import { authToken } from "@/lib/auth";
 
-export type LoginCredentials = {
+type LoginCredentials = {
   username: string;
   password: string;
 };
 
-export type LoginResponse = {
+type LoginResponse = {
   token: string;
   expires_at: number;
 };
@@ -84,11 +84,26 @@ export type HistoryOccurrenceRow = OccurrenceRow & {
   to_mmd: number | null;
 };
 
-export type HistoryOccurrenceFilters = {
+type HistoryOccurrenceFilters = {
   types?: string[];
   sections?: string[];
   depth_from?: number;
   depth_to?: number;
+};
+
+type TimeLogSource = {
+  ddr_id: string | null;
+  date: string | null;
+  well_name: string | null;
+  surface_location: string | null;
+  text: string | null;
+  score: number | null;
+};
+
+export type NLQueryResponse = {
+  answer: string;
+  sources: TimeLogSource[];
+  expanded_queries: string[];
 };
 
 export type MonitorMetrics = {
@@ -117,7 +132,7 @@ export type QueueItem = {
   updated_at: number;
 };
 
-export type ApiErrorCode = "UNAUTHORIZED" | "API_ERROR";
+type ApiErrorCode = "UNAUTHORIZED" | "API_ERROR";
 
 export class ApiError extends Error {
   constructor(
@@ -250,6 +265,14 @@ class ApiClient {
     return this.request<OccurrenceEditResponse[]>(`/monitor/corrections${params}`);
   }
 
+  async queryNL(query: string, signal?: AbortSignal) {
+    return this.request<NLQueryResponse>("/query/nl", {
+      method: "POST",
+      body: JSON.stringify({ query }),
+      signal,
+    });
+  }
+
   async searchHistoryOccurrences(filters?: HistoryOccurrenceFilters, signal?: AbortSignal) {
     const params = new URLSearchParams();
     filters?.types?.forEach((type) => params.append("type", type));
@@ -329,7 +352,7 @@ class ApiClient {
 
   private redirectToLogin() {
     if (window.location.pathname !== "/login") {
-      window.location.href = "/login";
+      window.history.pushState(null, "", "/login");
     }
   }
 }

@@ -6,48 +6,12 @@ import sqlalchemy
 
 from src.models.db.ddr import DDR, DDRDate
 from src.models.db.occurrence import Occurrence
-from src.services.occurrence.classify import classify_section
 from src.repository.crud.base import BaseCRUDRepository
+from src.services.occurrence.classify import OccurrenceClassifier
 
 
 class OccurrenceCRUDRepository(BaseCRUDRepository[Occurrence]):
     model = Occurrence
-
-    async def create_occurrence(
-        self,
-        ddr_id: str,
-        ddr_date_id: str,
-        occurrence_type: str,
-        well_name: str | None = None,
-        surface_location: str | None = None,
-        section: str | None = None,
-        mmd: float | None = None,
-        density: float | None = None,
-        notes: str | None = None,
-        date: str | None = None,
-        page_number: int | None = None,
-        commit: bool = True,
-    ) -> Occurrence:
-        now = int(time.time())
-        return await self.create(
-            {
-                "ddr_id": ddr_id,
-                "ddr_date_id": ddr_date_id,
-                "type": occurrence_type,
-                "well_name": well_name,
-                "surface_location": surface_location,
-                "section": section,
-                "mmd": mmd,
-                "density": density,
-                "notes": notes,
-                "date": date,
-                "page_number": page_number,
-                "is_exported": False,
-                "created_at": now,
-                "updated_at": now,
-            },
-            commit=commit,
-        )
 
     async def delete_by_ddr_id(self, ddr_id: str) -> None:
         stmt = sqlalchemy.delete(Occurrence).where(Occurrence.ddr_id == ddr_id)
@@ -81,32 +45,6 @@ class OccurrenceCRUDRepository(BaseCRUDRepository[Occurrence]):
             self.async_session.add_all(records)
         await self.async_session.commit()
 
-    async def bulk_create_occurrences(self, occurrences: list[dict]) -> None:
-        if not occurrences:
-            return
-        now = int(time.time())
-        records = [
-            Occurrence(
-                ddr_id=occ["ddr_id"],
-                ddr_date_id=occ["ddr_date_id"],
-                type=occ["type"],
-                well_name=occ.get("well_name"),
-                surface_location=occ.get("surface_location"),
-                section=occ.get("section"),
-                mmd=occ.get("mmd"),
-                density=occ.get("density"),
-                notes=occ.get("notes"),
-                date=occ.get("date"),
-                page_number=occ.get("page_number"),
-                is_exported=False,
-                created_at=now,
-                updated_at=now,
-            )
-            for occ in occurrences
-        ]
-        self.async_session.add_all(records)
-        await self.async_session.commit()
-
     async def get_by_ddr_id_filtered(
         self,
         ddr_id: str,
@@ -135,11 +73,6 @@ class OccurrenceCRUDRepository(BaseCRUDRepository[Occurrence]):
         result = await self.async_session.execute(stmt)
         return list(result.scalars().all())
 
-    async def get_by_ddr_id(self, ddr_id: str, limit: int = 100, offset: int = 0) -> list[Occurrence]:
-        stmt = sqlalchemy.select(Occurrence).where(Occurrence.ddr_id == ddr_id).limit(limit).offset(offset)
-        result = await self.async_session.execute(stmt)
-        return list(result.scalars().all())
-
     async def search_history(
         self,
         type_filters: list[str] | None = None,
@@ -149,6 +82,8 @@ class OccurrenceCRUDRepository(BaseCRUDRepository[Occurrence]):
         depth_to: float | None = None,
         date_from: str | None = None,
         date_to: str | None = None,
+        keyword: str | None = None,
+        ddr_date_pairs: list[tuple[str, str]] | None = None,
         limit: int = 1000,
         offset: int = 0,
     ) -> list[dict]:
@@ -173,7 +108,11 @@ class OccurrenceCRUDRepository(BaseCRUDRepository[Occurrence]):
             )
             .join(DDR, DDR.id == Occurrence.ddr_id)
             .join(DDRDate, DDRDate.id == Occurrence.ddr_date_id)
-            .order_by(Occurrence.date.desc().nullslast(), Occurrence.mmd.asc().nullslast(), Occurrence.created_at.desc())
+            .order_by(
+                Occurrence.date.desc().nullslast(),
+                Occurrence.mmd.asc().nullslast(),
+                Occurrence.created_at.desc(),
+            )
             .limit(limit)
             .offset(offset)
         )
@@ -191,6 +130,10 @@ class OccurrenceCRUDRepository(BaseCRUDRepository[Occurrence]):
             stmt = stmt.where(Occurrence.date >= date_from)
         if date_to is not None:
             stmt = stmt.where(Occurrence.date <= date_to)
+        if keyword is not None:
+            stmt = stmt.where(Occurrence.notes.ilike(f"%{keyword}%"))
+        if ddr_date_pairs:
+            stmt = stmt.where(sqlalchemy.tuple_(Occurrence.ddr_id, Occurrence.date).in_(ddr_date_pairs))
         result = await self.async_session.execute(stmt)
         rows = []
         for row in result.mappings().all():
@@ -206,7 +149,7 @@ class OccurrenceCRUDRepository(BaseCRUDRepository[Occurrence]):
         section = occurrence.get("section")
         if section is None:
             section_depth = to_mmd if to_mmd is not None else from_mmd
-            section = classify_section(section_depth)
+            section = OccurrenceClassifier.classify_section(section_depth)
         return {
             "start_time": time_log.get("start_time") if time_log else None,
             "end_time": time_log.get("end_time") if time_log else None,
@@ -228,11 +171,19 @@ class OccurrenceCRUDRepository(BaseCRUDRepository[Occurrence]):
             fields = [time_log.get("comment"), time_log.get("activity")]
             text = " ".join(str(value) for value in fields if value)
             normalized_text = self._normalize_text(text)
-            if normalized_notes == normalized_text or normalized_notes in normalized_text or normalized_text in normalized_notes:
+            if (
+                normalized_notes == normalized_text
+                or normalized_notes in normalized_text
+                or normalized_text in normalized_notes
+            ):
                 return time_log
         return None
 
-    def _depth_range(self, occurrence: dict[str, Any], time_log: dict[str, Any] | None) -> tuple[float | None, float | None]:
+    def _depth_range(
+        self,
+        occurrence: dict[str, Any],
+        time_log: dict[str, Any] | None,
+    ) -> tuple[float | None, float | None]:
         mmd = self._to_float(occurrence.get("mmd"))
         if mmd is not None:
             return mmd, mmd
@@ -246,7 +197,11 @@ class OccurrenceCRUDRepository(BaseCRUDRepository[Occurrence]):
         return self._parse_depth_range(text)
 
     def _parse_depth_range(self, text: str) -> tuple[float | None, float | None]:
-        range_match = re.search(r"\b(\d{2,5}(?:\.\d+)?)\s*m?\s*(?:-|–|to)\s*(\d{2,5}(?:\.\d+)?)\s*m\b", text, re.IGNORECASE)
+        range_match = re.search(
+            r"\b(\d{2,5}(?:\.\d+)?)\s*m?\s*(?:-|–|to)\s*(\d{2,5}(?:\.\d+)?)\s*m\b",
+            text,
+            re.IGNORECASE,
+        )
         if range_match:
             first = self._to_float(range_match.group(1))
             second = self._to_float(range_match.group(2))

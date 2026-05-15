@@ -1,91 +1,15 @@
 import { useState, useRef, useEffect } from "react";
+import { FileText, History, LogOut, Monitor, Search, Settings, Upload } from "lucide-react";
 import { Link, useLocation, useNavigate } from "react-router";
 
 import { useUploadModal } from "@/components/UploadModalContext";
 import { cn } from "@/lib/utils";
 
-function ReportsIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z" />
-      <path d="M14 3v6h6" />
-      <path d="M8 13h8M8 17h5" />
-    </svg>
-  );
-}
-
-function QueryIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <circle cx="11" cy="11" r="7" />
-      <path d="m20 20-3.5-3.5" />
-    </svg>
-  );
-}
-
-function HistoryIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d="M3 12a9 9 0 1 0 3-6.7" />
-      <path d="M3 3v6h6" />
-      <path d="M12 7v5l3 2" />
-    </svg>
-  );
-}
-
-function MonitorIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <rect x="3" y="4" width="18" height="13" rx="2" />
-      <path d="M8 21h8M12 17v4" />
-      <path d="m7 11 3 2 3-4 4 3" />
-    </svg>
-  );
-}
-
-function SearchIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <circle cx="11" cy="11" r="7" />
-      <path d="m20 20-3.5-3.5" />
-    </svg>
-  );
-}
-
-function UploadIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-      <path d="M17 8l-5-5-5 5" />
-      <path d="M12 3v12" />
-    </svg>
-  );
-}
-
-function SettingsIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <circle cx="12" cy="12" r="3" />
-      <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.67 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.67 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.67a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" />
-    </svg>
-  );
-}
-
-function LogoutIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4" />
-      <polyline points="10 17 15 12 10 7" />
-      <line x1="15" y1="12" x2="3" y2="12" />
-    </svg>
-  );
-}
-
 const TABS = [
-  { key: "reports", label: "Reports", path: "/", Icon: ReportsIcon },
-  { key: "query", label: "Query", path: "/query", Icon: QueryIcon },
-  { key: "history", label: "History", path: "/history", Icon: HistoryIcon },
-  { key: "monitor", label: "Monitor", path: "/monitor", Icon: MonitorIcon },
+  { key: "reports", label: "Reports", path: "/", Icon: FileText },
+  { key: "query", label: "Query", path: "/query", Icon: Search },
+  { key: "history", label: "History", path: "/history", Icon: History },
+  { key: "monitor", label: "Monitor", path: "/monitor", Icon: Monitor },
 ];
 
 export default function TopNav({ onLogout }: { onLogout: () => void }) {
@@ -139,7 +63,7 @@ export default function TopNav({ onLogout }: { onLogout: () => void }) {
 
       <div className="ml-auto flex items-center gap-2">
         <div className="relative hidden lg:block">
-          <SearchIcon className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-text-muted pointer-events-none" />
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-text-muted pointer-events-none" />
           <input
             type="text"
             placeholder="Search reports, wells, operators…"
@@ -158,7 +82,7 @@ export default function TopNav({ onLogout }: { onLogout: () => void }) {
           onClick={() => setOpen(true)}
           className="inline-flex items-center justify-center gap-1.5 h-9 px-3 rounded-md text-[13px] font-semibold bg-ces-red text-white hover:bg-ces-red-dark transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ces-red focus-visible:ring-offset-2 shrink-0"
         >
-          <UploadIcon className="w-3.5 h-3.5" />
+          <Upload className="w-3.5 h-3.5" />
           <span className="hidden sm:inline">Upload DDR</span>
         </button>
 
@@ -190,7 +114,7 @@ export default function TopNav({ onLogout }: { onLogout: () => void }) {
                 className="flex items-center gap-2.5 px-3 py-2 text-[13px] text-text-secondary hover:bg-surface hover:text-text-primary transition-colors"
                 role="menuitem"
               >
-                <SettingsIcon className="w-4 h-4" />
+                <Settings className="w-4 h-4" />
                 Settings
               </Link>
               <div className="mx-3 my-1 h-px bg-border-default" />
@@ -200,7 +124,7 @@ export default function TopNav({ onLogout }: { onLogout: () => void }) {
                 className="flex items-center gap-2.5 px-3 py-2 text-[13px] text-text-secondary hover:text-error-text hover:bg-error-bg transition-colors w-full"
                 role="menuitem"
               >
-                <LogoutIcon className="w-4 h-4" />
+                <LogOut className="w-4 h-4" />
                 Sign out
               </button>
             </div>

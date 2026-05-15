@@ -3,7 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 
 import App from "@/App";
-import { REQUIRED_ROUTES } from "@/routes";
+import { APP_ROUTES } from "@/routes";
 import { authToken } from "@/lib/auth";
 import { TestJwtFactory } from "@/test/test-utils";
 
@@ -71,7 +71,8 @@ describe("App routing and login", () => {
   });
 
   it("declares all required routes and protects each route except login", () => {
-    expect(REQUIRED_ROUTES).toEqual([
+    const routes = APP_ROUTES.map(({ path, protected: p }) => ({ path, protected: p }));
+    expect(routes).toEqual([
       { path: "/login", protected: false },
       { path: "/", protected: true },
       { path: "/reports/:id", protected: true },

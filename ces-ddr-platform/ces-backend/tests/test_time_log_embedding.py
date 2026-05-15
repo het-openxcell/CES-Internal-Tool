@@ -1,5 +1,4 @@
 import asyncio
-import logging
 import uuid
 from types import SimpleNamespace
 
@@ -28,6 +27,14 @@ class FakeQdrantClient:
         if self.fail_upsert:
             raise RuntimeError("qdrant down")
         self.upsert_calls.append({"collection_name": collection_name, "points": points})
+
+
+class FakeLogger:
+    def __init__(self) -> None:
+        self.warnings = []
+
+    def warning(self, message: str) -> None:
+        self.warnings.append(message)
 
 
 def test_embedding_service_extracts_time_log_text_and_payloads() -> None:
@@ -82,13 +89,15 @@ def test_embedding_service_extracts_time_log_text_and_payloads() -> None:
     assert points[1]["payload"]["code"] is None
 
 
-def test_embedding_failure_logs_warning_without_raising(caplog) -> None:
+def test_embedding_failure_logs_warning_without_raising() -> None:
+    logger = FakeLogger()
     service = TimeLogEmbeddingService(
         embedding_client=FakeEmbeddingClient(),
         qdrant_client=FakeQdrantClient(fail_upsert=True),
         collection_name="ddr_time_logs",
         embedding_model="gemini-embedding-2",
         vector_size=4,
+        service_logger=logger,
     )
     row = SimpleNamespace(
         id="date-1",
@@ -97,10 +106,10 @@ def test_embedding_failure_logs_warning_without_raising(caplog) -> None:
         final_json={"time_logs": [{"start_time": "00:00", "end_time": "06:00", "activity": "Drill ahead"}]},
     )
 
-    with caplog.at_level(logging.WARNING):
-        asyncio.run(service.embed_successful_date(row))
+    asyncio.run(service.embed_successful_date(row))
 
     assert row.final_json["time_logs"][0]["activity"] == "Drill ahead"
-    assert "time_log_embedding_failed" in caplog.text
-    assert "ddr-1" in caplog.text
-    assert "date-1" in caplog.text
+    assert len(logger.warnings) == 1
+    assert "time_log_embedding_failed" in logger.warnings[0]
+    assert "ddr-1" in logger.warnings[0]
+    assert "date-1" in logger.warnings[0]

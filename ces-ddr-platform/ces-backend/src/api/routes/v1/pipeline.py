@@ -10,7 +10,7 @@ router = APIRouter(prefix="/pipeline", tags=["Pipeline"])
 
 @router.get("/cost")
 async def get_pipeline_cost(
-    current_user = Depends(jwt_authentication),
+    _ = Depends(jwt_authentication),
     pipeline_run_repository: PipelineRunCRUDRepository = Depends(get_repository(PipelineRunCRUDRepository)),
 ) -> dict[str, float | int | str]:
     service = ExtractionCostService(pipeline_run_repository=pipeline_run_repository)

@@ -20,6 +20,7 @@
     - Everything must be encapsulated in classes/services (Or in constant file / Env var)
     - Avoid global state and standalone utility clutter
 - When ever want to run any file or test, activate the UV virtualenv: `source .venv/bin/activate`
+- Check deeply (atlest 10 times) before writing anything if already existing code can be reused please do that.
 - I never want to see any file comments
 - ❗ **Async correctness** - always wrap sync SDK calls (boto3, Twilio, Qdrant, etc.) in `asyncio.to_thread()`; never block the async event loop
 - All date time should be in epoch time

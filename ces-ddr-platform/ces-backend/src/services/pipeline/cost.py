@@ -2,13 +2,11 @@ from decimal import ROUND_HALF_UP, Decimal
 from typing import Any
 
 from src.config.manager import settings
+from src.constants.cost import COST_QUANTUM, TOKEN_UNIT
 from src.repository.crud.ddr import PipelineRunCRUDRepository
 
 
 class ExtractionCostService:
-    cost_quantum = Decimal("0.000001")
-    token_unit = Decimal("1000000")
-
     def __init__(
         self,
         pipeline_run_repository: PipelineRunCRUDRepository | None = None,
@@ -24,9 +22,9 @@ class ExtractionCostService:
         )
 
     def calculate_cost(self, input_tokens: int | None, output_tokens: int | None) -> Decimal:
-        input_cost = (Decimal(input_tokens or 0) / self.token_unit) * self.input_cost_per_1m_tokens
-        output_cost = (Decimal(output_tokens or 0) / self.token_unit) * self.output_cost_per_1m_tokens
-        return (input_cost + output_cost).quantize(self.cost_quantum, rounding=ROUND_HALF_UP)
+        input_cost = (Decimal(input_tokens or 0) / TOKEN_UNIT) * self.input_cost_per_1m_tokens
+        output_cost = (Decimal(output_tokens or 0) / TOKEN_UNIT) * self.output_cost_per_1m_tokens
+        return (input_cost + output_cost).quantize(COST_QUANTUM, rounding=ROUND_HALF_UP)
 
     async def record_extraction_run(
         self,

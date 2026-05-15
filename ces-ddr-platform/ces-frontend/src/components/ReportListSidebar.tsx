@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { ChevronLeft as ChevronIcon, Plus as PlusIcon } from "lucide-react";
 import { Link, useLocation } from "react-router";
 
 import { useUploadModal } from "@/components/UploadModalContext";
@@ -20,22 +21,6 @@ function StatusDot({ status, pulse = false }: { status: string; pulse?: boolean 
       {pulse && <span className={cn("absolute inset-0 rounded-full opacity-30 animate-pulse", color)} />}
       <span className={cn("relative inline-block h-2 w-2 rounded-full", color)} />
     </span>
-  );
-}
-
-function PlusIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d="M12 5v14M5 12h14" />
-    </svg>
-  );
-}
-
-function ChevronIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <polyline points="15 18 9 12 15 6" />
-    </svg>
   );
 }
 

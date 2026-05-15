@@ -20,18 +20,6 @@ class PipelineCostAggregate:
 class DDRCRUDRepository(BaseCRUDRepository[DDR]):
     model = DDR
 
-    async def create_ddr(self, file_path: str, well_name: str | None = None, status: str = DDRStatus.QUEUED) -> DDR:
-        now = int(time.time())
-        return await self.create(
-            {
-                "file_path": file_path,
-                "well_name": well_name,
-                "status": DDRStatus.validate(status),
-                "created_at": now,
-                "updated_at": now,
-            }
-        )
-
     async def read_ddr_by_id(self, ddr_id: str) -> DDR:
         ddr = await self.read_by_id(ddr_id)
         if ddr is None:
@@ -171,21 +159,6 @@ class DDRDateCRUDRepository(BaseCRUDRepository[DDRDate]):
         else:
             await self.async_session.flush()
         return [*existing_rows, *records]
-
-    async def update_source_page_numbers(
-        self,
-        ddr_date: DDRDate,
-        source_page_numbers: list[int] | None,
-        commit: bool = True,
-    ) -> DDRDate:
-        return await self.update(
-            ddr_date,
-            {
-                "source_page_numbers": source_page_numbers,
-                "updated_at": int(time.time()),
-            },
-            commit=commit,
-        )
 
     async def bulk_update_source_page_numbers(
         self,
@@ -340,9 +313,6 @@ class ProcessingQueueCRUDRepository(BaseCRUDRepository[ProcessingQueue]):
     model = ProcessingQueue
     queue_position_lock_id = 202605070022
 
-    async def create_queue_entry(self, ddr_id: str, position: int) -> ProcessingQueue:
-        return await self.create({"ddr_id": ddr_id, "position": position, "created_at": int(time.time())})
-
     async def next_position(self) -> int:
         await self.async_session.execute(
             sqlalchemy.text("SELECT pg_advisory_xact_lock(:lock_id)"),
@@ -351,19 +321,6 @@ class ProcessingQueueCRUDRepository(BaseCRUDRepository[ProcessingQueue]):
         stmt = sqlalchemy.select(sqlalchemy.func.coalesce(sqlalchemy.func.max(ProcessingQueue.position), 0) + 1)
         query = await self.async_session.execute(statement=stmt)
         return int(query.scalar_one())
-
-    async def read_queue_by_ddr_id(self, ddr_id: str) -> ProcessingQueue | None:
-        stmt = sqlalchemy.select(ProcessingQueue).where(ProcessingQueue.ddr_id == ddr_id)
-        query = await self.async_session.execute(statement=stmt)
-        return query.scalar_one_or_none()
-
-    async def read_all_ordered(self) -> typing.Sequence[ProcessingQueue]:
-        stmt = sqlalchemy.select(ProcessingQueue).order_by(
-            ProcessingQueue.position.asc(),
-            ProcessingQueue.created_at.asc(),
-        )
-        query = await self.async_session.execute(statement=stmt)
-        return query.scalars().all()
 
     async def read_active_ordered(self) -> typing.Sequence[ProcessingQueue]:
         stmt = (

@@ -7,6 +7,7 @@ from typing import IO, Union
 import pdfplumber
 import pypdf
 
+from src.constants.pipeline import DATE_SERIAL_PATTERN, RAW_TEXT_PREVIEW_CHARS, TRUNCATED_DATE_SERIAL_PATTERN
 from src.utilities.logging.logger import logger
 
 PDFSource = Union[str, bytes, IO[bytes]]
@@ -31,10 +32,6 @@ class PreSplitResult:
 
 
 class PDFPreSplitter:
-    serial_pattern = re.compile(r"\b[A-Z0-9]{2,10}_(\d{8})_\d[A-Z]\b")
-    truncated_serial_date_pattern = re.compile(r"(?<!\d)(0[2-9]\d{5})_\d[A-Z]\b")
-    raw_preview_chars = 500
-
     def split(self, source: PDFSource) -> PreSplitResult:
         source = self._normalize_source(source)
         page_texts, warnings = self._extract_page_texts(source)
@@ -103,9 +100,9 @@ class PDFPreSplitter:
 
     def _extract_dates(self, text: str) -> list[str]:
         matches: list[tuple[int, str]] = []
-        for match in self.serial_pattern.finditer(text):
+        for match in re.finditer(DATE_SERIAL_PATTERN, text):
             matches.append((match.start(), match.group(1)))
-        for match in self.truncated_serial_date_pattern.finditer(text):
+        for match in re.finditer(TRUNCATED_DATE_SERIAL_PATTERN, text):
             matches.append((match.start(), f"2{match.group(1)}"))
         return [date for _, date in sorted(matches)]
 
@@ -128,7 +125,7 @@ class PDFPreSplitter:
 
     def _build_preview(self, page_texts: list[str]) -> str:
         combined = "\n".join(text for text in page_texts if text)
-        return combined[: self.raw_preview_chars]
+        return combined[:RAW_TEXT_PREVIEW_CHARS]
 
     def _normalize_source(self, source: PDFSource) -> PDFSource:
         if isinstance(source, (str, bytes, bytearray)):

@@ -8,11 +8,11 @@ from fastapi import UploadFile
 from fastapi.routing import APIRoute
 from fastapi.testclient import TestClient
 
-from src.config.manager import settings
 from src.config.settings.base import BackendBaseSettings
 from src.main import backend_app
 from src.securities.authorizations.jwt_authentication import jwt_authentication
 from src.services.ddr import DDRUploadService, DDRUploadValidationError
+from src.services.processing_status import ProcessingStatusStreamService
 
 
 class StubQueuedDDRRepository:
@@ -165,7 +165,11 @@ def test_upload_service_saves_pdf_and_creates_queue_row(tmp_path) -> None:
 def test_upload_service_removes_partial_file_when_write_fails(tmp_path, monkeypatch) -> None:
     async def run() -> None:
         storage_service = FakeStorageService(tmp_path)
-        service = DDRUploadService(StubQueuedDDRRepository(), StubProcessingQueueRepository(), storage_service=storage_service)
+        service = DDRUploadService(
+            StubQueuedDDRRepository(),
+            StubProcessingQueueRepository(),
+            storage_service=storage_service,
+        )
 
         async def failing_upload(*_, **__):
             raise RuntimeError("write failed")
@@ -187,7 +191,11 @@ def test_upload_service_removes_partial_file_when_write_fails(tmp_path, monkeypa
 def test_upload_service_removes_file_when_db_insert_fails(tmp_path, monkeypatch) -> None:
     async def run() -> None:
         storage_service = FakeStorageService(tmp_path)
-        service = DDRUploadService(FailingDDRRepository(), StubProcessingQueueRepository(), storage_service=storage_service)
+        service = DDRUploadService(
+            FailingDDRRepository(),
+            StubProcessingQueueRepository(),
+            storage_service=storage_service,
+        )
 
         async def failing_upload(*_, **__):
             raise RuntimeError("db failed")
@@ -234,6 +242,7 @@ def test_upload_route_accepts_pdf_and_returns_queued(tmp_path, monkeypatch) -> N
     ] = StubProcessingQueueRepository
 
     monkeypatch.setattr("src.api.routes.v1.ddr.StorageService", lambda: storage_service)
+    backend_app.state.processing_status_stream_service = ProcessingStatusStreamService()
 
     try:
         response = TestClient(backend_app).post(
@@ -242,6 +251,7 @@ def test_upload_route_accepts_pdf_and_returns_queued(tmp_path, monkeypatch) -> N
         )
     finally:
         backend_app.dependency_overrides.clear()
+        delattr(backend_app.state, "processing_status_stream_service")
 
     assert response.status_code == 201
     body = response.json()
@@ -252,12 +262,12 @@ def test_upload_route_accepts_pdf_and_returns_queued(tmp_path, monkeypatch) -> N
 
 def test_upload_route_rejects_non_pdf_without_file_write(tmp_path, monkeypatch) -> None:
     repository = StubQueuedDDRRepository()
-    storage_service = FakeStorageService(tmp_path)
     backend_app.dependency_overrides[jwt_authentication] = override_auth
     backend_app.dependency_overrides[ddr_dependency("/api/ddrs/upload", "ddr_repository")] = lambda: repository
     backend_app.dependency_overrides[
         ddr_dependency("/api/ddrs/upload", "processing_queue_repository")
     ] = StubProcessingQueueRepository
+    backend_app.state.processing_status_stream_service = ProcessingStatusStreamService()
 
     try:
         response = TestClient(backend_app).post(
@@ -266,6 +276,7 @@ def test_upload_route_rejects_non_pdf_without_file_write(tmp_path, monkeypatch) 
         )
     finally:
         backend_app.dependency_overrides.clear()
+        delattr(backend_app.state, "processing_status_stream_service")
 
     assert response.status_code == 400
     body = response.json()
