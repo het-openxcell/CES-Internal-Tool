@@ -10,6 +10,7 @@ from sqlalchemy.sql.expression import text
 from src.repository.table import Base
 
 if TYPE_CHECKING:
+    from src.models.db.correction import Correction
     from src.models.db.ddr import DDR, DDRDate
 
 
@@ -43,3 +44,4 @@ class Occurrence(Base):
 
     ddr: Mapped[DDR] = relationship(back_populates="occurrences")
     ddr_date: Mapped[DDRDate] = relationship(back_populates="occurrences")
+    corrections: Mapped[list["Correction"]] = relationship(back_populates="occurrence")

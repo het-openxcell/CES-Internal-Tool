@@ -6,6 +6,7 @@ from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 if TYPE_CHECKING:
+    from src.models.db.correction import Correction
     from src.models.db.occurrence import Occurrence
     from src.models.db.user import User
 
@@ -42,6 +43,7 @@ class DDR(Base):
     dates: Mapped[list["DDRDate"]] = relationship(back_populates="ddr")
     queue_entries: Mapped[list["ProcessingQueue"]] = relationship(back_populates="ddr")
     occurrences: Mapped[list["Occurrence"]] = relationship(back_populates="ddr")
+    corrections: Mapped[list["Correction"]] = relationship(back_populates="ddr")
     uploaded_by: Mapped["User | None"] = relationship("User", lazy="selectin")
 
     @property
