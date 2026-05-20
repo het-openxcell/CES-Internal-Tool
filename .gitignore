@@ -21,7 +21,7 @@ __pycache__/
 .rollup.cache
 tsconfig.tsbuildinfo
 
-# Celery (Python's asynchronous task queues framework)
+# Celery (Python's asynchronous task queues framework).
 celerybeat-schedule
 
 # Code editor (IntelliJ & VSCode)
