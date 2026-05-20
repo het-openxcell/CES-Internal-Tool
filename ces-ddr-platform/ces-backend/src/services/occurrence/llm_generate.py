@@ -16,6 +16,7 @@ from src.constants.occurrence import (
 )
 from src.constants.prompts import LLMPrompts
 from src.models.schemas.ddr import DDRDateStatus
+from src.services.keywords.loader import KeywordLoader
 from src.services.langsmith_tracing import LangSmithTracingService
 from src.services.occurrence.classify import OccurrenceClassifier
 from src.services.occurrence.dedup import OccurrenceDeduplicator
@@ -136,12 +137,29 @@ class LLMOccurrenceGenerationService:
             lines.append(f"{date} | {occurrence_type} | {mmd} | {notes}".strip())
         return "\n".join(lines)
 
+    def _format_keyword_hints(self) -> str:
+        keywords = KeywordLoader.get_keywords()
+        if not keywords:
+            return ""
+        grouped: dict[str, list[str]] = {}
+        for phrase, occ_type in keywords.items():
+            if occ_type not in VALID_OCCURRENCE_TYPES:
+                continue
+            grouped.setdefault(occ_type, []).append(phrase)
+        lines = []
+        for occ_type in sorted(grouped):
+            phrases = sorted(set(grouped[occ_type]))
+            lines.append(f"{occ_type}: {', '.join(phrases)}")
+        return "\n".join(lines)
+
     def _build_prompt(self, time_logs_text: str, previous_occurrences_text: str = "") -> str:
         valid_types_str = ", ".join(sorted(VALID_OCCURRENCE_TYPES))
+        keyword_hints_text = self._format_keyword_hints()
         return LLMPrompts.occurrence_generation(
             time_logs_text=time_logs_text,
             valid_types=valid_types_str,
             previous_occurrences_text=previous_occurrences_text,
+            keyword_hints_text=keyword_hints_text,
         )
 
     @LangSmithTracingService.trace(
