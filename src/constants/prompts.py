@@ -28,14 +28,8 @@ class LLMPrompts:
     def occurrence_generation(
         time_logs_text: str,
         valid_types: str,
-        previous_occurrences_text: str = "",
         keyword_hints_text: str = "",
     ) -> str:
-        previous_context = (
-            f"\n\nPREVIOUS OCCURRENCES:\n{previous_occurrences_text}"
-            if previous_occurrences_text
-            else "\n\nPREVIOUS OCCURRENCES:\nNone"
-        )
         keyword_context = (
             "\n\nKEYWORD HINTS — phrases grouped by occurrence type. Use ONLY to decide the 'type' field "
             "AFTER you have already identified a real drilling event in the time logs. Rules:\n"
@@ -49,13 +43,12 @@ class LLMPrompts:
             else ""
         )
         return (
-            "You are a drilling engineering expert. From all current time logs below, generate the occurrence table "
-            "from scratch. Validate previous occurrences against current time logs and remove anything not supported. "
-            "Identify drilling events or problems. Use ONLY the valid types listed.\n\n"
+            "You are a drilling engineering expert. From the current time logs below, generate the occurrence table "
+            "from scratch. Identify drilling events or problems supported by the time logs. "
+            "Use ONLY the valid types listed.\n\n"
             f"VALID TYPES: {valid_types}"
             f"{keyword_context}\n\n"
             f"CURRENT TIME LOGS:\n{time_logs_text}"
-            f"{previous_context}"
             "\n\nReturn one final JSON object with key 'occurrences'. "
             "Do not return actions or explanations. "
             "Each occurrence must have: date (YYYYMMDD string), type (from valid types), "
