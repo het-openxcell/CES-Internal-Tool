@@ -54,20 +54,28 @@ class PDFPreSplitter:
             raw_text_preview=raw_preview,
         )
 
-    async def split_async(self, source: PDFSource) -> PreSplitResult:
-        return await asyncio.to_thread(self.split, source)
+    async def split_async(self, source: PDFSource, timeout: float = 120.0) -> PreSplitResult:
+        try:
+            return await asyncio.wait_for(asyncio.to_thread(self.split, source), timeout=timeout)
+        except asyncio.TimeoutError:
+            logger.error(f"PDFPreSplitter.split_async timed out after {timeout}s — PDF may have complex/corrupted pages")
+            raise
 
     def _extract_page_texts(self, source: PDFSource) -> tuple[list[str], list[PreSplitWarning]]:
         page_texts: list[str] = []
         warnings: list[PreSplitWarning] = []
         with pdfplumber.open(self._as_pdfplumber_input(source)) as pdf:
+            total_pages = len(pdf.pages)
+            logger.info(f"PDFPreSplitter: opened PDF, {total_pages} pages")
             for index, page in enumerate(pdf.pages):
+                page_number = index + 1
+                logger.debug(f"PDFPreSplitter: extracting text from page {page_number}/{total_pages}")
                 text = page.extract_text() or ""
                 if not text.strip():
-                    page_number = index + 1
                     warnings.append(PreSplitWarning(page_number=page_number, reason="empty_text_layer"))
-                    logger.warning(f"PDF page {page_number} has no extractable text layer")
+                    logger.warning(f"PDFPreSplitter: page {page_number} has no extractable text layer")
                 page_texts.append(text)
+            logger.info(f"PDFPreSplitter: text extraction complete, {total_pages} pages processed")
         return page_texts, warnings
 
     def _assign_page_dates(self, page_texts: list[str]) -> dict[int, list[str]]:
