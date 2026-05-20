@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { FileText, History, LogOut, Monitor, Search, Settings, Upload } from "lucide-react";
+import { FileText, History, Key, LogOut, Monitor, Search, Upload } from "lucide-react";
 import { Link, useLocation, useNavigate } from "react-router";
 
 import { useUploadModal } from "@/components/UploadModalContext";
@@ -10,6 +10,7 @@ const TABS = [
   { key: "query", label: "Query", path: "/query", Icon: Search },
   { key: "history", label: "History", path: "/history", Icon: History },
   { key: "monitor", label: "Monitor", path: "/monitor", Icon: Monitor },
+  { key: "keywords", label: "Keywords", path: "/settings/keywords", Icon: Key },
 ];
 
 export default function TopNav({ onLogout, username }: { onLogout: () => void; username?: string | null }) {
@@ -110,16 +111,6 @@ export default function TopNav({ onLogout, username }: { onLogout: () => void; u
               className="absolute right-0 top-full mt-1 w-48 bg-white rounded-lg border border-border-default shadow-[0_8px_24px_-8px_rgba(15,23,42,0.18),0_2px_6px_-2px_rgba(15,23,42,0.08)] py-1 z-50"
               role="menu"
             >
-              <Link
-                to="/settings/keywords"
-                onClick={() => setProfileOpen(false)}
-                className="flex items-center gap-2.5 px-3 py-2 text-[13px] text-text-secondary hover:bg-surface hover:text-text-primary transition-colors"
-                role="menuitem"
-              >
-                <Settings className="w-4 h-4" />
-                Settings
-              </Link>
-              <div className="mx-3 my-1 h-px bg-border-default" />
               <button
                 type="button"
                 onClick={() => { setProfileOpen(false); onLogout(); }}

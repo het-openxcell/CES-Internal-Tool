@@ -4,15 +4,6 @@ import { FileText, Upload, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { apiClient, type DDRUploadResponse } from "@/lib/api";
 
-const OPERATORS = [
-  "ARC Resources",
-  "Tourmaline Oil",
-  "Crescent Point",
-  "Whitecap Resources",
-  "Pembina Pipeline",
-  "Birchcliff Energy",
-];
-
 type DDRUploadModalProps = {
   open: boolean;
   onClose: () => void;
@@ -22,8 +13,8 @@ type DDRUploadModalProps = {
 export default function DDRUploadModal({ open, onClose, onUploaded }: DDRUploadModalProps) {
   const [file, setFile] = useState<File | null>(null);
   const [dragOver, setDragOver] = useState(false);
-  const [operator, setOperator] = useState("ARC Resources");
-  const [area, setArea] = useState("");
+  const [operator] = useState("ARC Resources");
+  const [area] = useState("");
   const [uploadState, setUploadState] = useState<"idle" | "uploading" | "error">("idle");
   const [uploadProgress, setUploadProgress] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -33,8 +24,6 @@ export default function DDRUploadModal({ open, onClose, onUploaded }: DDRUploadM
     if (open) {
       setFile(null);
       setDragOver(false);
-      setOperator("ARC Resources");
-      setArea("");
       setUploadState("idle");
       setUploadProgress(0);
     }
@@ -195,29 +184,6 @@ export default function DDRUploadModal({ open, onClose, onUploaded }: DDRUploadM
                 />
               </div>
 
-              <div className="mt-4 grid grid-cols-2 gap-3">
-                <div>
-                  <label className="text-[10.5px] uppercase tracking-wider font-semibold text-text-muted">Operator</label>
-                  <select
-                    className="mt-1 w-full h-9 text-[13px] rounded-md border border-border-default bg-white px-2 focus:outline-none focus:border-ces-red"
-                    value={operator}
-                    onChange={(e) => setOperator(e.target.value)}
-                  >
-                    {OPERATORS.map((o) => (
-                      <option key={o}>{o}</option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="text-[10.5px] uppercase tracking-wider font-semibold text-text-muted">Area (optional)</label>
-                  <input
-                    className="mt-1 w-full h-9 text-[13px] rounded-md border border-border-default bg-white px-2 focus:outline-none focus:border-ces-red"
-                    placeholder="e.g. Montney, Bakken"
-                    value={area}
-                    onChange={(e) => setArea(e.target.value)}
-                  />
-                </div>
-              </div>
             </>
           )}
 
