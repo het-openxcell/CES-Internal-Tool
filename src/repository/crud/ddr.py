@@ -119,6 +119,17 @@ class DDRDateCRUDRepository(BaseCRUDRepository[DDRDate]):
         query = await self.async_session.execute(statement=stmt)
         return query.scalars().all()
 
+    async def get_dates_with_timelogs(self, ddr_id: str) -> list[DDRDate]:
+        stmt = (
+            sqlalchemy.select(DDRDate)
+            .where(DDRDate.ddr_id == ddr_id)
+            .where(DDRDate.status == "success")
+            .where(DDRDate.final_json.isnot(None))
+            .order_by(DDRDate.date.asc())
+        )
+        result = await self.async_session.execute(stmt)
+        return list(result.scalars().all())
+
     async def read_date_for_update(self, ddr_id: str, date: str) -> DDRDate | None:
         stmt = (
             sqlalchemy.select(DDRDate)
