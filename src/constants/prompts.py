@@ -25,17 +25,35 @@ class LLMPrompts:
         )
 
     @staticmethod
-    def occurrence_generation(time_logs_text: str, valid_types: str, previous_occurrences_text: str = "") -> str:
+    def occurrence_generation(
+        time_logs_text: str,
+        valid_types: str,
+        previous_occurrences_text: str = "",
+        keyword_hints_text: str = "",
+    ) -> str:
         previous_context = (
             f"\n\nPREVIOUS OCCURRENCES:\n{previous_occurrences_text}"
             if previous_occurrences_text
             else "\n\nPREVIOUS OCCURRENCES:\nNone"
         )
+        keyword_context = (
+            "\n\nKEYWORD HINTS — phrases grouped by occurrence type. Use ONLY to decide the 'type' field "
+            "AFTER you have already identified a real drilling event in the time logs. Rules:\n"
+            "- Match on meaning, not exact wording (e.g. 'total losses' ≈ 'total loss of returns' → Lost Circulation).\n"
+            "- Hints are not exhaustive; a valid event may use wording not listed — still classify into the closest valid type.\n"
+            "- Presence of a hint phrase alone does NOT create an occurrence. The time log must show the actual event "
+            "(symptoms, response, depth/volume/pressure change). Do not invent occurrences from wording alone.\n"
+            "- If time-log context contradicts the hint, trust the context and pick the better type (or skip).\n"
+            f"\n{keyword_hints_text}"
+            if keyword_hints_text
+            else ""
+        )
         return (
             "You are a drilling engineering expert. From all current time logs below, generate the occurrence table "
             "from scratch. Validate previous occurrences against current time logs and remove anything not supported. "
             "Identify drilling events or problems. Use ONLY the valid types listed.\n\n"
-            f"VALID TYPES: {valid_types}\n\n"
+            f"VALID TYPES: {valid_types}"
+            f"{keyword_context}\n\n"
             f"CURRENT TIME LOGS:\n{time_logs_text}"
             f"{previous_context}"
             "\n\nReturn one final JSON object with key 'occurrences'. "
