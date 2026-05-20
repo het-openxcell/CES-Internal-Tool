@@ -120,20 +120,28 @@ class PDFPreSplitter:
         return [date for _, date in sorted(matches)]
 
     def _build_chunks(self, source: PDFSource, page_dates: dict[int, list[str]]) -> dict[str, bytes]:
+        logger.info(f"PDFPreSplitter: building chunks with pypdf for {len(page_dates)} page-date mappings")
         reader = pypdf.PdfReader(self._as_pypdf_input(source))
+        logger.info(f"PDFPreSplitter: pypdf reader opened, {len(reader.pages)} pages")
         date_to_pages: dict[str, list[int]] = {}
         for page_number, dates in page_dates.items():
             for date in dates:
                 date_to_pages.setdefault(date, []).append(page_number)
 
+        logger.info(f"PDFPreSplitter: building {len(date_to_pages)} date chunks: {sorted(date_to_pages.keys())}")
         result: dict[str, bytes] = {}
-        for date, pages in date_to_pages.items():
+        for i, (date, pages) in enumerate(date_to_pages.items()):
+            sorted_pages = sorted(set(pages))
+            logger.debug(f"PDFPreSplitter: chunk {i+1}/{len(date_to_pages)} date={date} pages={sorted_pages}")
             writer = pypdf.PdfWriter()
-            for page_number in sorted(set(pages)):
+            for page_number in sorted_pages:
                 writer.add_page(reader.pages[page_number - 1])
             buffer = BytesIO()
             writer.write(buffer)
+            chunk_size = len(buffer.getvalue())
             result[date] = buffer.getvalue()
+            logger.debug(f"PDFPreSplitter: chunk {i+1}/{len(date_to_pages)} date={date} written ({chunk_size} bytes)")
+        logger.info(f"PDFPreSplitter: all {len(result)} chunks built successfully")
         return result
 
     def _build_preview(self, page_texts: list[str]) -> str:
