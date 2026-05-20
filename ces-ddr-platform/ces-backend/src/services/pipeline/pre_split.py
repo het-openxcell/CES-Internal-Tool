@@ -54,11 +54,14 @@ class PDFPreSplitter:
             raw_text_preview=raw_preview,
         )
 
-    async def split_async(self, source: PDFSource, timeout: float = 120.0) -> PreSplitResult:
+    async def split_async(self, source: PDFSource, timeout: float | None = None) -> PreSplitResult:
+        from src.config.manager import settings
+        effective_timeout = timeout if timeout is not None else float(settings.PDF_SPLIT_TIMEOUT_SECONDS)
+        logger.info(f"PDFPreSplitter: split_async starting with timeout={effective_timeout}s")
         try:
-            return await asyncio.wait_for(asyncio.to_thread(self.split, source), timeout=timeout)
+            return await asyncio.wait_for(asyncio.to_thread(self.split, source), timeout=effective_timeout)
         except asyncio.TimeoutError:
-            logger.error(f"PDFPreSplitter.split_async timed out after {timeout}s — PDF may have complex/corrupted pages")
+            logger.error(f"PDFPreSplitter.split_async timed out after {effective_timeout}s — PDF too large/complex")
             raise
 
     def _extract_page_texts(self, source: PDFSource) -> tuple[list[str], list[PreSplitWarning]]:

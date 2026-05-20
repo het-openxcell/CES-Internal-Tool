@@ -86,6 +86,8 @@ class BackendBaseSettings(BaseSettings):
 
     KEY_HEX: str = config("KEY_HEX", cast=str, default="")
 
+    PDF_SPLIT_TIMEOUT_SECONDS: int = config("PDF_SPLIT_TIMEOUT_SECONDS", cast=int, default=60000)
+
     GEMINI_API_KEY: str = config("GEMINI_API_KEY", cast=str, default="")
     GEMINI_MODEL: str = config("GEMINI_MODEL", cast=str, default="gemini-2.5-flash-lite")
     GEMINI_EXTRACTION_MAX_CONCURRENT: int = config("GEMINI_EXTRACTION_MAX_CONCURRENT", cast=int, default=3)
