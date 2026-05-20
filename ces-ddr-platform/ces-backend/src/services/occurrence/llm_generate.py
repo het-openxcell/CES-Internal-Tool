@@ -126,17 +126,6 @@ class LLMOccurrenceGenerationService:
             blocks.append("\n".join(lines))
         return "\n\n".join(blocks)
 
-    async def _previous_occurrences_text(self, ddr_id: str) -> str:
-        previous = await self.occurrence_repository.get_by_ddr_id_filtered(ddr_id)
-        lines = []
-        for occurrence in previous:
-            date = getattr(occurrence, "date", None) or "?"
-            occurrence_type = getattr(occurrence, "type", None) or "?"
-            mmd = getattr(occurrence, "mmd", None)
-            notes = getattr(occurrence, "notes", None) or ""
-            lines.append(f"{date} | {occurrence_type} | {mmd} | {notes}".strip())
-        return "\n".join(lines)
-
     def _format_keyword_hints(self) -> str:
         keywords = KeywordLoader.get_keywords()
         if not keywords:
@@ -152,13 +141,12 @@ class LLMOccurrenceGenerationService:
             lines.append(f"{occ_type}: {', '.join(phrases)}")
         return "\n".join(lines)
 
-    def _build_prompt(self, time_logs_text: str, previous_occurrences_text: str = "") -> str:
+    def _build_prompt(self, time_logs_text: str) -> str:
         valid_types_str = ", ".join(sorted(VALID_OCCURRENCE_TYPES))
         keyword_hints_text = self._format_keyword_hints()
         return LLMPrompts.occurrence_generation(
             time_logs_text=time_logs_text,
             valid_types=valid_types_str,
-            previous_occurrences_text=previous_occurrences_text,
             keyword_hints_text=keyword_hints_text,
         )
 
@@ -187,8 +175,7 @@ class LLMOccurrenceGenerationService:
             return 0
 
         time_logs_text = self._format_time_logs(successful_rows)
-        previous_occurrences_text = await self._previous_occurrences_text(ddr_id)
-        prompt = self._build_prompt(time_logs_text, previous_occurrences_text=previous_occurrences_text)
+        prompt = self._build_prompt(time_logs_text)
         result_text: str | None = None
         last_error: Exception | None = None
         for attempt, backoff in enumerate(OCCURRENCE_BACKOFF_SECONDS):
