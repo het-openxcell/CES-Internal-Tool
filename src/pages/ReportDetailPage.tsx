@@ -25,12 +25,27 @@ export default function ReportDetailPage() {
   const [tab, setTab] = useState<"occurrences" | "failed" | "history">("occurrences");
   const [ddr, setDdr] = useState<DDRDetail | null>(null);
   const [reprocessOpen, setReprocessOpen] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
+  const [exportToast, setExportToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
   const [editHistory] = useState([
     { id: "edit-1", field: "Type", original: "Ream", corrected: "Back Ream", date: "2026-04-22", when: "2 min ago" },
     { id: "edit-2", field: "Type", original: "Washout", corrected: "Lost Circulation", date: "2026-04-23", when: "15 min ago" },
   ]);
 
   if (!id) return <Navigate to="/" replace />;
+
+  const handleExport = async () => {
+    setIsExporting(true);
+    try {
+      await apiClient.exportDDRExcel(id);
+      setExportToast({ message: "Export ready — file downloading", type: "success" });
+      setTimeout(() => setExportToast(null), 3000);
+    } catch {
+      setExportToast({ message: "Export failed — please try again", type: "error" });
+    } finally {
+      setIsExporting(false);
+    }
+  };
 
   const status = useProcessingStatus(id);
   const { data: occurrences, isLoading: occurrencesLoading, refetch: refetchOccurrences } = useOccurrences(id);
@@ -66,6 +81,23 @@ export default function ReportDetailPage() {
 
   return (
     <>
+      {exportToast && (
+        <div
+          className={`fixed bottom-6 right-6 z-50 text-white text-[13px] px-4 py-2.5 rounded-lg shadow-lg flex items-center gap-2 ${exportToast.type === "error" ? "bg-red-600" : "bg-gray-900"}`}
+        >
+          {exportToast.message}
+          {exportToast.type === "error" && (
+            <button
+              type="button"
+              onClick={() => setExportToast(null)}
+              className="ml-2 text-white/70 hover:text-white"
+              aria-label="Dismiss"
+            >
+              ×
+            </button>
+          )}
+        </div>
+      )}
       <ReportListSidebar selectedId={id} />
       <main className="flex-1 min-w-0 overflow-auto">
         <div className="px-6 py-5 max-w-[1500px] mx-auto animate-fade-in-up">
@@ -97,9 +129,23 @@ export default function ReportDetailPage() {
                 <RefreshIcon className="w-3.5 h-3.5" />
                 Reprocess
               </button>
-              <button className="inline-flex items-center gap-1.5 h-9 px-3 rounded-md text-[13px] font-semibold bg-ces-red text-white hover:bg-ces-red-dark transition-colors">
-                <DownloadIcon className="w-3.5 h-3.5" />
-                Export .xlsx
+              <button
+                type="button"
+                onClick={handleExport}
+                disabled={isExporting}
+                className="inline-flex items-center justify-center gap-1.5 h-9 min-w-[140px] px-3 rounded-md text-[13px] font-semibold bg-ces-red text-white hover:bg-ces-red-dark transition-colors disabled:opacity-70"
+              >
+                {isExporting ? (
+                  <>
+                    <RefreshIcon className="w-3.5 h-3.5 animate-spin" />
+                    Preparing export…
+                  </>
+                ) : (
+                  <>
+                    <DownloadIcon className="w-3.5 h-3.5" />
+                    Export .xlsx
+                  </>
+                )}
               </button>
             </div>
           </div>
