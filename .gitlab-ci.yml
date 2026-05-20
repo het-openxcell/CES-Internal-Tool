@@ -24,9 +24,9 @@ deploy_dev:
     url: https://$PROJECT.$DEV_BASE_DOMAIN
   variables:
     CONT_PORT: "8000"
-    CPU_REQUEST: 200m
+    CPU_REQUEST: 700m
     MEMORY_REQUEST: 1700Mi
-    CPU_LIMIT: 400m
+    CPU_LIMIT: 800m
     MEMORY_LIMIT: 2Gi
   only:
     - development
