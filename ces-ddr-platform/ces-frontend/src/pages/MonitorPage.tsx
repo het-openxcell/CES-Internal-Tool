@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { Plus as PlusIcon, RefreshCw as RefreshCwIcon, X as XIcon } from "lucide-react";
+import { RefreshCw as RefreshCwIcon } from "lucide-react";
 import { Link } from "react-router";
 
 import { TypeBadge } from "@/components/TypeBadge";
@@ -327,149 +327,6 @@ function CorrectionStore({
   );
 }
 
-// ─── KeywordRules ─────────────────────────────────────────────────────────────
-
-type KeywordRuleGroup = {
-  type: string;
-  patterns: string[];
-};
-
-function groupKeywords(raw: Record<string, string>): KeywordRuleGroup[] {
-  const map = new Map<string, string[]>();
-  for (const [pattern, type] of Object.entries(raw)) {
-    if (!map.has(type)) map.set(type, []);
-    map.get(type)!.push(pattern);
-  }
-  return Array.from(map.entries()).map(([type, patterns]) => ({ type, patterns }));
-}
-
-function flattenRules(groups: KeywordRuleGroup[]): Record<string, string> {
-  const out: Record<string, string> = {};
-  for (const g of groups) {
-    for (const p of g.patterns) {
-      if (p.trim()) out[p.trim()] = g.type;
-    }
-  }
-  return out;
-}
-
-function KeywordRules({ loading }: { loading: boolean }) {
-  const [rawKeywords, setRawKeywords] = useState<Record<string, string>>({});
-  const [groups, setGroups] = useState<KeywordRuleGroup[]>([]);
-  const [saving, setSaving] = useState<string | null>(null);
-  const [toast, setToast] = useState<string | null>(null);
-  const [newPatternInput, setNewPatternInput] = useState<Record<number, string>>({});
-
-  useEffect(() => {
-    apiClient.getKeywords().then((kw) => {
-      setRawKeywords(kw);
-      setGroups(groupKeywords(kw));
-    });
-  }, []);
-
-  const showToast = (msg: string) => {
-    setToast(msg);
-    setTimeout(() => setToast(null), 3000);
-  };
-
-  const removePattern = (groupIdx: number, patternIdx: number) => {
-    setGroups((prev) => {
-      const next = prev.map((g, i) =>
-        i === groupIdx ? { ...g, patterns: g.patterns.filter((_, j) => j !== patternIdx) } : g,
-      );
-      return next;
-    });
-  };
-
-  const addPattern = (groupIdx: number) => {
-    const val = (newPatternInput[groupIdx] ?? "").trim();
-    if (!val) return;
-    setGroups((prev) =>
-      prev.map((g, i) => (i === groupIdx ? { ...g, patterns: [...g.patterns, val] } : g)),
-    );
-    setNewPatternInput((prev) => ({ ...prev, [groupIdx]: "" }));
-  };
-
-  const saveGroup = async (groupIdx: number) => {
-    setSaving(groups[groupIdx].type);
-    try {
-      const flat = flattenRules(groups);
-      await apiClient.updateKeywords(flat);
-      showToast(`Keyword rules updated — ${groups[groupIdx].type}`);
-    } catch {
-      showToast("Save failed");
-    } finally {
-      setSaving(null);
-    }
-  };
-
-  if (loading) return <LoadingTable cols={1} />;
-
-  return (
-    <div className="space-y-3 relative">
-      {toast && (
-        <div className="fixed bottom-6 right-6 z-50 bg-gray-900 text-white text-[13px] px-4 py-2.5 rounded-lg shadow-lg">
-          {toast}
-        </div>
-      )}
-      <p className="text-[14px] text-gray-500">
-        Keyword rules supplement the LLM extractor. Updates apply to next extraction immediately — no deploy required.
-      </p>
-      {groups.length === 0 && (
-        <div className="text-[14px] text-gray-400 py-5 text-center border border-gray-200 rounded-lg bg-white">
-          No keyword rules loaded
-        </div>
-      )}
-      {groups.map((rule, gi) => (
-        <div key={rule.type} className="border border-gray-200 rounded-lg px-3 py-2.5 bg-white">
-          <div className="flex items-center gap-2 mb-2.5">
-            <TypeBadge type={rule.type} />
-            <span className="text-[13px] text-gray-500">{rule.patterns.length} patterns</span>
-            <button
-              onClick={() => saveGroup(gi)}
-              disabled={saving === rule.type}
-              className="ml-auto text-[13.5px] text-[var(--ces-red,#C41E3A)] hover:underline disabled:opacity-50"
-            >
-              {saving === rule.type ? "Saving…" : "Save changes"}
-            </button>
-          </div>
-          <div className="flex flex-wrap gap-1.5">
-            {rule.patterns.map((p, pi) => (
-              <span
-                key={pi}
-                className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded font-mono text-[13px] bg-gray-50 border border-gray-200"
-              >
-                {p}
-                <button
-                  onClick={() => removePattern(gi, pi)}
-                  className="text-gray-400 hover:text-red-500 ml-0.5"
-                >
-                  <XIcon size={10} />
-                </button>
-              </span>
-            ))}
-            <div className="inline-flex items-center gap-1">
-              <input
-                value={newPatternInput[gi] ?? ""}
-                onChange={(e) => setNewPatternInput((prev) => ({ ...prev, [gi]: e.target.value }))}
-                onKeyDown={(e) => e.key === "Enter" && addPattern(gi)}
-                placeholder="add pattern…"
-                className="h-7 px-2 text-[13px] font-mono border border-dashed border-gray-300 rounded focus:outline-none focus:border-gray-400 w-36"
-              />
-              <button
-                onClick={() => addPattern(gi)}
-                className="h-6 w-6 flex items-center justify-center rounded border border-dashed border-gray-300 text-gray-400 hover:text-gray-700 hover:border-gray-400"
-              >
-                <PlusIcon size={10} />
-              </button>
-            </div>
-          </div>
-        </div>
-      ))}
-    </div>
-  );
-}
-
 // ─── LoadingTable skeleton ────────────────────────────────────────────────────
 
 function LoadingTable({ cols }: { cols: number }) {
@@ -488,7 +345,7 @@ function LoadingTable({ cols }: { cols: number }) {
 
 // ─── Tab bar ──────────────────────────────────────────────────────────────────
 
-type Tab = "pipeline" | "corrections" | "keywords";
+type Tab = "pipeline" | "corrections";
 
 // ─── MonitorPage ──────────────────────────────────────────────────────────────
 
@@ -539,7 +396,6 @@ export default function MonitorPage() {
   const tabs: { k: Tab; l: string; n: number | null }[] = [
     { k: "pipeline", l: "Processing queue", n: activeCount },
     { k: "corrections", l: "Correction store", n: corrections.length },
-    { k: "keywords", l: "Keyword rules", n: null },
   ];
 
   return (
@@ -551,7 +407,7 @@ export default function MonitorPage() {
             <div className="text-[12px] uppercase tracking-wider font-semibold text-gray-500">Platform admin</div>
             <h1 className="text-[24px] font-bold tracking-tight text-gray-900">Pipeline monitor</h1>
             <p className="text-[14px] text-gray-500 mt-1">
-              Extraction pipeline health · correction store · keyword rules.
+              Extraction pipeline health · correction store.
             </p>
           </div>
           <div className="flex items-center gap-2">
@@ -673,7 +529,6 @@ export default function MonitorPage() {
             onFieldFilter={handleFieldFilter}
           />
         )}
-        {tab === "keywords" && <KeywordRules loading={false} />}
       </div>
     </main>
   );
