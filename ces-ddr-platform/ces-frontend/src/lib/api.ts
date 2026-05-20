@@ -133,6 +133,14 @@ export type QueueItem = {
   updated_at: number;
 };
 
+export type MasterExportFilters = {
+  types?: string[];
+  sections?: string[];
+  ddr_id?: string;
+  date_from?: string;
+  date_to?: string;
+};
+
 type ApiErrorCode = "UNAUTHORIZED" | "API_ERROR";
 
 export class ApiError extends Error {
@@ -293,6 +301,52 @@ class ApiClient {
       method: "PUT",
       body: JSON.stringify(keywords),
     });
+  }
+
+  async downloadFile(path: string, filename: string): Promise<void> {
+    const response = await fetch(this.url(path), {
+      headers: this.headers({ skipAuth: false }),
+    });
+
+    if (response.status === 401) {
+      authToken.clear();
+      this.redirectToLogin();
+      throw new ApiError("Unauthorized", "UNAUTHORIZED", response.status);
+    }
+
+    if (!response.ok) {
+      throw new ApiError("Export failed", "API_ERROR", response.status);
+    }
+
+    const blob = await response.blob();
+    const objectUrl = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = objectUrl;
+    anchor.download = filename;
+    document.body.appendChild(anchor);
+    anchor.click();
+    document.body.removeChild(anchor);
+    URL.revokeObjectURL(objectUrl);
+  }
+
+  async exportDDRExcel(ddrId: string): Promise<void> {
+    await this.downloadFile(
+      `/export/ddr/${encodeURIComponent(ddrId)}`,
+      `${ddrId}_occurrences.xlsx`,
+    );
+  }
+
+  async exportMasterExcel(filters?: MasterExportFilters): Promise<void> {
+    const params = new URLSearchParams();
+    filters?.types?.forEach((t) => params.append("type", t));
+    filters?.sections?.forEach((s) => params.append("section", s));
+    if (filters?.ddr_id) params.set("ddr_id", filters.ddr_id);
+    if (filters?.date_from) params.set("date_from", filters.date_from);
+    if (filters?.date_to) params.set("date_to", filters.date_to);
+    const query = params.toString() ? `?${params.toString()}` : "";
+    const hasFilters = params.toString().length > 0;
+    const filename = hasFilters ? "occurrences_filtered.xlsx" : "occurrences_all.xlsx";
+    await this.downloadFile(`/export/master${query}`, filename);
   }
 
   async request<TResponse>(path: string, options: RequestInit & { skipAuth?: boolean } = {}) {

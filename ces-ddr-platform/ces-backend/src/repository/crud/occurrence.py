@@ -73,6 +73,46 @@ class OccurrenceCRUDRepository(BaseCRUDRepository[Occurrence]):
         result = await self.async_session.execute(stmt)
         return list(result.scalars().all())
 
+    async def get_all_with_ddr_source(
+        self,
+        type_filter: str | None = None,
+        ddr_id: str | None = None,
+        date_from: str | None = None,
+        date_to: str | None = None,
+        limit: int = 50000,
+    ) -> list[dict]:
+        stmt = (
+            sqlalchemy.select(
+                Occurrence,
+                DDR.file_path.label("ddr_file_path"),
+            )
+            .join(DDR, DDR.id == Occurrence.ddr_id)
+            .order_by(Occurrence.date.desc().nullslast(), Occurrence.ddr_id)
+            .limit(limit)
+        )
+        if type_filter is not None:
+            stmt = stmt.where(Occurrence.type == type_filter)
+        if ddr_id is not None:
+            stmt = stmt.where(Occurrence.ddr_id == ddr_id)
+        if date_from is not None:
+            stmt = stmt.where(Occurrence.date >= date_from)
+        if date_to is not None:
+            stmt = stmt.where(Occurrence.date <= date_to)
+        result = await self.async_session.execute(stmt)
+        rows = []
+        for occ, file_path in result.tuples().all():
+            rows.append({
+                "well_name": occ.well_name,
+                "surface_location": occ.surface_location,
+                "type": occ.type,
+                "section": occ.section,
+                "mmd": occ.mmd,
+                "density": occ.density,
+                "notes": occ.notes,
+                "ddr_source": file_path.split("/")[-1] if file_path else "",
+            })
+        return rows
+
     async def search_history(
         self,
         type_filters: list[str] | None = None,

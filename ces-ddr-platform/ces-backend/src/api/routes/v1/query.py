@@ -1,9 +1,9 @@
 from fastapi import APIRouter, Depends, HTTPException
-from src.utilities.logging.logger import logger
 
 from src.models.schemas.query import NLQueryRequest, NLQueryResponse, TimeLogSource
 from src.securities.authorizations.jwt_authentication import jwt_authentication
 from src.services.query import NaturalLanguageQueryService
+from src.utilities.logging.logger import logger
 
 router = APIRouter(prefix="/query", tags=["Query"])
 

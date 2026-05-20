@@ -1,5 +1,5 @@
 # generated: 2026-05-06
-# last_updated: 2026-05-18 — story 4-1 done
+# last_updated: 2026-05-18 — stories 5-1 through 5-4 done
 # project: Canadian Energy Service Internal Tool
 # project_key: NOKEY
 # tracking_system: file-system
@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-05-06
-last_updated: 2026-05-12
+last_updated: 2026-05-18
 project: Canadian Energy Service Internal Tool
 project_key: NOKEY
 tracking_system: file-system
@@ -92,11 +92,11 @@ development_status:
   epic-4-retrospective: optional
 
   # ── Epic 5: Data Export ──
-  epic-5: backlog
-  5-1-per-ddr-excel-export-backend: backlog
-  5-2-master-excel-export-backend: backlog
-  5-3-time-log-csv-export-backend: backlog
-  5-4-export-ui-one-click-download-flow: backlog
+  epic-5: in-progress
+  5-1-per-ddr-excel-export-backend: review
+  5-2-master-excel-export-backend: review
+  5-3-time-log-csv-export-backend: review
+  5-4-export-ui-one-click-download-flow: review
   epic-5-retrospective: optional
 
   # ── Epic 6: Query & Well History ──

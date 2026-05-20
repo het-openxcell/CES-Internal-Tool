@@ -1,7 +1,7 @@
 import { type ReactNode, useEffect, useState } from "react";
 import { Download as DownloadIcon, Layers as LayersIcon } from "lucide-react";
 
-import { apiClient, type HistoryOccurrenceRow } from "@/lib/api";
+import { apiClient, type HistoryOccurrenceRow, type MasterExportFilters } from "@/lib/api";
 import { SectionBadge } from "@/components/SectionBadge";
 import { TypeBadge } from "@/components/TypeBadge";
 import { cn } from "@/lib/utils";
@@ -107,9 +107,27 @@ export default function HistoryPage() {
   const [toDepth, setToDepth] = useState(6000);
   const [rows, setRows] = useState<HistoryOccurrenceRow[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isExporting, setIsExporting] = useState(false);
+  const [exportToast, setExportToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
 
   const toggle = (value: string, values: string[], setValues: (next: string[]) => void) => {
     setValues(values.includes(value) ? values.filter((item) => item !== value) : [...values, value]);
+  };
+
+  const handleExport = async () => {
+    setIsExporting(true);
+    const filters: MasterExportFilters = {};
+    if (types.length > 0) filters.types = types;
+    if (sections.length > 0) filters.sections = sections;
+    try {
+      await apiClient.exportMasterExcel(filters);
+      setExportToast({ message: "Export ready — file downloading", type: "success" });
+      setTimeout(() => setExportToast(null), 3000);
+    } catch {
+      setExportToast({ message: "Export failed — please try again", type: "error" });
+    } finally {
+      setIsExporting(false);
+    }
   };
 
   const resetFilters = () => {
@@ -141,7 +159,25 @@ export default function HistoryPage() {
   }, [types, sections, fromDepth, toDepth]);
 
   return (
-    <main id="main-content" className="flex min-h-0 flex-1 overflow-hidden bg-white">
+    <>
+      {exportToast && (
+        <div
+          className={`fixed bottom-6 right-6 z-50 text-white text-[13px] px-4 py-2.5 rounded-lg shadow-lg flex items-center gap-2 ${exportToast.type === "error" ? "bg-red-600" : "bg-gray-900"}`}
+        >
+          {exportToast.message}
+          {exportToast.type === "error" && (
+            <button
+              type="button"
+              onClick={() => setExportToast(null)}
+              className="ml-2 text-white/70 hover:text-white"
+              aria-label="Dismiss"
+            >
+              ×
+            </button>
+          )}
+        </div>
+      )}
+      <main id="main-content" className="flex min-h-0 flex-1 overflow-hidden bg-white">
       <aside className="flex w-[260px] shrink-0 flex-col border-r border-gray-200 bg-surface">
         <div className="flex h-12 items-center justify-between border-b border-gray-200 px-3">
           <span className="text-[12px] font-bold uppercase tracking-wider text-gray-700">Filters</span>
@@ -226,9 +262,25 @@ export default function HistoryPage() {
                 <LayersIcon className="h-4 w-4" />
                 Group by well
               </button>
-              <button className="inline-flex h-9 items-center gap-2 rounded-md bg-ces-red px-3.5 text-[14px] font-semibold text-white hover:bg-ces-red-dark">
-                <DownloadIcon className="h-4 w-4" />
-                Export CSV
+              <button
+                type="button"
+                onClick={handleExport}
+                disabled={isExporting}
+                className="inline-flex h-9 min-w-[140px] items-center justify-center gap-2 rounded-md bg-ces-red px-3.5 text-[14px] font-semibold text-white hover:bg-ces-red-dark disabled:opacity-70"
+              >
+                {isExporting ? (
+                  <>
+                    <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+                      <path d="M21 12a9 9 0 11-6.219-8.56" strokeLinecap="round" />
+                    </svg>
+                    Preparing export…
+                  </>
+                ) : (
+                  <>
+                    <DownloadIcon className="h-4 w-4" />
+                    Export .xlsx
+                  </>
+                )}
               </button>
             </div>
           </div>
@@ -304,5 +356,6 @@ export default function HistoryPage() {
         </div>
       </section>
     </main>
+    </>
   );
 }

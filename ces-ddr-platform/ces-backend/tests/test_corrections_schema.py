@@ -205,7 +205,7 @@ def test_max_limit_cap_applied() -> None:
     assert "_MAX_LIMIT" in source_all
     assert "_MAX_LIMIT" in source_recent
     assert "_MAX_LIMIT" in source_by_ddr
-    assert _MAX_LIMIT == 500
+    assert _MAX_LIMIT == 10000
 
 
 def test_correction_in_create_schema() -> None:

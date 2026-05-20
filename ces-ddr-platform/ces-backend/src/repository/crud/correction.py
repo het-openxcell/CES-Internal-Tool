@@ -3,7 +3,7 @@ import sqlalchemy
 from src.models.db.correction import Correction
 from src.repository.crud.base import BaseCRUDRepository
 
-_MAX_LIMIT = 500
+_MAX_LIMIT = 10000
 
 
 class CorrectionCRUDRepository(BaseCRUDRepository[Correction]):
