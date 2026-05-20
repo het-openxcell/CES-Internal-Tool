@@ -104,6 +104,11 @@ class PDFPreSplitter:
             page_dates[page_number] = assigned
             active_date = unique_on_page[-1]
 
+        total_dates = len({d for dates in page_dates.values() for d in dates})
+        logger.info(f"PDFPreSplitter: date assignment done — {len(page_dates)} pages assigned, {total_dates} unique dates")
+        if not page_dates and page_texts:
+            sample = (page_texts[0] or "")[:300].replace("\n", " ")
+            logger.warning(f"PDFPreSplitter: no dates found — page 1 text sample: {sample!r}")
         return page_dates
 
     def _extract_dates(self, text: str) -> list[str]:
