@@ -61,19 +61,23 @@ class DDRPipelineTaskBase:
 
 class DDRProcessingTask(DDRPipelineTaskBase):
     async def process(self, ddr_id: str) -> None:
+        logger.info(f"[DDR:{ddr_id}] processing task started")
         session_factory = self.session_factory()
         async with session_factory() as session:
             processing_finished = False
             try:
                 await self.pipeline_service(session).run(ddr_id)
                 processing_finished = True
+                logger.info(f"[DDR:{ddr_id}] pipeline run completed successfully")
             except Exception as exc:
+                logger.error(f"[DDR:{ddr_id}] pipeline run raised exception: {exc!r}", exc_info=True)
                 await session.rollback()
                 await self._mark_failed(session, ddr_id)
                 processing_finished = True
-                logger.error(f"DDR pre-split failed for {ddr_id}: {exc}")
+                logger.error(f"[DDR:{ddr_id}] pre-split failed, marked as failed: {exc}")
             if processing_finished:
                 await ProcessingQueueCRUDRepository(async_session=session).delete_by_ddr_id(ddr_id)
+                logger.info(f"[DDR:{ddr_id}] removed from processing queue")
 
     async def _mark_failed(self, session: Any, ddr_id: str) -> None:
         try:
@@ -267,4 +271,6 @@ class DDRUploadService:
         return b"".join(chunks)
 
     async def dispatch_background(self, ddr_id: str) -> None:
+        logger.info(f"[DDR:{ddr_id}] background processing task dispatched")
         await self.processing_task.process(ddr_id)
+        logger.info(f"[DDR:{ddr_id}] background processing task completed")

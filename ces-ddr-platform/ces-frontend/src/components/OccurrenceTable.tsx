@@ -57,6 +57,11 @@ const columns: ColumnDef<OccurrenceRow>[] = [
     cell: ({ getValue }) => (getValue() as string | null) ?? "—",
   },
   {
+    accessorKey: "surface_location",
+    header: "Surface Location",
+    cell: ({ getValue }) => (getValue() as string | null) ?? "—",
+  },
+  {
     accessorKey: "type",
     header: "Type",
     cell: ({ getValue }) => {
@@ -80,11 +85,6 @@ const columns: ColumnDef<OccurrenceRow>[] = [
     cell: ({ getValue }) => (getValue() != null ? (getValue() as number).toFixed(2) : "—"),
   },
   {
-    accessorKey: "surface_location",
-    header: "Surface Location",
-    cell: ({ getValue }) => (getValue() as string | null) ?? "—",
-  },
-  {
     accessorKey: "page_number",
     header: "Page",
     cell: ({ getValue }) => (getValue() != null ? (getValue() as number) : "—"),
@@ -96,7 +96,7 @@ const columns: ColumnDef<OccurrenceRow>[] = [
   },
 ];
 
-const VISIBLE_COLUMN_KEYS = ["date", "well_name", "type", "section", "mmd", "density", "surface_location", "page_number", "notes"];
+const VISIBLE_COLUMN_KEYS = ["date", "well_name", "surface_location", "type", "section", "mmd", "density", "page_number", "notes"];
 const COLUMN_LAYOUT: Record<string, string> = {
   date: "text-left w-[112px]",
   well_name: "text-left w-[140px]",

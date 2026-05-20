@@ -58,11 +58,16 @@ class PreSplitPipelineService:
         self._write_lock = asyncio.Lock()
 
     async def run(self, ddr_id: str) -> PreSplitResult:
+        logger.info(f"[DDR:{ddr_id}] pipeline run started")
         ddr = await self.ddr_repository.read_ddr_by_id(ddr_id)
+        logger.info(f"[DDR:{ddr_id}] loading PDF from storage")
         pdf_bytes = await self.pdf_loader(ddr_id)
+        logger.info(f"[DDR:{ddr_id}] PDF loaded ({len(pdf_bytes)} bytes), running pre-splitter")
         result = await self.pre_splitter.split_async(pdf_bytes)
+        logger.info(f"[DDR:{ddr_id}] pre-split done: has_boundaries={result.has_boundaries}, dates={sorted(result.date_chunks.keys()) if result.has_boundaries else []}")
 
         if not result.has_boundaries:
+            logger.warning(f"[DDR:{ddr_id}] no date boundaries found, marking as failed")
             failed_row = await self.ddr_date_repository.create_failed_boundary(
                 ddr_id=ddr_id,
                 date=NO_BOUNDARY_PLACEHOLDER_DATE,
@@ -78,21 +83,27 @@ class PreSplitPipelineService:
 
         ordered_dates = sorted(result.date_chunks.keys())
         date_page_numbers = self._date_page_numbers_from_split(getattr(result, "page_dates", {}))
+        logger.info(f"[DDR:{ddr_id}] creating queued date rows: {ordered_dates}")
         await self.ddr_date_repository.bulk_create_queued(ddr_id=ddr_id, dates=ordered_dates, commit=False)
         await self._persist_source_page_numbers(ddr_id, date_page_numbers, commit=False)
         await self.ddr_repository.update_status(ddr, DDRStatus.PROCESSING, commit=False)
         await self._commit_outcome()
 
+        logger.info(f"[DDR:{ddr_id}] uploading {len(result.date_chunks)} date chunks to storage")
         for date, chunk_bytes in result.date_chunks.items():
             await self.storage_service.upload_chunk(ddr_id, date, chunk_bytes)
+            logger.debug(f"[DDR:{ddr_id}] chunk uploaded for date={date} ({len(chunk_bytes)} bytes)")
 
         if self.extract_after_split:
+            logger.info(f"[DDR:{ddr_id}] starting extraction for {len(result.date_chunks)} dates")
             await self._extract_all_dates(
                 ddr_id=ddr_id,
                 ddr=ddr,
                 date_chunks=result.date_chunks,
                 date_page_numbers=date_page_numbers,
             )
+        else:
+            logger.info(f"[DDR:{ddr_id}] extract_after_split=False, skipping extraction")
         return result
 
     async def prepare_retry(self, ddr_id: str, date: str) -> DDRDate:
@@ -364,9 +375,9 @@ class PreSplitPipelineService:
         coroutines = [run_one(date, chunk) for date, chunk in date_chunks.items() if date in date_to_row]
         outcomes = await asyncio.gather(*coroutines, return_exceptions=True)
 
-        for outcome in outcomes:
+        for date, outcome in zip(date_to_row.keys(), outcomes):
             if isinstance(outcome, BaseException):
-                logger.warning(f"Date extraction task failed for DDR {ddr_id}")
+                logger.error(f"[DDR:{ddr_id}] date={date} extraction task raised exception: {outcome!r}", exc_info=outcome)
 
         all_rows = await self.ddr_date_repository.read_dates_by_ddr_id(ddr_id)
         well_name, surface_location = self._metadata_from_rows(all_rows)
@@ -466,14 +477,18 @@ class PreSplitPipelineService:
         original_page_numbers: list[int] | None = None,
         preserve_existing_payload: bool = False,
     ) -> str:
-        await self._publish_date_started(row.ddr_id, date)
+        ddr_id = row.ddr_id
+        logger.info(f"[DDR:{ddr_id}] date={date} extraction started ({len(chunk_bytes)} bytes)")
+        await self._publish_date_started(ddr_id, date)
         try:
             extraction = await extractor.extract(
                 date=date,
                 pdf_bytes=chunk_bytes,
                 original_page_numbers=original_page_numbers,
             )
+            logger.info(f"[DDR:{ddr_id}] date={date} LLM extraction succeeded (in={extraction.input_tokens} out={extraction.output_tokens} tokens)")
         except RateLimitError:
+            logger.warning(f"[DDR:{ddr_id}] date={date} rate limited by Gemini API")
             async with self._write_lock:
                 marker = (
                     self.ddr_date_repository.mark_warning_preserve
@@ -487,6 +502,7 @@ class PreSplitPipelineService:
                 await self._publish_date_complete(updated_row)
             return DDRDateStatus.WARNING
         except ExtractionError as exc:
+            logger.error(f"[DDR:{ddr_id}] date={date} extraction error: {exc.detail}")
             async with self._write_lock:
                 marker = (
                     self.ddr_date_repository.mark_failed_preserve
@@ -502,7 +518,9 @@ class PreSplitPipelineService:
 
         raw_response = {"text": extraction.text}
         try:
+            logger.debug(f"[DDR:{ddr_id}] date={date} validating extraction response")
             validation = self.validator.validate(extraction.text)
+            logger.info(f"[DDR:{ddr_id}] date={date} validation result: is_valid={validation.is_valid}" + (f" errors={validation.errors}" if not validation.is_valid else ""))
             if validation.is_valid:
                 final_json = self.page_number_normalizer.normalize(validation.final_json, original_page_numbers)
                 async with self._write_lock:
@@ -528,7 +546,9 @@ class PreSplitPipelineService:
                     )
                     await self._commit_outcome()
                     await self._publish_date_complete(snapshot)
+                logger.info(f"[DDR:{ddr_id}] date={date} saved as SUCCESS, embedding now")
                 await self.resolve_embedding_service().embed_successful_date(snapshot)
+                logger.info(f"[DDR:{ddr_id}] date={date} embedding complete")
                 return DDRDateStatus.SUCCESS
 
             async with self._write_lock:
@@ -544,6 +564,7 @@ class PreSplitPipelineService:
                 )
                 await self._publish_date_failed(updated_row)
         except Exception as exc:
+            logger.error(f"[DDR:{ddr_id}] date={date} unexpected processing error: {exc!r}", exc_info=True)
             async with self._write_lock:
                 marker = (
                     self.ddr_date_repository.mark_failed_preserve
