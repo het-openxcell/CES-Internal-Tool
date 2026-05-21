@@ -86,7 +86,7 @@ development_status:
   4-0-well-name-surface-location-extraction: done
   4-1-corrections-database-schema: done
   4-2-occurrence-edit-api-correction-store-write: done
-  4-3-correction-context-builder-pipeline-injection: ready-for-dev
+  4-3-correction-context-builder-pipeline-injection: done
   4-4-correction-store-review-api: backlog
   4-5-inline-edit-ui-reasoncapturemodal: backlog
   epic-4-retrospective: optional

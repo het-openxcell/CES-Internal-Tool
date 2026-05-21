@@ -1,6 +1,6 @@
 # Story 4.3: Correction Context Builder & Pipeline Injection
 
-Status: ready-for-dev
+Status: done
 
 ## Story
 
@@ -58,50 +58,55 @@ The "same cap / same format / same test on **both Python backend**" clauses are 
 
 ## Tasks / Subtasks
 
-- [ ] **Task 1: `CorrectionContextBuilder` service** (AC: 1, 2, 3, 5)
-  - [ ] Create `src/services/correction/__init__.py` and `src/services/correction/context_builder.py`
-  - [ ] Class `CorrectionContextBuilder` with class constant `MAX_INJECTED_CORRECTIONS = 20`
-  - [ ] `__init__(self, correction_repository: CorrectionCRUDRepository)` — store repo (no loose functions; CLAUDE.md)
-  - [ ] `async def build(self) -> str`:
-    - [ ] `corrections = await self.correction_repository.get_recent(self.MAX_INJECTED_CORRECTIONS)` (reuse existing `get_recent` — do NOT add a new repo method)
-    - [ ] Defensively slice `corrections[: self.MAX_INJECTED_CORRECTIONS]` so a repo/mocked source returning more than 20 still caps at 20
-    - [ ] If empty → `return ""`
-    - [ ] Group by key `(c.field_name, c.original_value, c.corrected_value)` preserving first-seen order (rows already `created_at` desc, so first-seen == most recent). Track `count` and `most_recent_reason` (reason of the first row seen for that key)
-    - [ ] Format each group with the EXACT template in AC 1 and join with `"\n"`; return the joined string
-  - [ ] No file comments (CLAUDE.md). Keep method small and self-documenting.
+- [x] **Task 1: `CorrectionContextBuilder` service** (AC: 1, 2, 3, 5)
+  - [x] Create `src/services/correction/__init__.py` and `src/services/correction/context_builder.py`
+  - [x] Class `CorrectionContextBuilder` with class constant `MAX_INJECTED_CORRECTIONS = 20`
+  - [x] `__init__(self, correction_repository: CorrectionCRUDRepository)` — store repo (no loose functions; CLAUDE.md)
+  - [x] `async def build(self) -> str`:
+    - [x] `corrections = await self.correction_repository.get_recent(self.MAX_INJECTED_CORRECTIONS)` (reuse existing `get_recent` — do NOT add a new repo method)
+    - [x] Defensively slice `corrections[: self.MAX_INJECTED_CORRECTIONS]` so a repo/mocked source returning more than 20 still caps at 20
+    - [x] If empty → `return ""`
+    - [x] Group by key `(c.field_name, c.original_value, c.corrected_value)` preserving first-seen order (rows already `created_at` desc, so first-seen == most recent). Track `count` and `most_recent_reason` (reason of the first row seen for that key)
+    - [x] Format each group with the EXACT template in AC 1 and join with `"\n"`; return the joined string
+  - [x] No file comments (CLAUDE.md). Keep method small and self-documenting.
 
-- [ ] **Task 2: Prepend correction context in the occurrence-generation prompt** (AC: 4, 3)
-  - [ ] In `src/constants/prompts.py`, add a `corrections_context: str = ""` parameter to `LLMPrompts.occurrence_generation(...)`
-  - [ ] When `corrections_context` is non-empty, build a leading block (mirror the `keyword_context` conditional style already in the method) e.g.:
+- [x] **Task 2: Prepend correction context in the occurrence-generation prompt** (AC: 4, 3)
+  - [x] In `src/constants/prompts.py`, add a `corrections_context: str = ""` parameter to `LLMPrompts.occurrence_generation(...)`
+  - [x] When `corrections_context` is non-empty, build a leading block (mirror the `keyword_context` conditional style already in the method) e.g.:
         `"PREVIOUSLY CORRECTED — these were fixed by a human before; do not repeat the same mistake:\n{corrections_context}\n\n"` and place it **before** the existing `"You are a drilling engineering expert..."` body (i.e. prepended to the returned prompt). When empty, prepend nothing (AC 3 byte-identical baseline).
-  - [ ] Do not alter `VALID TYPES`, `keyword_context`, or `CURRENT TIME LOGS` content.
+  - [x] Do not alter `VALID TYPES`, `keyword_context`, or `CURRENT TIME LOGS` content.
 
-- [ ] **Task 3: Thread context through `LLMOccurrenceGenerationService`** (AC: 4, 6)
-  - [ ] `src/services/occurrence/llm_generate.py`: add optional `correction_repository: Any | None = None` as the **last** `__init__` param (keep `ddr_date_repository`, `occurrence_repository` positions unchanged — existing tests construct with 2 positional args)
-  - [ ] In `generate_for_ddr`, after computing `time_logs_text` and before/at `_build_prompt`, build context: `corrections_context = await CorrectionContextBuilder(self.correction_repository).build() if self.correction_repository is not None else ""`
-  - [ ] Change `_build_prompt(self, time_logs_text)` → `_build_prompt(self, time_logs_text, corrections_context="")`; pass `corrections_context` into `LLMPrompts.occurrence_generation(...)`
-  - [ ] Import `CorrectionContextBuilder` from `src.services.correction.context_builder`
+- [x] **Task 3: Thread context through `LLMOccurrenceGenerationService`** (AC: 4, 6)
+  - [x] `src/services/occurrence/llm_generate.py`: add optional `correction_repository: Any | None = None` as the **last** `__init__` param (keep `ddr_date_repository`, `occurrence_repository` positions unchanged — existing tests construct with 2 positional args)
+  - [x] In `generate_for_ddr`, after computing `time_logs_text` and before/at `_build_prompt`, build context: `corrections_context = await CorrectionContextBuilder(self.correction_repository).build() if self.correction_repository is not None else ""`
+  - [x] Change `_build_prompt(self, time_logs_text)` → `_build_prompt(self, time_logs_text, corrections_context="")`; pass `corrections_context` into `LLMPrompts.occurrence_generation(...)`
+  - [x] Import `CorrectionContextBuilder` from `src.services.correction.context_builder`
 
-- [ ] **Task 4: Wire `correction_repository` into the pipeline service** (AC: 6)
-  - [ ] `src/services/pipeline_service.py`: add `correction_repository: Any | None = None` to `PreSplitPipelineService.__init__` (last param) and store `self.correction_repository = correction_repository`
-  - [ ] In `_generate_occurrences`, pass `correction_repository=self.correction_repository` when constructing `LLMOccurrenceGenerationService`
+- [x] **Task 4: Wire `correction_repository` into the pipeline service** (AC: 6)
+  - [x] `src/services/pipeline_service.py`: add `correction_repository: Any | None = None` to `PreSplitPipelineService.__init__` (last param) and store `self.correction_repository = correction_repository`
+  - [x] In `_generate_occurrences`, pass `correction_repository=self.correction_repository` when constructing `LLMOccurrenceGenerationService`
 
-- [ ] **Task 5: Wire at all `PreSplitPipelineService` construction sites** (AC: 6)
-  - [ ] `src/api/dependencies/services.py#get_pipeline_service`: inject `correction_repository: CorrectionCRUDRepository = Depends(get_repository(CorrectionCRUDRepository))` and pass to the constructor (import already present in this file)
-  - [ ] `src/services/ddr.py#DDRPipelineTaskBase._default_pipeline_service_factory`: add `correction_repository=CorrectionCRUDRepository(async_session=session)` (import `CorrectionCRUDRepository` is already in `ddr.py`)
-  - [ ] `src/services/ddr.py#DDRReprocessService`: add `correction_repository: Any | None = None` to `__init__`, store it, and pass `correction_repository=self.correction_repository` in `regenerate_occurrences`'s `PreSplitPipelineService(...)` construction
-  - [ ] `src/api/dependencies/services.py#get_ddr_reprocess_service`: inject `CorrectionCRUDRepository` and pass to `DDRReprocessService(...)`
+- [x] **Task 5: Wire at all `PreSplitPipelineService` construction sites** (AC: 6)
+  - [x] `src/api/dependencies/services.py#get_pipeline_service`: inject `correction_repository: CorrectionCRUDRepository = Depends(get_repository(CorrectionCRUDRepository))` and pass to the constructor (import already present in this file)
+  - [x] `src/services/ddr.py#DDRPipelineTaskBase._default_pipeline_service_factory`: add `correction_repository=CorrectionCRUDRepository(async_session=session)` (import `CorrectionCRUDRepository` is already in `ddr.py`)
+  - [x] `src/services/ddr.py#DDRReprocessService`: add `correction_repository: Any | None = None` to `__init__`, store it, and pass `correction_repository=self.correction_repository` in `regenerate_occurrences`'s `PreSplitPipelineService(...)` construction
+  - [x] `src/api/dependencies/services.py#get_ddr_reprocess_service`: inject `CorrectionCRUDRepository` and pass to `DDRReprocessService(...)`
 
-- [ ] **Task 6: Tests** (AC: 1–6)
-  - [ ] New `tests/test_correction_context_builder.py` (style: `asyncio.run`, `AsyncMock`/`MagicMock`, no `pytest-asyncio` — match `tests/test_occurrence_generation.py` / `tests/test_corrections_schema.py`)
-    - [ ] 25-fixture cap test: mock `correction_repository.get_recent` returns 25 distinct `SimpleNamespace`/`MagicMock` rows (distinct keys, descending `created_at`) → `build()` yields exactly 20 lines; the 5 oldest keys are absent (AC 5)
-    - [ ] Grouping + count + format test: 3 rows sharing `(field_name, original_value, corrected_value)` with different reasons (newest first) → single line with `(3 times)` and `Reason: {newest reason}`, exact string match (AC 1)
-    - [ ] Empty store → `build()` returns `""` (AC 3)
-    - [ ] Fewer than 20 (e.g. 4 rows, 2 groups) → 2 lines, all used (AC 2)
-    - [ ] Assert `build()` requests at most 20 from the repo (`get_recent` called with `20`) AND output capped even if mock returns >20 (defensive slice)
-  - [ ] Prompt-injection test (new file or extend `tests/test_occurrence_generation.py`): patch `genai.Client`, supply a `correction_repository` mock whose `get_recent` returns ≥1 correction → assert the captured prompt (`generate_content.call_args.kwargs["contents"][0].text`) contains the summary line and the "PREVIOUSLY CORRECTED" label, and that `VALID TYPES` / `CURRENT TIME LOGS` are still present (AC 4)
-  - [ ] No-repo regression: a `generate_for_ddr` call with `correction_repository=None` produces a prompt without the correction block (AC 3/6) — confirm existing `test_pipeline_service_generate_occurrences_runs_service` and `test_pipeline_service_generate_occurrences_returns_zero_when_no_repo` still pass unchanged
-  - [ ] Run from `ces-ddr-platform/ces-backend/`: `source .venv/bin/activate && ruff check . && pytest` — all green except the **1 known pre-existing failure** noted below; introduce no new failures
+- [x] **Task 6: Tests** (AC: 1–6)
+  - [x] New `tests/test_correction_context_builder.py` (style: `asyncio.run`, `AsyncMock`/`MagicMock`, no `pytest-asyncio` — match `tests/test_occurrence_generation.py` / `tests/test_corrections_schema.py`)
+    - [x] 25-fixture cap test: mock `correction_repository.get_recent` returns 25 distinct `SimpleNamespace`/`MagicMock` rows (distinct keys, descending `created_at`) → `build()` yields exactly 20 lines; the 5 oldest keys are absent (AC 5)
+    - [x] Grouping + count + format test: 3 rows sharing `(field_name, original_value, corrected_value)` with different reasons (newest first) → single line with `(3 times)` and `Reason: {newest reason}`, exact string match (AC 1)
+    - [x] Empty store → `build()` returns `""` (AC 3)
+    - [x] Fewer than 20 (e.g. 4 rows, 2 groups) → 2 lines, all used (AC 2)
+    - [x] Assert `build()` requests at most 20 from the repo (`get_recent` called with `20`) AND output capped even if mock returns >20 (defensive slice)
+  - [x] Prompt-injection test (new file or extend `tests/test_occurrence_generation.py`): patch `genai.Client`, supply a `correction_repository` mock whose `get_recent` returns ≥1 correction → assert the captured prompt (`generate_content.call_args.kwargs["contents"][0].text`) contains the summary line and the "PREVIOUSLY CORRECTED" label, and that `VALID TYPES` / `CURRENT TIME LOGS` are still present (AC 4)
+  - [x] No-repo regression: a `generate_for_ddr` call with `correction_repository=None` produces a prompt without the correction block (AC 3/6) — confirm existing `test_pipeline_service_generate_occurrences_runs_service` and `test_pipeline_service_generate_occurrences_returns_zero_when_no_repo` still pass unchanged
+  - [x] Run from `ces-ddr-platform/ces-backend/`: `source .venv/bin/activate && ruff check . && pytest` — all green (271 passed, 0 failed)
+
+### Review Findings
+
+- [x] [Review][Patch] Scope correction context by DDR/well before injection [ces-backend/src/services/correction/context_builder.py:11]
+- [x] [Review][Patch] Correction-context failure hard-fails occurrence generation [ces-backend/src/services/occurrence/llm_generate.py:183]
 
 ## Dev Notes
 
@@ -190,9 +195,19 @@ In the request-scoped DI (`get_pipeline_service`, `get_ddr_reprocess_service`), 
 
 ### Agent Model Used
 
+claude-sonnet-4-6
+
 ### Debug Log References
 
+None.
+
 ### Completion Notes List
+
+- Created `CorrectionContextBuilder` service in `src/services/correction/` with `MAX_INJECTED_CORRECTIONS=20` class constant, `get_recent` reuse, defensive slice, order-preserving grouping, and exact AC-1 format string.
+- Added `corrections_context: str = ""` param to `LLMPrompts.occurrence_generation`; non-empty context prepended as "PREVIOUSLY CORRECTED" block before expert body; empty → prompt byte-identical to baseline.
+- Threaded `correction_repository: Any | None = None` through `LLMOccurrenceGenerationService`, `PreSplitPipelineService`, `DDRReprocessService`, `_default_pipeline_service_factory`, `get_pipeline_service`, and `get_ddr_reprocess_service`.
+- 7 new tests in `tests/test_correction_context_builder.py` covering cap, grouping+format, empty, fewer-than-20, defensive-slice, prompt-injection, and no-repo regression.
+- Full suite: 271 passed, 0 failed (note: the "1 pre-existing failure" referenced in story notes was already resolved on the current branch).
 
 ### File List
 
@@ -209,4 +224,5 @@ In the request-scoped DI (`get_pipeline_service`, `get_ddr_reprocess_service`), 
 
 ## Change Log
 
-- 2026-05-21: Story created — correction context builder (last-20, grouped, exact summary format) injected into the occurrence-generation prompt; threaded `correction_repository` through pipeline + reprocess paths; injection point corrected from epic's "extraction" to architecture's occurrence-generation prompt.
+- 2026-05-21: Story created
+- 2026-05-21: Implemented CorrectionContextBuilder + prompt injection + full pipeline wiring; 7 tests added; 271/271 pass — correction context builder (last-20, grouped, exact summary format) injected into the occurrence-generation prompt; threaded `correction_repository` through pipeline + reprocess paths; injection point corrected from epic's "extraction" to architecture's occurrence-generation prompt.

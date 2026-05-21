@@ -67,6 +67,7 @@ class DDRPipelineTaskBase:
             ddr_repository=DDRCRUDRepository(async_session=session),
             ddr_date_repository=DDRDateCRUDRepository(async_session=session),
             occurrence_repository=OccurrenceCRUDRepository(async_session=session),
+            correction_repository=CorrectionCRUDRepository(async_session=session),
             storage_service=self.storage_service,
         )
 
@@ -139,11 +140,13 @@ class DDRReprocessService:
         ddr_date_repository: Any,
         occurrence_repository: Any,
         storage_service: StorageService | None = None,
+        correction_repository: Any | None = None,
     ) -> None:
         self.ddr_repository = ddr_repository
         self.ddr_date_repository = ddr_date_repository
         self.occurrence_repository = occurrence_repository
         self.storage_service = storage_service or StorageService()
+        self.correction_repository = correction_repository
 
     async def prepare_full(self, ddr_id: str) -> None:
         ddr = await self.ddr_repository.read_ddr_by_id(ddr_id)
@@ -166,6 +169,7 @@ class DDRReprocessService:
             ddr_repository=self.ddr_repository,
             ddr_date_repository=self.ddr_date_repository,
             occurrence_repository=self.occurrence_repository,
+            correction_repository=self.correction_repository,
             storage_service=self.storage_service,
             status_stream_service=None,
         )

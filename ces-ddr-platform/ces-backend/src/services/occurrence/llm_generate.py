@@ -16,6 +16,7 @@ from src.constants.occurrence import (
 )
 from src.constants.prompts import LLMPrompts
 from src.models.schemas.ddr import DDRDateStatus
+from src.services.correction.context_builder import CorrectionContextBuilder
 from src.services.keywords.loader import KeywordLoader
 from src.services.langsmith_tracing import LangSmithTracingService
 from src.services.occurrence.classify import OccurrenceClassifier
@@ -86,9 +87,12 @@ class OccurrencePageNumberResolver:
 
 
 class LLMOccurrenceGenerationService:
-    def __init__(self, ddr_date_repository: Any, occurrence_repository: Any) -> None:
+    def __init__(
+        self, ddr_date_repository: Any, occurrence_repository: Any, correction_repository: Any | None = None
+    ) -> None:
         self.ddr_date_repository = ddr_date_repository
         self.occurrence_repository = occurrence_repository
+        self.correction_repository = correction_repository
         self.client = genai.Client(api_key=settings.GEMINI_API_KEY)
         self.model = settings.GEMINI_MODEL
 
@@ -141,13 +145,14 @@ class LLMOccurrenceGenerationService:
             lines.append(f"{occ_type}: {', '.join(phrases)}")
         return "\n".join(lines)
 
-    def _build_prompt(self, time_logs_text: str) -> str:
+    def _build_prompt(self, time_logs_text: str, corrections_context: str = "") -> str:
         valid_types_str = ", ".join(sorted(VALID_OCCURRENCE_TYPES))
         keyword_hints_text = self._format_keyword_hints()
         return LLMPrompts.occurrence_generation(
             time_logs_text=time_logs_text,
             valid_types=valid_types_str,
             keyword_hints_text=keyword_hints_text,
+            corrections_context=corrections_context,
         )
 
     @LangSmithTracingService.trace(
@@ -175,7 +180,8 @@ class LLMOccurrenceGenerationService:
             return 0
 
         time_logs_text = self._format_time_logs(successful_rows)
-        prompt = self._build_prompt(time_logs_text)
+        corrections_context = await self._build_corrections_context(ddr_id)
+        prompt = self._build_prompt(time_logs_text, corrections_context)
         result_text: str | None = None
         last_error: Exception | None = None
         for attempt, backoff in enumerate(OCCURRENCE_BACKOFF_SECONDS):
@@ -255,3 +261,12 @@ class LLMOccurrenceGenerationService:
         deduped = OccurrenceDeduplicator.dedup(all_occurrences)
         await self.occurrence_repository.replace_for_ddr(ddr_id, deduped)
         return len(deduped)
+
+    async def _build_corrections_context(self, ddr_id: str) -> str:
+        if self.correction_repository is None:
+            return ""
+        try:
+            return await CorrectionContextBuilder(self.correction_repository).build(ddr_id=ddr_id)
+        except Exception as exc:
+            logger.warning(f"correction_context_build_failed ddr_id={ddr_id} error={exc}")
+            return ""
