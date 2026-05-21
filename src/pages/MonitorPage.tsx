@@ -4,7 +4,7 @@ import { Link } from "react-router";
 
 import { TypeBadge } from "@/components/TypeBadge";
 import { SectionBadge } from "@/components/SectionBadge";
-import { apiClient, type MonitorMetrics, type OccurrenceEditResponse, type QueueItem } from "@/lib/api";
+import { apiClient, type Correction, type MonitorMetrics, type QueueItem } from "@/lib/api";
 import { cn } from "@/lib/utils";
 
 // ─── helpers ─────────────────────────────────────────────────────────────────
@@ -221,7 +221,7 @@ function CorrectionStore({
   fieldFilter,
   onFieldFilter,
 }: {
-  items: OccurrenceEditResponse[];
+  items: Correction[];
   loading: boolean;
   fieldFilter: string;
   onFieldFilter: (v: string) => void;
@@ -272,18 +272,18 @@ function CorrectionStore({
                 <tr key={c.id} className="border-t border-gray-100 hover:bg-gray-50 transition-colors">
                   <td className="px-4 py-3">
                     <span className="text-[13px] font-semibold uppercase tracking-wider text-gray-700">
-                      {c.field}
+                      {c.field_name}
                     </span>
                   </td>
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-2">
-                      {c.field === "type" ? (
+                      {c.field_name === "type" ? (
                         <>
                           <TypeBadge type={c.original_value ?? "?"} />
                           <span className="text-gray-400">→</span>
                           <TypeBadge type={c.corrected_value ?? "?"} />
                         </>
-                      ) : c.field === "section" ? (
+                      ) : c.field_name === "section" ? (
                         <>
                           <SectionBadge section={c.original_value} />
                           <span className="text-gray-400">→</span>
@@ -316,7 +316,7 @@ function CorrectionStore({
                     {c.ddr_id.slice(0, 8)}…
                   </td>
                   <td className="px-4 py-3 text-[13.5px] text-gray-500">{fmtTs(c.created_at)}</td>
-                  <td className="px-4 py-3 text-[13.5px] text-gray-700">{c.created_by ?? "—"}</td>
+                  <td className="px-4 py-3 text-[13.5px] text-gray-700">{c.user_id ?? "—"}</td>
                 </tr>
               ))}
             </tbody>
@@ -352,7 +352,7 @@ type Tab = "pipeline" | "corrections";
 export default function MonitorPage() {
   const [metrics, setMetrics] = useState<MonitorMetrics | null>(null);
   const [queue, setQueue] = useState<QueueItem[]>([]);
-  const [corrections, setCorrections] = useState<OccurrenceEditResponse[]>([]);
+  const [corrections, setCorrections] = useState<Correction[]>([]);
   const [fieldFilter, setFieldFilter] = useState("");
   const [tab, setTab] = useState<Tab>("pipeline");
   const [loadingMetrics, setLoadingMetrics] = useState(true);

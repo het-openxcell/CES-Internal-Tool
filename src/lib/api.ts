@@ -62,15 +62,15 @@ export type OccurrenceFilters = {
   date_to?: string;
 };
 
-export type OccurrenceEditResponse = {
+export type Correction = {
   id: string;
   occurrence_id: string;
   ddr_id: string;
-  field: string;
-  original_value: string | null;
-  corrected_value: string | null;
-  reason: string | null;
-  created_by: string | null;
+  field_name: string;
+  original_value: string;
+  corrected_value: string;
+  reason: string;
+  user_id: string;
   created_at: number;
 };
 
@@ -254,10 +254,10 @@ class ApiClient {
     return this.request<OccurrenceRow[]>(`/ddrs/${encodeURIComponent(ddrId)}/occurrences${query}`, { signal });
   }
 
-  async patchOccurrence(ddrId: string, occurrenceId: string, field: string, value: string | null, reason?: string) {
-    return this.request<OccurrenceEditResponse>(
-      `/ddrs/${encodeURIComponent(ddrId)}/occurrences/${encodeURIComponent(occurrenceId)}`,
-      { method: "PATCH", body: JSON.stringify({ field, value, reason }) },
+  async patchOccurrence(occurrenceId: string, fieldName: string, correctedValue: string, reason: string) {
+    return this.request<OccurrenceRow>(
+      `/occurrences/${encodeURIComponent(occurrenceId)}`,
+      { method: "PATCH", body: JSON.stringify({ field_name: fieldName, corrected_value: correctedValue, reason }) },
     );
   }
 
@@ -269,9 +269,9 @@ class ApiClient {
     return this.request<QueueItem[]>("/monitor/queue");
   }
 
-  async getMonitorCorrections(field?: string) {
-    const params = field ? `?field=${encodeURIComponent(field)}` : "";
-    return this.request<OccurrenceEditResponse[]>(`/monitor/corrections${params}`);
+  async getMonitorCorrections(fieldName?: string) {
+    const params = fieldName ? `?field=${encodeURIComponent(fieldName)}` : "";
+    return this.request<Correction[]>(`/monitor/corrections${params}`);
   }
 
   async queryNL(query: string, signal?: AbortSignal) {
