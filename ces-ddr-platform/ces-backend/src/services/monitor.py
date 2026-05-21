@@ -8,14 +8,14 @@ from src.constants.time import SECONDS_PER_WEEK
 from src.models.db.ddr import DDR, DDRDate, PipelineRun
 from src.models.db.occurrence import Occurrence
 from src.models.schemas.monitor import MonitorMetrics, QueueItemResponse
-from src.repository.crud.occurrence_edit import OccurrenceEditCRUDRepository
+from src.repository.crud.correction import CorrectionCRUDRepository
 
 
 class MonitorService:
-    def __init__(self, ddr_repository: Any, ddr_date_repository: Any, edit_repository: OccurrenceEditCRUDRepository):
+    def __init__(self, ddr_repository: Any, ddr_date_repository: Any, correction_repository: CorrectionCRUDRepository):
         self.ddr_repository = ddr_repository
         self.ddr_date_repository = ddr_date_repository
-        self.edit_repository = edit_repository
+        self.correction_repository = correction_repository
         self.session = ddr_repository.async_session if ddr_repository is not None else None
 
     async def metrics(self) -> MonitorMetrics:
@@ -26,7 +26,7 @@ class MonitorService:
         occurrences_extracted = await self._count_occurrences_since(week_start)
         ai_cost_weekly = await self._sum_pipeline_cost_since(week_start)
         failed_dates_count = await self._count_failed_dates()
-        corrections_this_week = await self.edit_repository.count_since(week_start)
+        corrections_this_week = await self.correction_repository.count_since(week_start)
         avg_processing_seconds = await self._avg_processing_seconds_since(month_start)
         exports_this_week = await self._count_exports_since(week_start)
         uptime_month = await self._uptime_since(month_start)
@@ -64,8 +64,8 @@ class MonitorService:
             )
         return result
 
-    async def corrections(self, field: str | None, limit: int, offset: int) -> list[Any]:
-        return list(await self.edit_repository.list_all_descending(field_filter=field, limit=limit, offset=offset))
+    async def corrections(self, field_name: str | None, limit: int, offset: int) -> list[Any]:
+        return await self.correction_repository.get_all(field_name=field_name, limit=limit, offset=offset)
 
     async def _count_ddrs_since(self, since_ts: int) -> int:
         statement = sqlalchemy.select(sqlalchemy.func.count(DDR.id)).where(DDR.created_at >= since_ts)

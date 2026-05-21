@@ -6,6 +6,19 @@ from src.constants.occurrence import VALID_SECTIONS
 from src.models.schemas.base import BaseSchemaModel
 
 
+class OccurrenceCorrectionRequest(BaseSchemaModel):
+    field_name: str
+    corrected_value: str
+    reason: str
+
+    @field_validator("field_name", "corrected_value", "reason")
+    @classmethod
+    def must_be_non_empty(cls, v: str) -> str:
+        if not v.strip():
+            raise ValueError("must not be empty")
+        return v
+
+
 class OccurrenceInCreate(BaseSchemaModel):
     ddr_id: str
     ddr_date_id: str

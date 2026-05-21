@@ -33,8 +33,10 @@ class LLMPrompts:
         keyword_context = (
             "\n\nKEYWORD HINTS — phrases grouped by occurrence type. Use ONLY to decide the 'type' field "
             "AFTER you have already identified a real drilling event in the time logs. Rules:\n"
-            "- Match on meaning, not exact wording (e.g. 'total losses' ≈ 'total loss of returns' → Lost Circulation).\n"
-            "- Hints are not exhaustive; a valid event may use wording not listed — still classify into the closest valid type.\n"
+            "- Match on meaning, not exact wording "
+            "(e.g. 'total losses' ≈ 'total loss of returns' → Lost Circulation).\n"
+            "- Hints are not exhaustive; a valid event may use wording not listed — "
+            "still classify into the closest valid type.\n"
             "- Presence of a hint phrase alone does NOT create an occurrence. The time log must show the actual event "
             "(symptoms, response, depth/volume/pressure change). Do not invent occurrences from wording alone.\n"
             "- If time-log context contradicts the hint, trust the context and pick the better type (or skip).\n"

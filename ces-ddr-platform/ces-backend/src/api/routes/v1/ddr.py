@@ -7,7 +7,6 @@ from src.api.dependencies.repository import get_repository
 from src.api.dependencies.services import (
     get_ddr_reprocess_service,
     get_ddr_reprocess_task,
-    get_occurrence_correction_service,
     get_pipeline_service,
     get_processing_status_stream_service,
 )
@@ -20,17 +19,16 @@ from src.models.schemas.ddr import (
     DDRReprocessOccurrencesResponse,
     DDRUploadResponse,
 )
-from src.models.schemas.monitor import OccurrenceEditResponse, OccurrencePatchRequest
 from src.models.schemas.occurrence import OccurrenceInResponse
 from src.repository.crud.ddr import DDRCRUDRepository, DDRDateCRUDRepository, ProcessingQueueCRUDRepository
 from src.repository.crud.occurrence import OccurrenceCRUDRepository
 from src.securities.authorizations.jwt_authentication import jwt_authentication, stream_query_token_authentication
 from src.services.ddr import (
+    AuthenticatedUserIdentity,
     DDRProcessingTask,
     DDRReprocessService,
     DDRReprocessTask,
     DDRUploadService,
-    OccurrenceCorrectionService,
 )
 from src.services.ddr_status import DDRStatusSnapshotFactory
 from src.services.pipeline_service import PreSplitPipelineService
@@ -62,7 +60,12 @@ async def upload_ddr(
             storage_service=storage_service,
         ),
     )
-    ddr = await service.upload(file, operator=operator, area=area, user_id=current_user.id)
+    ddr = await service.upload(
+        file,
+        operator=operator,
+        area=area,
+        user_id=AuthenticatedUserIdentity.user_id(current_user),
+    )
     background_tasks.add_task(service.dispatch_background, ddr.id)
     return DDRUploadResponse(id=ddr.id, status=ddr.status)
 
@@ -150,7 +153,7 @@ async def get_ddr(
         status=ddr.status,
         well_name=ddr.well_name,
         created_at=ddr.created_at,
-        uploaded_by_username=ddr.uploaded_by_username,
+        uploaded_by_username=getattr(ddr, "uploaded_by_username", None),
         dates=[DDRDateInResponse.model_validate(row) for row in rows],
     )
 
@@ -224,24 +227,3 @@ async def reprocess_occurrences(
         )
 
 
-@router.patch(
-    "/{ddr_id}/occurrences/{occurrence_id}",
-    response_model=OccurrenceEditResponse,
-    status_code=status.HTTP_200_OK,
-)
-async def patch_occurrence(
-    ddr_id: str,
-    occurrence_id: str,
-    payload: OccurrencePatchRequest,
-    current_user=Depends(jwt_authentication),
-    service: OccurrenceCorrectionService = Depends(get_occurrence_correction_service),
-) -> OccurrenceEditResponse:
-    edit = await service.patch_occurrence(
-        ddr_id=ddr_id,
-        occurrence_id=occurrence_id,
-        field=payload.field,
-        value=payload.value,
-        reason=payload.reason,
-        current_user=current_user,
-    )
-    return OccurrenceEditResponse.model_validate(edit)

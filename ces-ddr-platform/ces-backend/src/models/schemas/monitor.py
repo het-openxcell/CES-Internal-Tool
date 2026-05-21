@@ -29,23 +29,3 @@ class QueueItemResponse(BaseSchemaModel):
     date_warning: int
     created_at: int
     updated_at: int
-
-
-class OccurrenceEditResponse(BaseSchemaModel):
-    model_config = ConfigDict(from_attributes=True)
-
-    id: str
-    occurrence_id: str
-    ddr_id: str
-    field: str
-    original_value: str | None
-    corrected_value: str | None
-    reason: str | None
-    created_by: str | None
-    created_at: int
-
-
-class OccurrencePatchRequest(BaseSchemaModel):
-    field: str
-    value: str | None
-    reason: str | None = None

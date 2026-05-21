@@ -64,7 +64,8 @@ class PreSplitPipelineService:
         pdf_bytes = await self.pdf_loader(ddr_id)
         logger.info(f"[DDR:{ddr_id}] PDF loaded ({len(pdf_bytes)} bytes), running pre-splitter")
         result = await self.pre_splitter.split_async(pdf_bytes)
-        logger.info(f"[DDR:{ddr_id}] pre-split done: has_boundaries={result.has_boundaries}, dates={sorted(result.date_chunks.keys()) if result.has_boundaries else []}")
+        dates = sorted(result.date_chunks.keys()) if result.has_boundaries else []
+        logger.info(f"[DDR:{ddr_id}] pre-split done: has_boundaries={result.has_boundaries}, dates={dates}")
 
         if not result.has_boundaries:
             logger.warning(f"[DDR:{ddr_id}] no date boundaries found, marking as failed")
@@ -375,9 +376,12 @@ class PreSplitPipelineService:
         coroutines = [run_one(date, chunk) for date, chunk in date_chunks.items() if date in date_to_row]
         outcomes = await asyncio.gather(*coroutines, return_exceptions=True)
 
-        for date, outcome in zip(date_to_row.keys(), outcomes):
+        for date, outcome in zip(date_to_row.keys(), outcomes, strict=False):
             if isinstance(outcome, BaseException):
-                logger.error(f"[DDR:{ddr_id}] date={date} extraction task raised exception: {outcome!r}", exc_info=outcome)
+                logger.error(
+                    f"[DDR:{ddr_id}] date={date} extraction task raised exception: {outcome!r}",
+                    exc_info=outcome,
+                )
 
         all_rows = await self.ddr_date_repository.read_dates_by_ddr_id(ddr_id)
         well_name, surface_location = self._metadata_from_rows(all_rows)
@@ -486,7 +490,10 @@ class PreSplitPipelineService:
                 pdf_bytes=chunk_bytes,
                 original_page_numbers=original_page_numbers,
             )
-            logger.info(f"[DDR:{ddr_id}] date={date} LLM extraction succeeded (in={extraction.input_tokens} out={extraction.output_tokens} tokens)")
+            logger.info(
+                f"[DDR:{ddr_id}] date={date} LLM extraction succeeded "
+                f"(in={extraction.input_tokens} out={extraction.output_tokens} tokens)"
+            )
         except RateLimitError:
             logger.warning(f"[DDR:{ddr_id}] date={date} rate limited by Gemini API")
             async with self._write_lock:
@@ -520,7 +527,8 @@ class PreSplitPipelineService:
         try:
             logger.debug(f"[DDR:{ddr_id}] date={date} validating extraction response")
             validation = self.validator.validate(extraction.text)
-            logger.info(f"[DDR:{ddr_id}] date={date} validation result: is_valid={validation.is_valid}" + (f" errors={validation.errors}" if not validation.is_valid else ""))
+            errors = f" errors={validation.errors}" if not validation.is_valid else ""
+            logger.info(f"[DDR:{ddr_id}] date={date} validation result: is_valid={validation.is_valid}{errors}")
             if validation.is_valid:
                 final_json = self.page_number_normalizer.normalize(validation.final_json, original_page_numbers)
                 async with self._write_lock:

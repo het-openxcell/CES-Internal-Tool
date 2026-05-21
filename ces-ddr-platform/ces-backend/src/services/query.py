@@ -90,10 +90,10 @@ class NaturalLanguageQueryService:
             raise HTTPException(
                 status_code=503,
                 detail="AI service is temporarily unavailable due to high demand. Please try again shortly.",
-            )
+            ) from exc
         except genai_errors.ClientError as exc:
             logger.error(f"gemini_client_error code={exc.code} status={exc.status} message={exc.message}")
-            raise HTTPException(status_code=502, detail="AI service returned an error. Please try again.")
+            raise HTTPException(status_code=502, detail="AI service returned an error. Please try again.") from exc
         return response.text or "Could not generate an answer."
 
     def hits_to_context(self, hits: list[dict[str, Any]]) -> str:

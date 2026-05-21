@@ -67,3 +67,8 @@ class CorrectionCRUDRepository(BaseCRUDRepository[Correction]):
         stmt = sqlalchemy.select(self.model).order_by(self.model.created_at.desc()).limit(limit)
         result = await self.async_session.execute(stmt)
         return list(result.scalars().all())
+
+    async def count_since(self, since_ts: int) -> int:
+        stmt = sqlalchemy.select(sqlalchemy.func.count(self.model.id)).where(self.model.created_at >= since_ts)
+        result = await self.async_session.execute(stmt)
+        return int(result.scalar_one() or 0)

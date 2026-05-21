@@ -265,3 +265,40 @@ def test_correction_in_response_schema_from_attributes() -> None:
 def test_correction_in_response_inherits_base_config() -> None:
     assert CorrectionInResponse.model_config.get("populate_by_name") is True
     assert CorrectionInResponse.model_config.get("validate_assignment") is True
+
+
+def test_count_since_uses_created_at_filter() -> None:
+    import asyncio
+    from unittest.mock import AsyncMock, MagicMock
+
+    mock_session = AsyncMock()
+    mock_result = MagicMock()
+    mock_result.scalar_one.return_value = 5
+    mock_session.execute.return_value = mock_result
+
+    repo = CorrectionCRUDRepository(async_session=mock_session)
+
+    async def run():
+        return await repo.count_since(since_ts=1700000000)
+
+    count = asyncio.run(run())
+    assert count == 5
+    mock_session.execute.assert_awaited_once()
+
+
+def test_count_since_returns_zero_on_none() -> None:
+    import asyncio
+    from unittest.mock import AsyncMock, MagicMock
+
+    mock_session = AsyncMock()
+    mock_result = MagicMock()
+    mock_result.scalar_one.return_value = None
+    mock_session.execute.return_value = mock_result
+
+    repo = CorrectionCRUDRepository(async_session=mock_session)
+
+    async def run():
+        return await repo.count_since(since_ts=0)
+
+    count = asyncio.run(run())
+    assert count == 0

@@ -83,7 +83,7 @@ def test_embedding_service_extracts_time_log_text_and_payloads() -> None:
     assert points[0]["payload"]["time_from"] == "00:00"
     assert points[0]["payload"]["time_to"] == "06:00"
     assert points[0]["payload"]["code"] == "DRL"
-    assert "text" not in points[0]["payload"]
+    assert points[0]["payload"]["text"] == "Drill ahead Smooth run"
     assert points[1]["id"] == str(uuid.uuid5(uuid.NAMESPACE_URL, "date-1:2"))
     assert points[1]["payload"]["time_from"] == "07:00"
     assert points[1]["payload"]["code"] is None

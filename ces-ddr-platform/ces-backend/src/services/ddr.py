@@ -1,25 +1,37 @@
 import asyncio
+import math
 import time
 import uuid
 from typing import Any, Callable
 
 from fastapi import HTTPException, UploadFile
 
+from src.constants.occurrence import VALID_SECTIONS
 from src.constants.storage import PDF_CONTENT_TYPES, PDF_HEADER, UPLOAD_CHUNK_SIZE_BYTES
 from src.models.schemas.ddr import DDRDateStatus, DDRStatus
+from src.repository.crud.correction import CorrectionCRUDRepository
 from src.repository.crud.ddr import DDRCRUDRepository, DDRDateCRUDRepository, ProcessingQueueCRUDRepository
 from src.repository.crud.occurrence import OccurrenceCRUDRepository
-from src.repository.crud.occurrence_edit import OccurrenceEditCRUDRepository
 from src.services.pipeline_service import PreSplitPipelineService
 from src.services.processing_status import ProcessingStatusStreamService
 from src.services.storage_service import StorageService
-from src.utilities.exceptions import BadRequestException, EntityDoesNotExist
+from src.utilities.exceptions import BadRequestException, EntityDoesNotExist, SecurityException
 from src.utilities.logging.logger import logger
 
 
 class DDRUploadValidationError(BadRequestException):
     def __init__(self, detail: str = "only_pdf_files_accepted"):
         super().__init__(detail=detail)
+
+
+class AuthenticatedUserIdentity:
+    @classmethod
+    def user_id(cls, current_user: Any) -> str:
+        if hasattr(current_user, "id"):
+            return str(current_user.id)
+        if isinstance(current_user, dict) and current_user.get("user_id"):
+            return str(current_user["user_id"])
+        raise SecurityException("current_user_id_missing")
 
 
 class DDRPipelineTaskBase:
@@ -169,48 +181,67 @@ class OccurrenceCorrectionService:
         self,
         ddr_repository: DDRCRUDRepository,
         occurrence_repository: OccurrenceCRUDRepository,
-        edit_repository: OccurrenceEditCRUDRepository,
+        correction_repository: CorrectionCRUDRepository,
     ) -> None:
         self.ddr_repository = ddr_repository
         self.occurrence_repository = occurrence_repository
-        self.edit_repository = edit_repository
+        self.correction_repository = correction_repository
         self.allowed_fields = {"type", "section", "mmd", "notes", "density"}
 
     async def patch_occurrence(
         self,
-        ddr_id: str,
         occurrence_id: str,
-        field: str,
-        value: str | None,
-        reason: str | None,
+        field_name: str,
+        corrected_value: str,
+        reason: str,
         current_user: Any,
     ) -> Any:
-        ddr = await self.ddr_repository.read_by_id(ddr_id)
+        occurrence = await self.occurrence_repository.read_by_id(occurrence_id)
+        if occurrence is None:
+            raise EntityDoesNotExist("occurrence_not_found")
+
+        ddr = await self.ddr_repository.read_by_id(occurrence.ddr_id)
         if ddr is None:
             raise EntityDoesNotExist("ddr_not_found")
 
-        occurrence = await self.occurrence_repository.read_by_id(occurrence_id)
-        if occurrence is None or occurrence.ddr_id != ddr_id:
-            raise EntityDoesNotExist("occurrence_not_found")
+        if ddr.uploaded_by_user_id is not None and ddr.uploaded_by_user_id != current_user.id:
+            raise SecurityException("occurrence_edit_forbidden")
 
-        if field not in self.allowed_fields:
-            raise HTTPException(status_code=422, detail=f"field must be one of {sorted(self.allowed_fields)}")
+        if field_name not in self.allowed_fields:
+            raise HTTPException(status_code=422, detail=f"field_name must be one of {sorted(self.allowed_fields)}")
 
-        original_value = str(getattr(occurrence, field, None) or "") or None
+        original_value = str(getattr(occurrence, field_name)) if getattr(occurrence, field_name) is not None else ""
+
+        if field_name in {"mmd", "density"}:
+            try:
+                casted_value: Any = float(corrected_value)
+            except (ValueError, TypeError) as exc:
+                raise HTTPException(status_code=422, detail=f"{field_name} must be a valid number") from exc
+            if not math.isfinite(casted_value):
+                raise HTTPException(status_code=422, detail=f"{field_name} must be a finite number")
+        elif field_name == "section" and corrected_value not in VALID_SECTIONS:
+            raise HTTPException(status_code=422, detail=f"section must be one of {sorted(VALID_SECTIONS)}")
+        else:
+            casted_value = corrected_value
+
         await self.occurrence_repository.update(
             occurrence,
-            {field: value, "updated_at": int(time.time())},
+            {field_name: casted_value, "updated_at": int(time.time())},
+            commit=False,
         )
-        username = getattr(current_user, "username", None) or getattr(current_user, "email", None)
-        return await self.edit_repository.create_edit(
+        await self.correction_repository.create_correction(
             occurrence_id=occurrence_id,
-            ddr_id=ddr_id,
-            field=field,
+            ddr_id=occurrence.ddr_id,
+            field_name=field_name,
             original_value=original_value,
-            corrected_value=value,
+            corrected_value=str(corrected_value),
             reason=reason,
-            created_by=username,
+            user_id=current_user.id,
+            commit=False,
         )
+        await self.occurrence_repository.async_session.commit()
+        await self.occurrence_repository.async_session.refresh(occurrence)
+        return occurrence
 
 
 class DDRUploadService:
