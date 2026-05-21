@@ -245,39 +245,21 @@ class TimeLogEmbeddingService:
         if not isinstance(time_logs, list):
             return []
 
-        well_name = final_json.get("well_name") or "Unknown"
-        surface_location = final_json.get("surface_location") or "Unknown"
-        date = getattr(ddr_date, "date", None) or "Unknown"
-
-        log_lines = []
-        for row in time_logs:
+        rows = []
+        for index, row in enumerate(time_logs):
             if not isinstance(row, dict):
                 continue
-            log_text = self.row_log_text(row)
-            if not log_text:
+            text = self.row_log_text(row)
+            if not text:
                 continue
-            time_from = row.get("time_from") or row.get("start_time") or ""
-            time_to = row.get("time_to") or row.get("end_time") or ""
-            time_stamp = f"{time_from} : {time_to}".strip(" :") or "Unknown"
-            log_lines.append(f"    Time Stamp: {time_stamp} Logs: {log_text}")
-
-        if not log_lines:
-            return []
-
-        text = (
-            f"Date: {date}\n"
-            f"Well Name: {well_name}\n"
-            f"Surface Location: {surface_location}\n"
-            + "\n".join(log_lines)
-        )
-
-        return [
-            {
-                "id": str(uuid.uuid5(uuid.NAMESPACE_URL, str(ddr_date.id))),
-                "text": text,
-                "payload": self.payload(ddr_date, final_json, text=text),
-            }
-        ]
+            rows.append(
+                {
+                    "id": str(uuid.uuid5(uuid.NAMESPACE_URL, f"{ddr_date.id}:{index}")),
+                    "text": text,
+                    "payload": self.payload(ddr_date, final_json, row, text=text),
+                }
+            )
+        return rows
 
     def row_log_text(self, row: dict[str, Any]) -> str:
         parts = [
@@ -285,13 +267,22 @@ class TimeLogEmbeddingService:
             str(row.get("details") or "").strip(),
             str(row.get("comment") or "").strip(),
         ]
-        return " | ".join(part for part in parts if part)
+        return " ".join(part for part in parts if part)
 
-    def payload(self, ddr_date: Any, final_json: dict[str, Any], text: str = "") -> dict[str, Any]:
+    def payload(
+        self,
+        ddr_date: Any,
+        final_json: dict[str, Any],
+        row: dict[str, Any],
+        text: str,
+    ) -> dict[str, Any]:
         return {
             "ddr_id": getattr(ddr_date, "ddr_id", None),
             "ddr_date_id": getattr(ddr_date, "id", None),
             "date": getattr(ddr_date, "date", None),
+            "time_from": row.get("time_from") or row.get("start_time"),
+            "time_to": row.get("time_to") or row.get("end_time"),
+            "code": row.get("code"),
             "well_name": final_json.get("well_name"),
             "surface_location": final_json.get("surface_location"),
             "text": text,

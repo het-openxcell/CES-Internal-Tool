@@ -1,9 +1,9 @@
 from fastapi import Depends, Request
 
 from src.api.dependencies.repository import get_repository
+from src.repository.crud.correction import CorrectionCRUDRepository
 from src.repository.crud.ddr import DDRCRUDRepository, DDRDateCRUDRepository
 from src.repository.crud.occurrence import OccurrenceCRUDRepository
-from src.repository.crud.occurrence_edit import OccurrenceEditCRUDRepository
 from src.services.ddr import (
     DDRReprocessService,
     DDRReprocessTask,
@@ -57,6 +57,6 @@ def get_ddr_reprocess_task(
 def get_occurrence_correction_service(
     ddr_repository: DDRCRUDRepository = Depends(get_repository(DDRCRUDRepository)),
     occurrence_repository: OccurrenceCRUDRepository = Depends(get_repository(OccurrenceCRUDRepository)),
-    edit_repository: OccurrenceEditCRUDRepository = Depends(get_repository(OccurrenceEditCRUDRepository)),
+    correction_repository: CorrectionCRUDRepository = Depends(get_repository(CorrectionCRUDRepository)),
 ) -> OccurrenceCorrectionService:
-    return OccurrenceCorrectionService(ddr_repository, occurrence_repository, edit_repository)
+    return OccurrenceCorrectionService(ddr_repository, occurrence_repository, correction_repository)

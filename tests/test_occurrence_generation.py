@@ -460,7 +460,7 @@ def test_pipeline_service_generate_occurrences_returns_zero_when_no_repo():
     asyncio.run(run())
 
 
-def test_llm_generation_allows_model_to_remove_previous_occurrences():
+def test_llm_generation_builds_prompt_from_current_logs_only():
     from src.services.occurrence.llm_generate import LLMOccurrenceGenerationService
 
     async def run():
@@ -494,8 +494,10 @@ def test_llm_generation_allows_model_to_remove_previous_occurrences():
         assert count == 0
         occurrence_repo.replace_for_ddr.assert_awaited_once_with("d1", [])
         prompt = fake_models.generate_content.call_args.kwargs["contents"][0].text
-        assert "Validate previous occurrences against current time logs" in prompt
-        assert "Stuck Pipe" in prompt
+        assert "CURRENT TIME LOGS" in prompt
+        assert "normal drilling" in prompt
+        assert "Validate previous occurrences against current time logs" not in prompt
+        assert "old" not in prompt
 
     asyncio.run(run())
 

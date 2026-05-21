@@ -16,6 +16,7 @@ def test_update_well_metadata_sets_fields():
 
     async def run():
         session = AsyncMock()
+        session.add = MagicMock()
         session.commit = AsyncMock()
         session.refresh = AsyncMock()
 
@@ -44,6 +45,7 @@ def test_update_well_metadata_accepts_nulls():
 
     async def run():
         session = AsyncMock()
+        session.add = MagicMock()
         session.commit = AsyncMock()
         session.refresh = AsyncMock()
 

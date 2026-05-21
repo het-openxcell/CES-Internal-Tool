@@ -22,7 +22,7 @@ async def natural_language_query(
         raise
     except Exception as exc:
         logger.error(f"nl_query_unexpected_error error={exc}")
-        raise HTTPException(status_code=500, detail="An unexpected error occurred. Please try again.")
+        raise HTTPException(status_code=500, detail="An unexpected error occurred. Please try again.") from exc
     sources = [
         TimeLogSource(
             ddr_id=(hit.get("payload") or {}).get("ddr_id"),
