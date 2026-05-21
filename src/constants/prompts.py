@@ -29,7 +29,14 @@ class LLMPrompts:
         time_logs_text: str,
         valid_types: str,
         keyword_hints_text: str = "",
+        corrections_context: str = "",
     ) -> str:
+        correction_block = (
+            f"PREVIOUSLY CORRECTED — these were fixed by a human before; do not repeat the same mistake:\n"
+            f"{corrections_context}\n\n"
+            if corrections_context
+            else ""
+        )
         keyword_context = (
             "\n\nKEYWORD HINTS — phrases grouped by occurrence type. Use ONLY to decide the 'type' field "
             "AFTER you have already identified a real drilling event in the time logs. Rules:\n"
@@ -45,6 +52,7 @@ class LLMPrompts:
             else ""
         )
         return (
+            f"{correction_block}"
             "You are a drilling engineering expert. From the current time logs below, generate the occurrence table "
             "from scratch. Identify drilling events or problems supported by the time logs. "
             "Use ONLY the valid types listed.\n\n"

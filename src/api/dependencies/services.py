@@ -26,6 +26,7 @@ def get_pipeline_service(
     ddr_repository: DDRCRUDRepository = Depends(get_repository(DDRCRUDRepository)),
     ddr_date_repository: DDRDateCRUDRepository = Depends(get_repository(DDRDateCRUDRepository)),
     occurrence_repository: OccurrenceCRUDRepository = Depends(get_repository(OccurrenceCRUDRepository)),
+    correction_repository: CorrectionCRUDRepository = Depends(get_repository(CorrectionCRUDRepository)),
     storage_service: StorageService = Depends(get_storage_service),
     status_stream_service: ProcessingStatusStreamService = Depends(get_processing_status_stream_service),
 ) -> PreSplitPipelineService:
@@ -33,6 +34,7 @@ def get_pipeline_service(
         ddr_repository=ddr_repository,
         ddr_date_repository=ddr_date_repository,
         occurrence_repository=occurrence_repository,
+        correction_repository=correction_repository,
         storage_service=storage_service,
         status_stream_service=status_stream_service,
     )
@@ -42,9 +44,12 @@ def get_ddr_reprocess_service(
     ddr_repository: DDRCRUDRepository = Depends(get_repository(DDRCRUDRepository)),
     ddr_date_repository: DDRDateCRUDRepository = Depends(get_repository(DDRDateCRUDRepository)),
     occurrence_repository: OccurrenceCRUDRepository = Depends(get_repository(OccurrenceCRUDRepository)),
+    correction_repository: CorrectionCRUDRepository = Depends(get_repository(CorrectionCRUDRepository)),
     storage_service: StorageService = Depends(get_storage_service),
 ) -> DDRReprocessService:
-    return DDRReprocessService(ddr_repository, ddr_date_repository, occurrence_repository, storage_service)
+    return DDRReprocessService(
+        ddr_repository, ddr_date_repository, occurrence_repository, storage_service, correction_repository
+    )
 
 
 def get_ddr_reprocess_task(
