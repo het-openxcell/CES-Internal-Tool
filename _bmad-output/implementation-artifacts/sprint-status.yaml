@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-05-06
-last_updated: 2026-05-25 — story 4-5 done
+last_updated: 2026-05-25 — story 7-1 ready for dev
 project: Canadian Energy Service Internal Tool
 project_key: NOKEY
 tracking_system: file-system
@@ -52,6 +52,15 @@ approved_changes:
     notes:
       - Use the project src backend structure adapted to CES rules.
       - Use SQLAlchemy async ORM, repository/service modules, session dependencies, pytest, and Ruff.
+  rbac_user_management:
+    status: approved
+    date: 2026-05-25
+    proposal: _bmad-output/planning-artifacts/sprint-change-proposal-2026-05-25.md
+    notes:
+      - Implement RBAC using the AI Avatar B2C pattern: roles table, user_roles join table, RoleChecker dependencies.
+      - Seed ADMIN and USER roles plus initial admin account from settings.
+      - Admin users can create and deactivate users.
+      - Show User Management navigation only for ADMIN users.
 
 development_status:
   # ── Epic 1: Platform Foundation & Authenticated Access ──
@@ -93,24 +102,26 @@ development_status:
 
   # ── Epic 5: Data Export ──
   epic-5: in-progress
-  5-1-per-ddr-excel-export-backend: review
-  5-2-master-excel-export-backend: review
-  5-3-time-log-csv-export-backend: review
-  5-4-export-ui-one-click-download-flow: review
+  5-1-per-ddr-excel-export-backend: done
+  5-2-master-excel-export-backend: done
+  5-3-time-log-csv-export-backend: done
+  5-4-export-ui-one-click-download-flow: done
   epic-5-retrospective: optional
 
   # ── Epic 6: Query & Well History ──
-  epic-6: backlog
-  6-1-bm25-keyword-search-backend: backlog
-  6-2-qdrant-vector-search-nl-query-api: backlog
-  6-3-cross-ddr-filter-well-history-api: backlog
-  6-4-query-history-ui: backlog
+  epic-6: in-progress
+  6-1-bm25-keyword-search-backend: done
+  6-2-qdrant-vector-search-nl-query-api: done
+  6-3-cross-ddr-filter-well-history-api: done
+  6-4-query-history-ui: done
   epic-6-retrospective: optional
 
   # ── Epic 7: Pipeline Monitoring & System Administration ──
-  epic-7: backlog
-  7-1-pipeline-queue-per-date-status-api: backlog
+  epic-7: in-progress
+  7-1-pipeline-queue-per-date-status-api: ready-for-dev
   7-2-error-log-per-date-re-run-api: backlog
   7-3-keyword-management-api: backlog
   7-4-monitor-dashboard-keyword-editor-ui: backlog
+  7-5-rbac-schema-seeded-admin-user-management-api: backlog
+  7-6-admin-user-management-ui: backlog
   epic-7-retrospective: optional

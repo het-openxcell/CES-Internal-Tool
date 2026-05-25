@@ -61,7 +61,7 @@ function rowsFromDetail(detail: DDRDetail) {
 }
 
 function needsLiveConnection(detail: DDRDetail) {
-  return detail.status === "processing" || (detail.dates ?? []).some((row) => row.status === "queued");
+  return detail.status === "queued" || detail.status === "processing" || (detail.dates ?? []).some((row) => row.status === "queued");
 }
 
 function errorFromLog(errorLog: Record<string, unknown> | null | undefined) {
