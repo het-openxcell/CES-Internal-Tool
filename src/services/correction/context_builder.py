@@ -35,12 +35,18 @@ class CorrectionContextBuilder:
         return "\n".join(lines)
 
     async def _summary_context(self, ddr_id: str | None) -> str:
-        if not ddr_id or self.correction_summary_repository is None:
+        if self.correction_summary_repository is None:
             return ""
-        summaries = await self.correction_summary_repository.get_by_ddr_id(
-            ddr_id,
-            limit=self.MAX_INJECTED_SUMMARIES,
-        )
+        summaries: list[Any] = []
+        if ddr_id:
+            summaries = await self.correction_summary_repository.get_by_ddr_id(
+                ddr_id,
+                limit=self.MAX_INJECTED_SUMMARIES,
+            )
+        if not summaries:
+            summaries = await self.correction_summary_repository.get_recent(
+                limit=self.MAX_INJECTED_SUMMARIES,
+            )
         if not summaries:
             return ""
         lines = []
@@ -52,6 +58,17 @@ class CorrectionContextBuilder:
         return "\n".join(lines)
 
     async def _recent_corrections(self, ddr_id: str | None) -> list[Any]:
-        if ddr_id:
-            return await self.correction_repository.get_by_ddr_id(ddr_id, limit=self.MAX_INJECTED_CORRECTIONS)
-        return await self.correction_repository.get_recent(self.MAX_INJECTED_CORRECTIONS)
+        recent = await self.correction_repository.get_recent(self.MAX_INJECTED_CORRECTIONS)
+        if not ddr_id:
+            return recent
+        ddr_specific = await self.correction_repository.get_by_ddr_id(ddr_id, limit=self.MAX_INJECTED_CORRECTIONS)
+        seen: set = set()
+        merged: list[Any] = []
+        for c in [*ddr_specific, *recent]:
+            key = getattr(c, "id", None)
+            if key is not None and key in seen:
+                continue
+            if key is not None:
+                seen.add(key)
+            merged.append(c)
+        return merged[: self.MAX_INJECTED_CORRECTIONS]
