@@ -53,7 +53,7 @@ class CorrectionCRUDRepository(BaseCRUDRepository[Correction]):
         offset: int = 0,
     ) -> list[Correction]:
         limit = min(limit, _MAX_LIMIT)
-        stmt = sqlalchemy.select(self.model).order_by(self.model.created_at.desc())
+        stmt = sqlalchemy.select(self.model).order_by(self.model.created_at.desc(), self.model.id.desc())
         if field_name is not None:
             stmt = stmt.where(self.model.field_name == field_name)
         if ddr_id is not None:
@@ -67,6 +67,15 @@ class CorrectionCRUDRepository(BaseCRUDRepository[Correction]):
         stmt = sqlalchemy.select(self.model).order_by(self.model.created_at.desc()).limit(limit)
         result = await self.async_session.execute(stmt)
         return list(result.scalars().all())
+
+    async def count_all(self, field_name: str | None = None, ddr_id: str | None = None) -> int:
+        stmt = sqlalchemy.select(sqlalchemy.func.count(self.model.id))
+        if field_name is not None:
+            stmt = stmt.where(self.model.field_name == field_name)
+        if ddr_id is not None:
+            stmt = stmt.where(self.model.ddr_id == ddr_id)
+        result = await self.async_session.execute(stmt)
+        return int(result.scalar_one() or 0)
 
     async def count_since(self, since_ts: int) -> int:
         stmt = sqlalchemy.select(sqlalchemy.func.count(self.model.id)).where(self.model.created_at >= since_ts)

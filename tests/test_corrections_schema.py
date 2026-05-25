@@ -1,6 +1,7 @@
 import importlib.util
 import inspect
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -8,7 +9,12 @@ import sqlalchemy
 from sqlalchemy.dialects import postgresql
 
 from src.models.db.correction import Correction
-from src.models.schemas.correction import CorrectionInCreate, CorrectionInResponse
+from src.models.schemas.correction import (
+    CorrectionInCreate,
+    CorrectionInResponse,
+    CorrectionPageResponse,
+    CorrectionReviewItem,
+)
 from src.repository.crud.base import BaseCRUDRepository
 from src.repository.crud.correction import _MAX_LIMIT, CorrectionCRUDRepository
 
@@ -189,7 +195,8 @@ def test_get_all_source_uses_field_name_column() -> None:
     source = inspect.getsource(CorrectionCRUDRepository.get_all)
     assert "field_name" in source
     assert "ddr_id" in source
-    assert ".desc()" in source
+    assert "self.model.created_at.desc()" in source
+    assert "self.model.id.desc()" in source
 
 
 def test_get_recent_uses_created_at_desc() -> None:
@@ -299,6 +306,133 @@ def test_count_since_returns_zero_on_none() -> None:
 
     async def run():
         return await repo.count_since(since_ts=0)
+
+    count = asyncio.run(run())
+    assert count == 0
+
+
+def test_correction_review_item_has_exact_contract_fields() -> None:
+    item = CorrectionReviewItem(
+        id="corr-1",
+        occurrence_id="occ-1",
+        ddr_id="ddr-1",
+        field_name="type",
+        original_value="old",
+        corrected_value="new",
+        reason="reviewed",
+        created_at=1700000000,
+    )
+    assert set(item.model_dump().keys()) == {
+        "id",
+        "occurrence_id",
+        "ddr_id",
+        "field_name",
+        "original_value",
+        "corrected_value",
+        "reason",
+        "created_at",
+    }
+    assert not hasattr(item, "user_id")
+
+
+def test_correction_page_response_envelope() -> None:
+    item = CorrectionReviewItem(
+        id="corr-1",
+        occurrence_id="occ-1",
+        ddr_id="ddr-1",
+        field_name="type",
+        original_value="old",
+        corrected_value="new",
+        reason="reviewed",
+        created_at=1700000000,
+    )
+    response = CorrectionPageResponse(items=[item], total=7, page=2, page_size=50)
+    assert response.model_dump() == {"items": [item.model_dump()], "total": 7, "page": 2, "page_size": 50}
+
+
+class SeededCorrectionResult:
+    def __init__(self, rows: list[SimpleNamespace] | None = None, count: int | None = None) -> None:
+        self.rows = rows or []
+        self.count = count
+
+    def scalars(self):
+        return self
+
+    def all(self):
+        return self.rows
+
+    def scalar_one(self):
+        return self.count
+
+
+class SeededCorrectionSession:
+    def __init__(self, rows: list[SimpleNamespace]) -> None:
+        self.rows = rows
+
+    async def execute(self, stmt):
+        rows = self._matching_rows(stmt)
+        if self._is_count(stmt):
+            return SeededCorrectionResult(count=len(rows))
+        return SeededCorrectionResult(rows=self._paged_rows(rows, stmt))
+
+    def _matching_rows(self, stmt):
+        rows = self.rows
+        for criterion in stmt._where_criteria:
+            key = criterion.left.key
+            value = criterion.right.value
+            rows = [row for row in rows if getattr(row, key) == value]
+        return sorted(rows, key=lambda row: (row.created_at, row.id), reverse=True)
+
+    def _paged_rows(self, rows, stmt):
+        offset = stmt._offset_clause.value if stmt._offset_clause is not None else 0
+        limit = stmt._limit_clause.value if stmt._limit_clause is not None else len(rows)
+        return rows[offset : offset + limit]
+
+    def _is_count(self, stmt) -> bool:
+        return any(getattr(column, "name", None) == "count" for column in stmt._raw_columns)
+
+
+def test_count_all_returns_seeded_filtered_totals_matching_get_all() -> None:
+    import asyncio
+
+    seeded_rows = [
+        SimpleNamespace(id="corr-4", field_name="type", ddr_id="ddr-b", created_at=40),
+        SimpleNamespace(id="corr-3", field_name="section", ddr_id="ddr-a", created_at=30),
+        SimpleNamespace(id="corr-2", field_name="type", ddr_id="ddr-a", created_at=20),
+        SimpleNamespace(id="corr-1", field_name="type", ddr_id="ddr-a", created_at=10),
+    ]
+    repo = CorrectionCRUDRepository(async_session=SeededCorrectionSession(seeded_rows))
+
+    async def run():
+        cases = [
+            (None, None, 4),
+            ("type", None, 3),
+            (None, "ddr-a", 3),
+            ("type", "ddr-a", 2),
+            ("section", "ddr-b", 0),
+        ]
+        for field_name, ddr_id, expected in cases:
+            rows = await repo.get_all(field_name=field_name, ddr_id=ddr_id, limit=100, offset=0)
+            count = await repo.count_all(field_name=field_name, ddr_id=ddr_id)
+            assert count == expected
+            assert count == len(rows)
+
+    asyncio.run(run())
+
+
+def test_count_all_returns_zero_on_none() -> None:
+    import asyncio
+    from unittest.mock import AsyncMock, MagicMock
+
+    mock_session = AsyncMock()
+    mock_result = MagicMock()
+    mock_result.scalar_one.return_value = None
+    mock_session.execute.return_value = mock_result
+
+    repo = CorrectionCRUDRepository(async_session=mock_session)
+
+    async def run():
+        return await repo.count_all()
 
     count = asyncio.run(run())
     assert count == 0
