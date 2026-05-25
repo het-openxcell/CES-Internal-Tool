@@ -88,11 +88,16 @@ class OccurrencePageNumberResolver:
 
 class LLMOccurrenceGenerationService:
     def __init__(
-        self, ddr_date_repository: Any, occurrence_repository: Any, correction_repository: Any | None = None
+        self,
+        ddr_date_repository: Any,
+        occurrence_repository: Any,
+        correction_repository: Any | None = None,
+        correction_summary_repository: Any | None = None,
     ) -> None:
         self.ddr_date_repository = ddr_date_repository
         self.occurrence_repository = occurrence_repository
         self.correction_repository = correction_repository
+        self.correction_summary_repository = correction_summary_repository
         self.client = genai.Client(api_key=settings.GEMINI_API_KEY)
         self.model = settings.GEMINI_MODEL
 
@@ -266,7 +271,10 @@ class LLMOccurrenceGenerationService:
         if self.correction_repository is None:
             return ""
         try:
-            return await CorrectionContextBuilder(self.correction_repository).build(ddr_id=ddr_id)
+            return await CorrectionContextBuilder(
+                self.correction_repository,
+                self.correction_summary_repository,
+            ).build(ddr_id=ddr_id)
         except Exception as exc:
             logger.warning(f"correction_context_build_failed ddr_id={ddr_id} error={exc}")
             return ""

@@ -18,6 +18,7 @@ class CorrectionCRUDRepository(BaseCRUDRepository[Correction]):
         corrected_value: str,
         reason: str,
         user_id: str,
+        ddr_date_id: str | None = None,
         commit: bool = True,
     ) -> Correction:
         return await self.create(
@@ -29,6 +30,7 @@ class CorrectionCRUDRepository(BaseCRUDRepository[Correction]):
                 "corrected_value": corrected_value,
                 "reason": reason,
                 "user_id": user_id,
+                "ddr_date_id": ddr_date_id,
             },
             commit=commit,
         )
@@ -41,6 +43,17 @@ class CorrectionCRUDRepository(BaseCRUDRepository[Correction]):
             .order_by(self.model.created_at.desc())
             .limit(limit)
             .offset(offset)
+        )
+        result = await self.async_session.execute(stmt)
+        return list(result.scalars().all())
+
+    async def get_by_ddr_date_id(self, ddr_date_id: str, limit: int = 1000) -> list[Correction]:
+        limit = min(limit, _MAX_LIMIT)
+        stmt = (
+            sqlalchemy.select(self.model)
+            .where(self.model.ddr_date_id == ddr_date_id)
+            .order_by(self.model.created_at.desc(), self.model.id.desc())
+            .limit(limit)
         )
         result = await self.async_session.execute(stmt)
         return list(result.scalars().all())

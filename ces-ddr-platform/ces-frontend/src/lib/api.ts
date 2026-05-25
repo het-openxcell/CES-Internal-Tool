@@ -66,12 +66,35 @@ export type Correction = {
   id: string;
   occurrence_id: string;
   ddr_id: string;
+  ddr_date_id?: string | null;
   field_name: string;
   original_value: string;
   corrected_value: string;
   reason: string;
-  user_id: string;
+  user_id?: string;
   created_at: number;
+};
+
+export type CorrectionSummary = {
+  id: string;
+  ddr_id: string;
+  ddr_date_id: string;
+  date?: string | null;
+  scope: string;
+  summary: string;
+  source_logs: unknown[];
+  edit_details: unknown[];
+  correction_count: number;
+  created_at: number;
+  updated_at: number;
+};
+
+export type CorrectionPageResponse = {
+  items: Correction[];
+  summaries: CorrectionSummary[];
+  total: number;
+  page: number;
+  page_size: number;
 };
 
 export type HistoryOccurrenceRow = OccurrenceRow & {
@@ -272,6 +295,11 @@ class ApiClient {
   async getMonitorCorrections(fieldName?: string) {
     const params = fieldName ? `?field=${encodeURIComponent(fieldName)}` : "";
     return this.request<Correction[]>(`/monitor/corrections${params}`);
+  }
+
+  async getCorrections(ddrId: string, page = 1, pageSize = 100) {
+    const params = new URLSearchParams({ ddr_id: ddrId, page: String(page), page_size: String(pageSize) });
+    return this.request<CorrectionPageResponse>(`/corrections?${params.toString()}`);
   }
 
   async queryNL(query: string, signal?: AbortSignal) {

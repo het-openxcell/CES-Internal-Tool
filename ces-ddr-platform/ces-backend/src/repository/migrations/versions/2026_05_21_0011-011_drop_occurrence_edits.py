@@ -9,10 +9,10 @@ depends_on = None
 
 
 def upgrade() -> None:
-    op.drop_index("idx_occurrence_edits_created_at", table_name="occurrence_edits")
-    op.drop_index("idx_occurrence_edits_occurrence_id", table_name="occurrence_edits")
-    op.drop_index("idx_occurrence_edits_ddr_id", table_name="occurrence_edits")
-    op.drop_table("occurrence_edits")
+    op.execute("DROP INDEX IF EXISTS idx_occurrence_edits_created_at")
+    op.execute("DROP INDEX IF EXISTS idx_occurrence_edits_occurrence_id")
+    op.execute("DROP INDEX IF EXISTS idx_occurrence_edits_ddr_id")
+    op.execute("DROP TABLE IF EXISTS occurrence_edits CASCADE")
 
 
 def downgrade() -> None:

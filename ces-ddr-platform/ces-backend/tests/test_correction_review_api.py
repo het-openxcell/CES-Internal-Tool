@@ -175,6 +175,7 @@ def test_get_corrections_route_returns_paginated_envelope(correction_route_clien
                 "created_at": 1700000000,
             }
         ],
+        "summaries": [],
         "total": 7,
         "page": 2,
         "page_size": 50,

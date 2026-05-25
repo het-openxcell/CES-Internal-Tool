@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   AlertTriangle as AlertIcon,
   Check as CheckIcon,
@@ -13,12 +13,21 @@ import { OccurrenceMetrics } from "@/components/OccurrenceMetrics";
 import { OccurrenceTable } from "@/components/OccurrenceTable";
 import ReportListSidebar from "@/components/ReportListSidebar";
 import ReprocessModal from "@/components/ReprocessModal";
-import { TypeBadge } from "@/components/TypeBadge";
 import { useOccurrences } from "@/hooks/useOccurrences";
 import { useProcessingStatus } from "@/hooks/useProcessingStatus";
 import { useRetryDate } from "@/hooks/useRetryDate";
-import { apiClient, type DDRDetail } from "@/lib/api";
+import { apiClient, type Correction, type CorrectionSummary, type DDRDetail } from "@/lib/api";
 import { cn } from "@/lib/utils";
+
+type EditHistoryRow = {
+  id: string;
+  field: string;
+  original: string;
+  corrected: string;
+  reason: string;
+  date: string;
+  when: string;
+};
 
 export default function ReportDetailPage() {
   const { id } = useParams();
@@ -27,10 +36,11 @@ export default function ReportDetailPage() {
   const [reprocessOpen, setReprocessOpen] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const [exportToast, setExportToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
-  const [editHistory] = useState([
-    { id: "edit-1", field: "Type", original: "Ream", corrected: "Back Ream", date: "2026-04-22", when: "2 min ago" },
-    { id: "edit-2", field: "Type", original: "Washout", corrected: "Lost Circulation", date: "2026-04-23", when: "15 min ago" },
-  ]);
+  const [editHistory, setEditHistory] = useState<EditHistoryRow[]>([]);
+  const [editSummaries, setEditSummaries] = useState<CorrectionSummary[]>([]);
+  const [historyLoaded, setHistoryLoaded] = useState(false);
+  const [historyError, setHistoryError] = useState<string | null>(null);
+  const historyRequestRef = useRef(0);
 
   if (!id) return <Navigate to="/" replace />;
 
@@ -51,13 +61,86 @@ export default function ReportDetailPage() {
   const { data: occurrences, isLoading: occurrencesLoading, refetch: refetchOccurrences } = useOccurrences(id);
   const { retryingDate, handleRetryDate } = useRetryDate(id, status.refresh, status.reconnect);
 
+  const mapCorrectionToHistory = useCallback((correction: Correction): EditHistoryRow => {
+    const createdAt = new Date(correction.created_at * 1000);
+    return {
+      id: correction.id,
+      field: correction.field_name === "mmd" ? "MMD" : correction.field_name.charAt(0).toUpperCase() + correction.field_name.slice(1),
+      original: correction.original_value || "—",
+      corrected: correction.corrected_value || "—",
+      reason: correction.reason,
+      date: createdAt.toLocaleDateString(),
+      when: createdAt.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+    };
+  }, []);
+
+  const loadEditHistory = useCallback(async (requestId: number) => {
+    if (!id) return;
+    setHistoryLoaded(false);
+    setHistoryError(null);
+    const isCurrent = () => historyRequestRef.current === requestId;
+    try {
+      const items: Correction[] = [];
+      let summaries: CorrectionSummary[] = [];
+      let pageNumber = 1;
+      let total = 0;
+      const pageSize = 100;
+      do {
+        const page = await apiClient.getCorrections(id, pageNumber, pageSize);
+        items.push(...page.items);
+        if (pageNumber === 1) summaries = page.summaries ?? [];
+        total = page.total;
+        pageNumber += 1;
+      } while (items.length < total);
+      if (!isCurrent()) return;
+      setEditHistory(items.map(mapCorrectionToHistory));
+      setEditSummaries(summaries);
+      setHistoryError(null);
+    } catch {
+      if (!isCurrent()) return;
+      setEditHistory([]);
+      setEditSummaries([]);
+      setHistoryError("Couldn't load edit history — try again");
+    } finally {
+      if (isCurrent()) setHistoryLoaded(true);
+    }
+  }, [id, mapCorrectionToHistory]);
+
   useEffect(() => {
+    const requestId = historyRequestRef.current + 1;
+    historyRequestRef.current = requestId;
     let active = true;
     apiClient.getDDR(id).then((detail) => {
       if (active) setDdr(detail);
     }).catch(() => {});
-    return () => { active = false; };
-  }, [id]);
+    void loadEditHistory(requestId);
+    return () => {
+      active = false;
+      if (historyRequestRef.current === requestId) historyRequestRef.current += 1;
+    };
+  }, [id, loadEditHistory]);
+
+  const addEditHistory = useCallback((change: {
+    occurrenceId: string;
+    field: "type" | "section" | "mmd" | "density" | "notes";
+    originalValue: string;
+    correctedValue: string;
+    reason: string;
+  }) => {
+    const now = new Date();
+    setEditHistory((current) => [
+      {
+        id: `${change.occurrenceId}-${change.field}-${now.getTime()}`,
+        field: change.field === "mmd" ? "MMD" : change.field.charAt(0).toUpperCase() + change.field.slice(1),
+        original: change.originalValue || "—",
+        corrected: change.correctedValue || "—",
+        reason: change.reason,
+        date: now.toLocaleDateString(),
+        when: "just now",
+      },
+      ...current,
+    ]);
+  }, []);
 
   const processedLabel = `Processing date ${status.currentProcessedCount} of ${status.totalDates || status.currentProcessedCount}…`;
   const extractedCount = status.finalSummary
@@ -235,6 +318,7 @@ export default function ReportDetailPage() {
               <OccurrenceTable
                 occurrences={occurrences ?? []}
                 isLoading={occurrencesLoading}
+                onCorrectionSaved={addEditHistory}
               />
             </section>
           )}
@@ -279,7 +363,7 @@ export default function ReportDetailPage() {
           )}
 
           {tab === "history" && (
-            <EditHistoryTab rows={editHistory} />
+            <EditHistoryTab rows={editHistory} summaries={editSummaries} loaded={historyLoaded} error={historyError} />
           )}
 
         </div>
@@ -318,11 +402,35 @@ function ProcStat({ value, label, tone }: { value: number; label: string; tone: 
   );
 }
 
-function EditHistoryTab({ rows }: { rows: Array<{ id: string; field: string; original: string; corrected: string; date: string; when: string }> }) {
-  if (rows.length === 0) {
+function EditHistoryTab({
+  rows,
+  summaries,
+  loaded,
+  error,
+}: {
+  rows: EditHistoryRow[];
+  summaries: CorrectionSummary[];
+  loaded: boolean;
+  error: string | null;
+}) {
+  if (!loaded) {
+    return (
+      <div className="rounded-lg border border-border-default bg-white p-6 text-[13px] font-medium text-text-muted">
+        Loading edit history…
+      </div>
+    );
+  }
+  if (error) {
+    return (
+      <div className="rounded-lg border border-error-text/20 bg-error-bg p-4 text-[13px] font-medium text-error-text">
+        {error}
+      </div>
+    );
+  }
+  if (rows.length === 0 && summaries.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center text-center py-16 px-6">
-        <div className="h-12 w-12 rounded-full bg-surface grid place-items-center text-text-muted mb-3">
+        <div className="h-12 w-12 rounded-2xl bg-surface grid place-items-center text-text-muted mb-3">
           <Pencil className="w-5 h-5" aria-hidden="true" />
         </div>
         <div className="text-[14px] font-semibold text-text-primary">No edits yet</div>
@@ -331,29 +439,59 @@ function EditHistoryTab({ rows }: { rows: Array<{ id: string; field: string; ori
     );
   }
   return (
-    <div className="border border-border-default rounded-lg overflow-hidden">
-      <table className="w-full text-[12.5px]">
-        <thead className="bg-surface text-[10.5px] uppercase tracking-wider font-semibold text-text-muted">
-          <tr>
-            <th className="text-left px-3 py-2 w-16">Field</th>
-            <th className="text-left px-3 py-2 w-20">Original</th>
-            <th className="text-left px-3 py-2">Corrected</th>
-            <th className="text-left px-3 py-2 w-32">Date</th>
-            <th className="text-left px-3 py-2 w-28">When</th>
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((r) => (
-            <tr key={r.id} className="border-t border-border-default hover:bg-slate-50 transition-colors">
-              <td className="px-3 py-2 font-medium text-text-primary">{r.field}</td>
-              <td className="px-3 py-2 text-text-muted line-through">{r.original}</td>
-              <td className="px-3 py-2"><TypeBadge type={r.corrected} /></td>
-              <td className="px-3 py-2 font-mono text-[11.5px] text-text-primary">{r.date}</td>
-              <td className="px-3 py-2 text-text-muted">{r.when}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+    <div className="space-y-3">
+      {summaries.length > 0 && (
+        <div className="rounded-xl border border-amber-200 bg-amber-50/60 p-4">
+          <div className="text-[11px] font-bold uppercase tracking-wider text-amber-700">Correction learning summaries</div>
+          <div className="mt-3 space-y-3">
+            {summaries.map((summary) => (
+              <div key={summary.id} className="rounded-lg border border-amber-100 bg-white px-3 py-2.5">
+                <div className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-amber-700">
+                  {summary.date ?? "Date summary"}
+                </div>
+                <div className="whitespace-pre-line text-[13px] font-medium leading-5 text-text-primary">{summary.summary}</div>
+                <div className="mt-2 text-[11.5px] text-text-muted">
+                  {summary.correction_count} {summary.correction_count === 1 ? "edit" : "edits"} merged · {new Date(summary.updated_at * 1000).toLocaleString()}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+      {rows.map((r) => (
+        <div
+          key={r.id}
+          className="group flex items-center gap-4 rounded-xl border border-border-default bg-white px-4 py-3 hover:shadow-sm hover:border-ces-red/20 transition-all"
+        >
+          <div className="h-8 w-8 rounded-lg bg-amber-50 border border-amber-100 grid place-items-center shrink-0">
+            <svg className="w-3.5 h-3.5 text-amber-600" viewBox="0 0 16 16" fill="none">
+              <path d="M3 8.5L6.5 12L13 4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-[11px] uppercase tracking-wider font-bold text-text-muted">{r.field}</span>
+              <span className="text-[12.5px] text-text-muted line-through">{r.original}</span>
+              <svg className="w-3 h-3 text-ces-red/50" viewBox="0 0 12 12" fill="none">
+                <path d="M2.5 6H9.5M6.5 3L9.5 6L6.5 9" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+              <span className="max-w-[520px] truncate text-[12.5px] font-semibold text-text-primary">
+                {r.corrected}
+              </span>
+              {r.reason && (
+                <span className="rounded bg-surface px-2 py-0.5 text-[11.5px] text-text-muted">
+                  Reason: {r.reason}
+                </span>
+              )}
+            </div>
+          </div>
+          <div className="flex items-center gap-3 shrink-0 text-[11.5px] text-text-muted">
+            <span className="font-mono text-text-secondary">{r.date}</span>
+            <span className="h-1 w-1 rounded-full bg-border-default" />
+            <span>{r.when}</span>
+          </div>
+        </div>
+      ))}
     </div>
   );
 }

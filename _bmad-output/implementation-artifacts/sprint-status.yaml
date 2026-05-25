@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-05-06
-last_updated: 2026-05-21 — story 4-4 done; story 4-5 ready-for-dev
+last_updated: 2026-05-25 — story 4-5 done
 project: Canadian Energy Service Internal Tool
 project_key: NOKEY
 tracking_system: file-system
@@ -88,7 +88,7 @@ development_status:
   4-2-occurrence-edit-api-correction-store-write: done
   4-3-correction-context-builder-pipeline-injection: done
   4-4-correction-store-review-api: done
-  4-5-inline-edit-ui-reasoncapturemodal: ready-for-dev
+  4-5-inline-edit-ui-reasoncapturemodal: done
   epic-4-retrospective: optional
 
   # ── Epic 5: Data Export ──

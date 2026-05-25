@@ -33,7 +33,7 @@ def test_correction_model_has_no_updated_at() -> None:
 def test_correction_model_columns_present() -> None:
     table = Correction.__table__
     expected = {
-        "id", "occurrence_id", "ddr_id", "field_name",
+        "id", "occurrence_id", "ddr_id", "ddr_date_id", "field_name",
         "original_value", "corrected_value", "reason", "user_id", "created_at",
     }
     assert set(table.c.keys()) == expected
@@ -53,6 +53,10 @@ def test_correction_model_column_types_and_nullability() -> None:
     assert isinstance(table.c.ddr_id.type, postgresql.UUID)
     assert not table.c.ddr_id.nullable
     assert next(iter(table.c.ddr_id.foreign_keys)).target_fullname == "ddrs.id"
+
+    assert isinstance(table.c.ddr_date_id.type, postgresql.UUID)
+    assert table.c.ddr_date_id.nullable
+    assert next(iter(table.c.ddr_date_id.foreign_keys)).target_fullname == "ddr_dates.id"
 
     assert isinstance(table.c.field_name.type, sqlalchemy.String)
     assert table.c.field_name.type.length == 100
@@ -347,7 +351,13 @@ def test_correction_page_response_envelope() -> None:
         created_at=1700000000,
     )
     response = CorrectionPageResponse(items=[item], total=7, page=2, page_size=50)
-    assert response.model_dump() == {"items": [item.model_dump()], "total": 7, "page": 2, "page_size": 50}
+    assert response.model_dump() == {
+        "items": [item.model_dump()],
+        "summaries": [],
+        "total": 7,
+        "page": 2,
+        "page_size": 50,
+    }
 
 
 class SeededCorrectionResult:

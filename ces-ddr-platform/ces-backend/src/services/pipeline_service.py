@@ -41,11 +41,13 @@ class PreSplitPipelineService:
         occurrence_repository: Any | None = None,
         storage_service: StorageService | None = None,
         correction_repository: Any | None = None,
+        correction_summary_repository: Any | None = None,
     ) -> None:
         self.ddr_repository = ddr_repository
         self.ddr_date_repository = ddr_date_repository
         self.occurrence_repository = occurrence_repository
         self.correction_repository = correction_repository
+        self.correction_summary_repository = correction_summary_repository
         self.pre_splitter = pre_splitter or PDFPreSplitter()
         self.storage_service = storage_service or StorageService()
         self.pdf_loader = pdf_loader or self._default_pdf_loader
@@ -623,6 +625,7 @@ class PreSplitPipelineService:
             ddr_date_repository=self.ddr_date_repository,
             occurrence_repository=self.occurrence_repository,
             correction_repository=self.correction_repository,
+            correction_summary_repository=self.correction_summary_repository,
         )
         return await service.generate_for_ddr(
             ddr_id=ddr_id,
