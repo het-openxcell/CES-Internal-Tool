@@ -137,20 +137,23 @@ def test_build_defensive_slice_caps_even_if_repo_returns_more():
     asyncio.run(run())
 
 
-def test_build_scopes_by_ddr_when_ddr_id_provided():
+def test_build_merges_ddr_specific_with_global_recent():
     from src.services.correction.context_builder import CorrectionContextBuilder
 
     async def run():
-        corrections = [_make_correction("type", "Ream", "Back Ream", "human fixed it", 1001)]
+        ddr_specific = [_make_correction("type", "Ream", "Back Ream", "human fixed it", 1001)]
+        global_recent = [_make_correction("notes", "1550kg/m3", "516.667kg/m3", "divide by 3", 1002)]
         repo = AsyncMock()
-        repo.get_by_ddr_id.return_value = corrections
+        repo.get_by_ddr_id.return_value = ddr_specific
+        repo.get_recent.return_value = global_recent
 
         builder = CorrectionContextBuilder(repo)
         result = await builder.build(ddr_id="ddr-1")
 
         repo.get_by_ddr_id.assert_awaited_once_with("ddr-1", limit=20)
-        repo.get_recent.assert_not_called()
+        repo.get_recent.assert_awaited_once_with(20)
         assert "Back Ream" in result
+        assert "516.667kg/m3" in result
 
     asyncio.run(run())
 
@@ -165,6 +168,7 @@ def test_prompt_injection_with_correction_repository():
         correction_repo.get_by_ddr_id.return_value = [
             _make_correction("type", "Ream", "Back Ream", "human fixed it", 1001),
         ]
+        correction_repo.get_recent.return_value = []
         ddr_date_repo.read_dates_by_ddr_id.return_value = [
             _make_date_row("dd1", "20240115", DDRDateStatus.SUCCESS, time_logs=[_tl("drilling", 1500.0)]),
         ]
@@ -264,6 +268,7 @@ def test_build_includes_date_scoped_summaries_and_recent_exact_corrections():
 
     async def run():
         correction_repo = AsyncMock()
+        correction_repo.get_recent.return_value = []
         summary_repo = AsyncMock()
         summary_repo.get_by_ddr_id.return_value = [
             SimpleNamespace(

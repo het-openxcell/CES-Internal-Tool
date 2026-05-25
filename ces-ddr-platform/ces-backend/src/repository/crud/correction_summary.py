@@ -71,6 +71,17 @@ class CorrectionSummaryCRUDRepository(BaseCRUDRepository[CorrectionSummary]):
         result = await self.async_session.execute(stmt)
         return list(result.scalars().all())
 
+    async def get_recent(self, limit: int = 100) -> list[CorrectionSummary]:
+        limit = min(limit, _MAX_LIMIT)
+        stmt = (
+            sqlalchemy.select(self.model)
+            .options(selectinload(self.model.ddr_date))
+            .order_by(self.model.updated_at.desc(), self.model.id.desc())
+            .limit(limit)
+        )
+        result = await self.async_session.execute(stmt)
+        return list(result.scalars().all())
+
     async def get_by_ddr_date_id(self, ddr_date_id: str) -> CorrectionSummary | None:
         stmt = sqlalchemy.select(self.model).options(selectinload(self.model.ddr_date)).where(
             self.model.ddr_date_id == ddr_date_id,
