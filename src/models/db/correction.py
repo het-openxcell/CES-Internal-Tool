@@ -19,6 +19,7 @@ class Correction(Base):
     __tablename__ = "corrections"
     __table_args__ = (
         sqlalchemy.Index("idx_corrections_ddr_id", "ddr_id"),
+        sqlalchemy.Index("idx_corrections_ddr_date_id", "ddr_date_id"),
         sqlalchemy.Index("idx_corrections_occurrence_id", "occurrence_id"),
         sqlalchemy.Index("idx_corrections_field_name_ddr_id", "field_name", "ddr_id"),
     )
@@ -31,6 +32,9 @@ class Correction(Base):
     )
     ddr_id: Mapped[str] = mapped_column(
         UUID(as_uuid=False), sqlalchemy.ForeignKey("ddrs.id", ondelete="CASCADE"), nullable=False
+    )
+    ddr_date_id: Mapped[str | None] = mapped_column(
+        UUID(as_uuid=False), sqlalchemy.ForeignKey("ddr_dates.id", ondelete="CASCADE"), nullable=True
     )
     field_name: Mapped[str] = mapped_column(sqlalchemy.String(100), nullable=False)
     original_value: Mapped[str] = mapped_column(sqlalchemy.Text(), nullable=False)

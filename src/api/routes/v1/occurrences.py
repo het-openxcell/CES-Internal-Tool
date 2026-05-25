@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, BackgroundTasks, Depends, status
 
 from src.api.dependencies.services import get_occurrence_correction_service
 from src.models.schemas.occurrence import OccurrenceCorrectionRequest, OccurrenceInResponse
@@ -12,6 +12,7 @@ router = APIRouter(prefix="/occurrences", tags=["Occurrences"])
 async def patch_occurrence(
     occurrence_id: str,
     payload: OccurrenceCorrectionRequest,
+    background_tasks: BackgroundTasks,
     current_user=Depends(jwt_authentication),
     service: OccurrenceCorrectionService = Depends(get_occurrence_correction_service),
 ) -> OccurrenceInResponse:
@@ -22,4 +23,5 @@ async def patch_occurrence(
         reason=payload.reason,
         current_user=current_user,
     )
+    background_tasks.add_task(service.refresh_correction_summary, occurrence.ddr_date_id)
     return OccurrenceInResponse.model_validate(occurrence)

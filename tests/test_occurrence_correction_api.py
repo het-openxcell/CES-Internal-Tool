@@ -80,6 +80,19 @@ class StubCorrectionRepo:
     async def create_correction(self, **kwargs):
         self.created.append(kwargs)
 
+    async def get_by_ddr_date_id(self, ddr_date_id: str):
+        return [SimpleNamespace(**item) for item in self.created]
+
+
+class StubDDRDateRepo:
+    async def read_by_id(self, ddr_date_id: str):
+        return SimpleNamespace(id=ddr_date_id, ddr_id="ddr-1", date="20260101", final_json={"time_logs": []})
+
+
+class RaisingSummaryService:
+    async def refresh_date_summary(self, ddr_date, corrections):
+        raise RuntimeError("summary failed")
+
 
 def test_patch_occurrence_happy_path() -> None:
     occurrence = _make_occurrence()
@@ -114,6 +127,35 @@ def test_patch_occurrence_happy_path() -> None:
     assert call["commit"] is False
     assert occ_repo.committed is True
     assert occ_repo.refreshed is True
+
+
+def test_patch_occurrence_summary_failure_does_not_fail_edit() -> None:
+    occurrence = _make_occurrence()
+    ddr_repo = StubDDRRepo()
+    occ_repo = StubOccurrenceRepo(occurrence)
+    corr_repo = StubCorrectionRepo()
+    service = OccurrenceCorrectionService(
+        ddr_repo,
+        occ_repo,
+        corr_repo,
+        StubDDRDateRepo(),
+        RaisingSummaryService(),
+    )
+
+    async def run():
+        return await service.patch_occurrence(
+            occurrence_id="occ-1",
+            field_name="type",
+            corrected_value="Back Ream",
+            reason="Text said backreamed",
+            current_user=_make_user(),
+        )
+
+    result = asyncio.run(run())
+
+    assert result.type == "Back Ream"
+    assert len(corr_repo.created) == 1
+    assert occ_repo.committed is True
 
 
 def test_patch_occurrence_404_when_not_found() -> None:

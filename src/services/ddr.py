@@ -10,6 +10,7 @@ from src.constants.occurrence import VALID_SECTIONS
 from src.constants.storage import PDF_CONTENT_TYPES, PDF_HEADER, UPLOAD_CHUNK_SIZE_BYTES
 from src.models.schemas.ddr import DDRDateStatus, DDRStatus
 from src.repository.crud.correction import CorrectionCRUDRepository
+from src.repository.crud.correction_summary import CorrectionSummaryCRUDRepository
 from src.repository.crud.ddr import DDRCRUDRepository, DDRDateCRUDRepository, ProcessingQueueCRUDRepository
 from src.repository.crud.occurrence import OccurrenceCRUDRepository
 from src.services.pipeline_service import PreSplitPipelineService
@@ -68,6 +69,7 @@ class DDRPipelineTaskBase:
             ddr_date_repository=DDRDateCRUDRepository(async_session=session),
             occurrence_repository=OccurrenceCRUDRepository(async_session=session),
             correction_repository=CorrectionCRUDRepository(async_session=session),
+            correction_summary_repository=CorrectionSummaryCRUDRepository(async_session=session),
             storage_service=self.storage_service,
         )
 
@@ -141,12 +143,14 @@ class DDRReprocessService:
         occurrence_repository: Any,
         storage_service: StorageService | None = None,
         correction_repository: Any | None = None,
+        correction_summary_repository: Any | None = None,
     ) -> None:
         self.ddr_repository = ddr_repository
         self.ddr_date_repository = ddr_date_repository
         self.occurrence_repository = occurrence_repository
         self.storage_service = storage_service or StorageService()
         self.correction_repository = correction_repository
+        self.correction_summary_repository = correction_summary_repository
 
     async def prepare_full(self, ddr_id: str) -> None:
         ddr = await self.ddr_repository.read_ddr_by_id(ddr_id)
@@ -170,6 +174,7 @@ class DDRReprocessService:
             ddr_date_repository=self.ddr_date_repository,
             occurrence_repository=self.occurrence_repository,
             correction_repository=self.correction_repository,
+            correction_summary_repository=self.correction_summary_repository,
             storage_service=self.storage_service,
             status_stream_service=None,
         )
@@ -186,10 +191,14 @@ class OccurrenceCorrectionService:
         ddr_repository: DDRCRUDRepository,
         occurrence_repository: OccurrenceCRUDRepository,
         correction_repository: CorrectionCRUDRepository,
+        ddr_date_repository: DDRDateCRUDRepository | None = None,
+        correction_summary_service: Any | None = None,
     ) -> None:
         self.ddr_repository = ddr_repository
+        self.ddr_date_repository = ddr_date_repository
         self.occurrence_repository = occurrence_repository
         self.correction_repository = correction_repository
+        self.correction_summary_service = correction_summary_service
         self.allowed_fields = {"type", "section", "mmd", "notes", "density"}
 
     async def patch_occurrence(
@@ -214,7 +223,8 @@ class OccurrenceCorrectionService:
         if field_name not in self.allowed_fields:
             raise HTTPException(status_code=422, detail=f"field_name must be one of {sorted(self.allowed_fields)}")
 
-        original_value = str(getattr(occurrence, field_name)) if getattr(occurrence, field_name) is not None else ""
+        current_value = getattr(occurrence, field_name)
+        original_value = str(current_value) if current_value is not None else ""
 
         if field_name in {"mmd", "density"}:
             try:
@@ -223,10 +233,15 @@ class OccurrenceCorrectionService:
                 raise HTTPException(status_code=422, detail=f"{field_name} must be a valid number") from exc
             if not math.isfinite(casted_value):
                 raise HTTPException(status_code=422, detail=f"{field_name} must be a finite number")
+            unchanged = current_value is not None and float(current_value) == casted_value
         elif field_name == "section" and corrected_value not in VALID_SECTIONS:
             raise HTTPException(status_code=422, detail=f"section must be one of {sorted(VALID_SECTIONS)}")
         else:
-            casted_value = corrected_value
+            casted_value = corrected_value.strip()
+            unchanged = original_value.strip() == casted_value
+
+        if unchanged:
+            return occurrence
 
         await self.occurrence_repository.update(
             occurrence,
@@ -236,6 +251,7 @@ class OccurrenceCorrectionService:
         await self.correction_repository.create_correction(
             occurrence_id=occurrence_id,
             ddr_id=occurrence.ddr_id,
+            ddr_date_id=occurrence.ddr_date_id,
             field_name=field_name,
             original_value=original_value,
             corrected_value=str(corrected_value),
@@ -246,6 +262,18 @@ class OccurrenceCorrectionService:
         await self.occurrence_repository.async_session.commit()
         await self.occurrence_repository.async_session.refresh(occurrence)
         return occurrence
+
+    async def refresh_correction_summary(self, ddr_date_id: str | None) -> None:
+        if ddr_date_id is None or self.ddr_date_repository is None or self.correction_summary_service is None:
+            return
+        try:
+            ddr_date = await self.ddr_date_repository.read_by_id(ddr_date_id)
+            if ddr_date is None:
+                return
+            corrections = await self.correction_repository.get_by_ddr_date_id(ddr_date_id)
+            await self.correction_summary_service.refresh_date_summary(ddr_date, corrections)
+        except Exception as exc:
+            logger.warning(f"correction_summary_refresh_failed ddr_date_id={ddr_date_id} error={exc}")
 
 
 class DDRUploadService:

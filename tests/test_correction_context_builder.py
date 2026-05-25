@@ -254,3 +254,38 @@ def test_no_correction_repo_prompt_has_no_correction_block():
         assert "CURRENT TIME LOGS" in prompt
 
     asyncio.run(run())
+
+
+def test_build_includes_date_scoped_summaries_and_recent_exact_corrections():
+    from types import SimpleNamespace
+    from unittest.mock import AsyncMock
+
+    from src.services.correction.context_builder import CorrectionContextBuilder
+
+    async def run():
+        correction_repo = AsyncMock()
+        summary_repo = AsyncMock()
+        summary_repo.get_by_ddr_id.return_value = [
+            SimpleNamespace(
+                date="20261207",
+                ddr_date_id="date-1",
+                summary="type: Kick / Well Control -> Lost Circulation when source logs mention pit gain.",
+            )
+        ]
+        correction_repo.get_by_ddr_id.return_value = [
+            SimpleNamespace(
+                field_name="type",
+                original_value="Kick / Well Control",
+                corrected_value="Lost Circulation",
+                reason="pit gain with losses",
+            )
+        ]
+
+        result = await CorrectionContextBuilder(correction_repo, summary_repo).build(ddr_id="ddr-1")
+
+        assert "[20261207] type: Kick / Well Control -> Lost Circulation when source logs mention pit gain." in result
+        assert "Field 'type': 'Kick / Well Control' corrected to 'Lost Circulation'" in result
+        summary_repo.get_by_ddr_id.assert_awaited_once_with("ddr-1", limit=12)
+        correction_repo.get_by_ddr_id.assert_awaited_once_with("ddr-1", limit=20)
+
+    asyncio.run(run())
