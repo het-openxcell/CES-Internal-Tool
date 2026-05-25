@@ -28,3 +28,21 @@ class CorrectionInResponse(BaseSchemaModel):
     reason: str
     user_id: str
     created_at: int
+
+
+class CorrectionReviewItem(BaseSchemaModel):
+    id: str
+    occurrence_id: str
+    ddr_id: str
+    field_name: str
+    original_value: str
+    corrected_value: str
+    reason: str
+    created_at: int
+
+
+class CorrectionPageResponse(BaseSchemaModel):
+    items: list[CorrectionReviewItem]
+    total: int
+    page: int
+    page_size: int

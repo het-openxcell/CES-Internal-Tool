@@ -4,6 +4,7 @@ from src.api.dependencies.repository import get_repository
 from src.repository.crud.correction import CorrectionCRUDRepository
 from src.repository.crud.ddr import DDRCRUDRepository, DDRDateCRUDRepository
 from src.repository.crud.occurrence import OccurrenceCRUDRepository
+from src.services.correction.review import CorrectionReviewService
 from src.services.ddr import (
     DDRReprocessService,
     DDRReprocessTask,
@@ -65,3 +66,9 @@ def get_occurrence_correction_service(
     correction_repository: CorrectionCRUDRepository = Depends(get_repository(CorrectionCRUDRepository)),
 ) -> OccurrenceCorrectionService:
     return OccurrenceCorrectionService(ddr_repository, occurrence_repository, correction_repository)
+
+
+def get_correction_review_service(
+    correction_repository: CorrectionCRUDRepository = Depends(get_repository(CorrectionCRUDRepository)),
+) -> CorrectionReviewService:
+    return CorrectionReviewService(correction_repository)
