@@ -11,6 +11,7 @@ from src.api.routes.v1.monitor import router as monitor_router
 from src.api.routes.v1.occurrences import router as occurrences_router
 from src.api.routes.v1.pipeline import router as pipeline_router
 from src.api.routes.v1.query import router as query_router
+from src.api.routes.v1.users import router as users_router
 
 router = APIRouter()
 
@@ -26,3 +27,4 @@ router.include_router(router=history_router)
 router.include_router(router=query_router)
 router.include_router(router=export_router)
 router.include_router(router=health_router)
+router.include_router(router=users_router)

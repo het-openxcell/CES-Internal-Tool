@@ -32,7 +32,8 @@ class JWTGenerator:
 
         expiration_seconds = settings.JWT_ACCESS_TOKEN_EXPIRATION_TIME * 60
         expires_delta = datetime.timedelta(seconds=expiration_seconds)
-        token_data = JWTUser(user_id=str(user.id), username=user.username).model_dump()
+        role_names = [r.name for r in getattr(user, "roles", [])]
+        token_data = JWTUser(user_id=str(user.id), username=user.username, roles=role_names).model_dump()
         token = self._generate_jwt_token(
             jwt_data=token_data,
             expires_delta=expires_delta,

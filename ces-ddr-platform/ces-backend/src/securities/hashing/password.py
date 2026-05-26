@@ -4,6 +4,11 @@ import bcrypt
 
 
 class PasswordGenerator:
+    _DUMMY_HASH = "$2b$12$ugrU2DLrcp6QoLBOh2pnUe96x25t1ZGJEUfXc2/eRS41SsRsi.HFi"
+
+    def dummy_hash(self) -> str:
+        return self._DUMMY_HASH
+
     async def generate_hashed_password(self, password: str) -> str:
         return await asyncio.to_thread(self.generate_hashed_password_sync, password)
 

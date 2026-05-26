@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-05-06
-last_updated: 2026-05-25 — story 7-1 ready for dev
+last_updated: 2026-05-26 — story 7-5 done after code review
 project: Canadian Energy Service Internal Tool
 project_key: NOKEY
 tracking_system: file-system
@@ -119,9 +119,9 @@ development_status:
   # ── Epic 7: Pipeline Monitoring & System Administration ──
   epic-7: in-progress
   7-1-pipeline-queue-per-date-status-api: ready-for-dev
-  7-2-error-log-per-date-re-run-api: backlog
-  7-3-keyword-management-api: backlog
-  7-4-monitor-dashboard-keyword-editor-ui: backlog
-  7-5-rbac-schema-seeded-admin-user-management-api: backlog
-  7-6-admin-user-management-ui: backlog
+  7-2-error-log-per-date-re-run-api: ready-for-dev
+  7-3-keyword-management-api: ready-for-dev
+  7-4-monitor-dashboard-keyword-editor-ui: ready-for-dev
+  7-5-rbac-schema-seeded-admin-user-management-api: done
+  7-6-admin-user-management-ui: ready-for-dev
   epic-7-retrospective: optional

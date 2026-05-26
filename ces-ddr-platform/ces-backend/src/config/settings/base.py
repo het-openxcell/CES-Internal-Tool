@@ -81,6 +81,9 @@ class BackendBaseSettings(BaseSettings):
     S3_SECRET_ACCESS_KEY: str = config("S3_SECRET_ACCESS_KEY", default="", cast=str)
     S3_KEY_PREFIX: str = config("S3_KEY_PREFIX", default="ces/", cast=str)
 
+    ADMIN_USERNAME: str = config("ADMIN_USERNAME", default="admin", cast=str)
+    ADMIN_PASSWORD: str = config("ADMIN_PASSWORD", cast=str)
+
     HASHING_ALGORITHM_LAYER_1: str = config("HASHING_ALGORITHM_LAYER_1", default="bcrypt", cast=str)
     HASHING_ALGORITHM_LAYER_2: str = config("HASHING_ALGORITHM_LAYER_2", default="sha256", cast=str)
 

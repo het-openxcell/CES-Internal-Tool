@@ -12,3 +12,4 @@ class JWToken(pydantic.BaseModel):
 class JWTUser(pydantic.BaseModel):
     user_id: str
     username: str
+    roles: list[str] = []

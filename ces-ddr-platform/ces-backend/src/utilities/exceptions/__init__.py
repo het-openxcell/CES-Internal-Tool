@@ -4,6 +4,8 @@ __all__ = [
     "BaseTrackedException",
     "BadRequestException",
     "EntityAlreadyExistsException",
+    "UsernameConflictException",
+    "ForbiddenException",
     "SecurityException",
     "EntityDoesNotExist",
     "EntityDoesNotExistException",
