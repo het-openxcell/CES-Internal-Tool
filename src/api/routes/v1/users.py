@@ -25,7 +25,7 @@ def _user_response(user) -> UserResponse:
     )
 
 
-@router.get("/", response_model=list[UserResponse], status_code=status.HTTP_200_OK, dependencies=[Depends(admin_only)])
+@router.get("", response_model=list[UserResponse], status_code=status.HTTP_200_OK, dependencies=[Depends(admin_only)])
 async def list_users(
     user_repository: UserCRUDRepository = Depends(get_repository(UserCRUDRepository)),
 ) -> list[UserResponse]:
@@ -33,7 +33,7 @@ async def list_users(
     return [_user_response(u) for u in users]
 
 
-@router.post("/", response_model=UserResponse, status_code=status.HTTP_201_CREATED, dependencies=[Depends(admin_only)])
+@router.post("", response_model=UserResponse, status_code=status.HTTP_201_CREATED, dependencies=[Depends(admin_only)])
 async def create_user(
     body: CreateUserRequest,
     user_repository: UserCRUDRepository = Depends(get_repository(UserCRUDRepository)),
