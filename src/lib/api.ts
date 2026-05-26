@@ -164,6 +164,20 @@ export type MasterExportFilters = {
   date_to?: string;
 };
 
+export type User = {
+  id: string;
+  username: string;
+  is_active: boolean;
+  roles: string[];
+  created_at: number;
+  updated_at: number;
+};
+
+export type CreateUserRequest = {
+  username: string;
+  password: string;
+};
+
 type ApiErrorCode = "UNAUTHORIZED" | "API_ERROR";
 
 export class ApiError extends Error {
@@ -375,6 +389,23 @@ class ApiClient {
     const hasFilters = params.toString().length > 0;
     const filename = hasFilters ? "occurrences_filtered.xlsx" : "occurrences_all.xlsx";
     await this.downloadFile(`/export/master${query}`, filename);
+  }
+
+  async getUsers() {
+    return this.request<User[]>("/users");
+  }
+
+  async createUser(req: CreateUserRequest) {
+    return this.request<User>("/users", {
+      method: "POST",
+      body: JSON.stringify(req),
+    });
+  }
+
+  async deactivateUser(userId: string) {
+    return this.request<User>(`/users/${encodeURIComponent(userId)}/deactivate`, {
+      method: "PATCH",
+    });
   }
 
   async request<TResponse>(path: string, options: RequestInit & { skipAuth?: boolean } = {}) {

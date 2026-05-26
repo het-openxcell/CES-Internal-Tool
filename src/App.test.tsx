@@ -80,6 +80,7 @@ describe("App routing and login", () => {
       { path: "/query", protected: true },
       { path: "/monitor", protected: true },
       { path: "/settings/keywords", protected: true },
+      { path: "/users", protected: true },
     ]);
   });
 });

@@ -7,6 +7,7 @@ import LoginPage from "@/pages/LoginPage";
 import MonitorPage from "@/pages/MonitorPage";
 import QueryPage from "@/pages/QueryPage";
 import ReportDetailPage from "@/pages/ReportDetailPage";
+import UserManagementPage from "@/pages/UserManagementPage";
 
 export type AppRoute = {
   path: string;
@@ -22,5 +23,6 @@ export const APP_ROUTES: AppRoute[] = [
   { path: "/query", protected: true, Component: QueryPage },
   { path: "/monitor", protected: true, Component: MonitorPage },
   { path: "/settings/keywords", protected: true, Component: KeywordsPage },
+  { path: "/users", protected: true, Component: UserManagementPage },
 ];
 

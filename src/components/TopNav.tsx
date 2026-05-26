@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { FileText, History, Key, LogOut, Monitor, Search, Upload } from "lucide-react";
+import { FileText, History, Key, LogOut, Monitor, Search, Upload, Users } from "lucide-react";
 import { Link, useLocation, useNavigate } from "react-router";
 
 import { useUploadModal } from "@/components/UploadModalContext";
@@ -13,7 +13,7 @@ const TABS = [
   { key: "keywords", label: "Keywords", path: "/settings/keywords", Icon: Key },
 ];
 
-export default function TopNav({ onLogout, username }: { onLogout: () => void; username?: string | null }) {
+export default function TopNav({ onLogout, username, roles }: { onLogout: () => void; username?: string | null; roles?: string[] }) {
   const initials = username
     ? (username.split(/[\s._-]+/).map((w) => w[0]?.toUpperCase() ?? "").join("").slice(0, 2) || (username[0]?.toUpperCase() ?? "?"))
     : "?";
@@ -23,7 +23,12 @@ export default function TopNav({ onLogout, username }: { onLogout: () => void; u
   const [profileOpen, setProfileOpen] = useState(false);
   const profileRef = useRef<HTMLDivElement>(null);
 
-  const activeKey = TABS.find((t) =>
+  const isAdmin = roles?.includes("ADMIN") ?? false;
+  const visibleTabs = isAdmin
+    ? [...TABS, { key: "users", label: "Users", path: "/users", Icon: Users }]
+    : TABS;
+
+  const activeKey = visibleTabs.find((t) =>
     t.path === "/" ? location.pathname === "/" : location.pathname.startsWith(t.path)
   )?.key ?? "reports";
 
@@ -46,7 +51,7 @@ export default function TopNav({ onLogout, username }: { onLogout: () => void; u
       </div>
 
       <nav className="flex items-center gap-0.5 ml-1" aria-label="Primary">
-        {TABS.map((t) => {
+        {visibleTabs.map((t) => {
           const active = activeKey === t.key;
           return (
             <Link
