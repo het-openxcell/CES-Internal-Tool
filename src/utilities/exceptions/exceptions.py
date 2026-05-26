@@ -1,10 +1,12 @@
+import inspect
 from typing import Dict, Optional
 
-from fastapi import Request, HTTPException, status
+from fastapi import HTTPException, Request, status
 from fastapi.responses import JSONResponse
-from src.models.schemas.response import MessageModel, ResponseModel as Response
+
+from src.models.schemas.response import MessageModel
+from src.models.schemas.response import ResponseModel as Response
 from src.utilities.logging.logger import logger
-import inspect
 
 
 def get_call_hierarchy_from_stack() -> str:
@@ -151,6 +153,16 @@ class PasswordDoesNotMatchException(Exception):
         self.detail = detail
 
 
+class UsernameConflictException(EntityAlreadyExistsException):
+    def __init__(self, detail: str = "Username already exists"):
+        super().__init__(detail)
+
+
+class ForbiddenException(Exception):
+    def __init__(self, detail: str = "forbidden"):
+        self.detail = detail
+
+
 class SecurityException(BaseTrackedException):
     def __init__(self, detail: str = "security_error", format_data: dict = None):
         super().__init__(detail, format_data)
@@ -166,6 +178,10 @@ class EntityDoesNotExist(EntityDoesNotExistException):
 
 async def bad_request_exception_handler(request: Request, exc: BadRequestException):
     return await exception_json_response(status.HTTP_400_BAD_REQUEST, request, exc.detail, str(exc), format_data=exc.format_data, call_hierarchy=exc.get_hierarchy())
+
+
+async def username_conflict_exception_handler(request: Request, exc: UsernameConflictException):
+    return await exception_json_response(status.HTTP_409_CONFLICT, request, exc.detail, "USERNAME_CONFLICT", format_data=exc.format_data, call_hierarchy=exc.get_hierarchy())
 
 
 async def entity_already_exists_exception_handler(request: Request, exc: EntityAlreadyExistsException):
@@ -186,3 +202,7 @@ async def invalid_credentials_exception_handler(request: Request, exc: InvalidCr
 
 async def security_exception_handler(request: Request, exc: SecurityException):
     return await exception_json_response(status.HTTP_403_FORBIDDEN, request, exc.detail, str(exc), format_data=exc.format_data, call_hierarchy=exc.get_hierarchy())
+
+
+async def forbidden_exception_handler(request: Request, exc: ForbiddenException):
+    return await exception_json_response(status.HTTP_403_FORBIDDEN, request, exc.detail, "FORBIDDEN")

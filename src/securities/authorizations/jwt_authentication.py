@@ -1,10 +1,10 @@
 from typing import Optional
 
-from fastapi import Depends, Request
-from fastapi.security import HTTPBearer
-from fastapi.security import HTTPAuthorizationCredentials, OAuth2PasswordBearer
-from fastapi.security.utils import get_authorization_scheme_param
 import sqlalchemy
+from fastapi import Depends, Request
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer, OAuth2PasswordBearer
+from fastapi.security.utils import get_authorization_scheme_param
+from sqlalchemy.orm import selectinload
 
 from src.models.db.user import User
 from src.repository.database import async_db
@@ -30,6 +30,7 @@ class CustomHTTPBearer(HTTPBearer):
                 return None
         return HTTPAuthorizationCredentials(scheme=scheme, credentials=credentials)
 
+
 security = CustomHTTPBearer()
 
 
@@ -44,7 +45,7 @@ class StreamQueryTokenAuthentication:
             user_id = token_data.get("user_id")
             current_user = await get_current_user(user_id=user_id)
             if not current_user:
-                raise AuthorizationHeaderException(detail='sign_in_required')
+                raise AuthorizationHeaderException(detail="sign_in_required")
 
             request.state.user = current_user
             request.state.token_data = token_data
@@ -52,7 +53,7 @@ class StreamQueryTokenAuthentication:
         except SecurityException as security_error:
             raise AuthorizationHeaderException(detail=str(security_error))
         except Exception:
-            raise AuthorizationHeaderException(detail='sign_in_required')
+            raise AuthorizationHeaderException(detail="sign_in_required")
 
 
 stream_query_token_authentication = StreamQueryTokenAuthentication()
@@ -72,27 +73,32 @@ class CustomOAuth2PasswordBearer(OAuth2PasswordBearer):
         if authorization.startswith("Bearer "):
             token = authorization[7:]
         else:
-            raise AuthorizationHeaderException(
-                detail="AUTH_TOKEN_MISSING",
-            )
+            raise AuthorizationHeaderException(detail="AUTH_TOKEN_MISSING")
 
         return token
 
 
-async def get_current_user(user_id: int) -> User:
+async def get_current_user(user_id: str) -> User | None:
     async for async_session in async_db.get_session():
-        stmt = sqlalchemy.select(User).where(User.id == user_id)
+        stmt = (
+            sqlalchemy.select(User)
+            .options(selectinload(User.roles))
+            .where(User.id == user_id)
+        )
         result = await async_session.execute(statement=stmt)
-        return result.scalar_one_or_none()
+        user = result.scalar_one_or_none()
+        if user is not None and not user.is_active:
+            return None
+        return user
 
 
 async def jwt_authentication(
     request: Request,
-    credentials: HTTPAuthorizationCredentials = Depends(security)
+    credentials: HTTPAuthorizationCredentials = Depends(security),
 ) -> User:
     token = credentials.credentials
     if token is None:
-        raise AuthorizationHeaderException('sign_in_required')
+        raise AuthorizationHeaderException("sign_in_required")
 
     try:
         token_data = jwt_generator.retrieve_details_from_token(token)
@@ -100,7 +106,7 @@ async def jwt_authentication(
 
         current_user = await get_current_user(user_id=user_id)
         if not current_user:
-            raise AuthorizationHeaderException(detail='sign_in_required')
+            raise AuthorizationHeaderException(detail="sign_in_required")
 
         request.state.user = current_user
         request.state.token_data = token_data
@@ -110,4 +116,4 @@ async def jwt_authentication(
     except SecurityException as security_error:
         raise AuthorizationHeaderException(detail=str(security_error))
     except Exception:
-        raise AuthorizationHeaderException(detail='sign_in_required')
+        raise AuthorizationHeaderException(detail="sign_in_required")

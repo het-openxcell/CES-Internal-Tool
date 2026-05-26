@@ -10,15 +10,19 @@ from src.utilities.exceptions.exceptions import (
     BadRequestException,
     EntityAlreadyExists,
     EntityDoesNotExist,
+    ForbiddenException,
     InvalidCredentialsException,
     SecurityException,
+    UsernameConflictException,
     authorization_header_exception_handler,
     bad_request_exception_handler,
     entity_already_exists_exception_handler,
     entity_does_not_exist_exception_handler,
+    forbidden_exception_handler,
     general_exception_handler,
     invalid_credentials_exception_handler,
     security_exception_handler,
+    username_conflict_exception_handler,
 )
 
 
@@ -37,7 +41,9 @@ def initialize_backend_application() -> FastAPI:
     app.add_exception_handler(BadRequestException, bad_request_exception_handler)
     app.add_exception_handler(SecurityException, security_exception_handler)
     app.add_exception_handler(EntityDoesNotExist, entity_does_not_exist_exception_handler)
+    app.add_exception_handler(UsernameConflictException, username_conflict_exception_handler)
     app.add_exception_handler(EntityAlreadyExists, entity_already_exists_exception_handler)
+    app.add_exception_handler(ForbiddenException, forbidden_exception_handler)
     app.add_exception_handler(Exception, general_exception_handler)
 
     app.include_router(router=api_endpoint_router, prefix=settings.API_PREFIX)
