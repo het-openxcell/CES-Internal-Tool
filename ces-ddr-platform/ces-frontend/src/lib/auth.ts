@@ -3,6 +3,8 @@ const TOKEN_KEY = "ces.auth.token";
 type JwtPayload = {
   exp?: unknown;
   username?: unknown;
+  roles?: unknown;
+  user_id?: unknown;
 };
 
 class AuthToken {
@@ -26,6 +28,21 @@ class AuthToken {
     if (!token) return null;
     const payload = this.decodePayload(token);
     return typeof payload?.username === "string" ? payload.username : null;
+  }
+
+  getRoles(): string[] {
+    const token = this.get();
+    if (!token) return [];
+    const payload = this.decodePayload(token);
+    if (!Array.isArray(payload?.roles)) return [];
+    return payload.roles.filter((r): r is string => typeof r === "string");
+  }
+
+  getUserId(): string | null {
+    const token = this.get();
+    if (!token) return null;
+    const payload = this.decodePayload(token);
+    return typeof payload?.user_id === "string" ? payload.user_id : null;
   }
 
   clear() {

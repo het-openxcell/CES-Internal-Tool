@@ -123,5 +123,5 @@ development_status:
   7-3-keyword-management-api: ready-for-dev
   7-4-monitor-dashboard-keyword-editor-ui: ready-for-dev
   7-5-rbac-schema-seeded-admin-user-management-api: done
-  7-6-admin-user-management-ui: ready-for-dev
+  7-6-admin-user-management-ui: review
   epic-7-retrospective: optional

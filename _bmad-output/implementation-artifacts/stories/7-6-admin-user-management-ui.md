@@ -1,6 +1,6 @@
 # Story 7.6: Admin User Management UI
 
-Status: ready-for-dev
+Status: review
 
 ## Story
 
@@ -21,9 +21,9 @@ so that I can create and deactivate users from the app.
 
 ## Tasks / Subtasks
 
-- [ ] Add `getRoles()` to `AuthToken` in `auth.ts` (AC: 7)
-  - [ ] In `ces-frontend/src/lib/auth.ts`, update `JwtPayload` type to include `roles?: unknown`.
-  - [ ] Add method `getRoles(): string[]` to `AuthToken` class:
+- [x] Add `getRoles()` to `AuthToken` in `auth.ts` (AC: 7)
+  - [x] In `ces-frontend/src/lib/auth.ts`, update `JwtPayload` type to include `roles?: unknown`.
+  - [x] Add method `getRoles(): string[]` to `AuthToken` class:
     ```ts
     getRoles(): string[] {
       const token = this.get();
@@ -33,9 +33,9 @@ so that I can create and deactivate users from the app.
       return payload.roles.filter((r): r is string => typeof r === "string");
     }
     ```
-  - [ ] `decodePayload` already exists and handles JWT decode — no change needed there.
-- [ ] Add user management API methods and types to `api.ts` (AC: 3, 4, 5)
-  - [ ] Add types:
+  - [x] `decodePayload` already exists and handles JWT decode — no change needed there.
+- [x] Add user management API methods and types to `api.ts` (AC: 3, 4, 5)
+  - [x] Add types:
     ```ts
     export type User = {
       id: string;
@@ -51,42 +51,42 @@ so that I can create and deactivate users from the app.
       password: string;
     };
     ```
-  - [ ] Add methods to `apiClient`:
+  - [x] Add methods to `apiClient`:
     - `getUsers()` → `GET /api/users` → returns `User[]`.
     - `createUser(req: CreateUserRequest)` → `POST /api/users` → returns `User`.
     - `deactivateUser(userId: string)` → `PATCH /api/users/{id}/deactivate` → returns `User`.
-- [ ] Update `TopNav.tsx` to accept and render `roles` prop (AC: 1, 2)
-  - [ ] Add `roles?: string[]` to TopNav props: `{ onLogout: () => void; username?: string | null; roles?: string[] }`.
-  - [ ] Add `isAdmin` derived value: `const isAdmin = roles?.includes("ADMIN") ?? false`.
-  - [ ] Add "Users" tab entry to `TABS` array conditionally — filter it out if not admin:
+- [x] Update `TopNav.tsx` to accept and render `roles` prop (AC: 1, 2)
+  - [x] Add `roles?: string[]` to TopNav props: `{ onLogout: () => void; username?: string | null; roles?: string[] }`.
+  - [x] Add `isAdmin` derived value: `const isAdmin = roles?.includes("ADMIN") ?? false`.
+  - [x] Add "Users" tab entry to `TABS` array conditionally — filter it out if not admin:
     ```ts
     const visibleTabs = isAdmin
       ? [...TABS, { key: "users", label: "Users", path: "/users", Icon: Users }]
       : TABS;
     ```
     Use `Users` icon from `lucide-react` (already a dependency).
-  - [ ] Replace `TABS.map(...)` in JSX with `visibleTabs.map(...)`. No other TopNav changes.
-  - [ ] Do NOT add any role-based logic elsewhere in TopNav.
-- [ ] Update `AppShell.tsx` to pass `roles` to `TopNav` (AC: 1, 2)
-  - [ ] In `AppShellInner`, add: `const roles = authToken.getRoles()`.
-  - [ ] Pass `roles={roles}` to `<TopNav onLogout={handleLogout} username={username} roles={roles} />`.
-  - [ ] No other AppShell changes.
-- [ ] Create `UserManagementPage.tsx` (AC: 3, 4, 5, 6)
-  - [ ] New file: `ces-frontend/src/pages/UserManagementPage.tsx`.
-  - [ ] On mount: call `apiClient.getUsers()`. If 403, show forbidden empty state ("You do not have permission to view this page").
-  - [ ] Table columns: Username, Roles (comma-separated role names), Status (Active/Inactive badge), Created, Actions.
-  - [ ] "Create User" button opens an inline form or modal with `username` and `password` fields. Submits `apiClient.createUser(...)`. On success: adds user to table, clears form.
-  - [ ] "Deactivate" button in Actions column — only shows for active users. Inline confirmation ("Confirm deactivate?"). On confirm: calls `apiClient.deactivateUser(user.id)`. Updates row to inactive.
-  - [ ] Prevent self-deactivation: compare `user.id` against JWT payload `user_id` (add `getUserId()` to `AuthToken` or decode inline) — hide/disable Deactivate for own row.
-  - [ ] Status badge: Active = green badge, Inactive = gray badge. No `border-l-*` styling.
-  - [ ] Error states: show inline error text for create/deactivate failures. Do not crash the page.
-- [ ] Register `/users` route in `routes.ts` (AC: 8)
-  - [ ] Import `UserManagementPage` from `@/pages/UserManagementPage`.
-  - [ ] Add to `APP_ROUTES`: `{ path: "/users", protected: true, Component: UserManagementPage }`.
-  - [ ] No route guard beyond `ProtectedRoute` (which checks auth token) — forbidden state is handled by 403 from backend.
-- [ ] Run frontend quality gates (AC: 1–8)
-  - [ ] `cd ces-ddr-platform/ces-frontend && npm run build` — no TypeScript errors.
-  - [ ] `cd ces-ddr-platform/ces-frontend && npm run test` if test suite exists.
+  - [x] Replace `TABS.map(...)` in JSX with `visibleTabs.map(...)`. No other TopNav changes.
+  - [x] Do NOT add any role-based logic elsewhere in TopNav.
+- [x] Update `AppShell.tsx` to pass `roles` to `TopNav` (AC: 1, 2)
+  - [x] In `AppShellInner`, add: `const roles = authToken.getRoles()`.
+  - [x] Pass `roles={roles}` to `<TopNav onLogout={handleLogout} username={username} roles={roles} />`.
+  - [x] No other AppShell changes.
+- [x] Create `UserManagementPage.tsx` (AC: 3, 4, 5, 6)
+  - [x] New file: `ces-frontend/src/pages/UserManagementPage.tsx`.
+  - [x] On mount: call `apiClient.getUsers()`. If 403, show forbidden empty state ("You do not have permission to view this page").
+  - [x] Table columns: Username, Roles (comma-separated role names), Status (Active/Inactive badge), Created, Actions.
+  - [x] "Create User" button opens an inline form or modal with `username` and `password` fields. Submits `apiClient.createUser(...)`. On success: adds user to table, clears form.
+  - [x] "Deactivate" button in Actions column — only shows for active users. Inline confirmation ("Confirm deactivate?"). On confirm: calls `apiClient.deactivateUser(user.id)`. Updates row to inactive.
+  - [x] Prevent self-deactivation: compare `user.id` against JWT payload `user_id` (add `getUserId()` to `AuthToken` or decode inline) — hide/disable Deactivate for own row.
+  - [x] Status badge: Active = green badge, Inactive = gray badge. No `border-l-*` styling.
+  - [x] Error states: show inline error text for create/deactivate failures. Do not crash the page.
+- [x] Register `/users` route in `routes.ts` (AC: 8)
+  - [x] Import `UserManagementPage` from `@/pages/UserManagementPage`.
+  - [x] Add to `APP_ROUTES`: `{ path: "/users", protected: true, Component: UserManagementPage }`.
+  - [x] No route guard beyond `ProtectedRoute` (which checks auth token) — forbidden state is handled by 403 from backend.
+- [x] Run frontend quality gates (AC: 1–8)
+  - [x] `cd ces-ddr-platform/ces-frontend && npm run build` — no TypeScript errors.
+  - [x] `cd ces-ddr-platform/ces-frontend && npm run test` if test suite exists.
 
 ## Dev Notes
 
@@ -199,8 +199,32 @@ Ultimate context engine analysis completed — minimal extension of `AuthToken`,
 
 ### Agent Model Used
 
+claude-sonnet-4-6
+
 ### Debug Log References
+
+- Test `App.test.tsx` had hardcoded route snapshot; updated to include `/users`.
 
 ### Completion Notes List
 
+- Extended `AuthToken` with `getRoles()` (reads `roles[]` from JWT) and `getUserId()` (reads `user_id` from JWT). Both reuse existing `decodePayload()`.
+- Added `User`, `CreateUserRequest` types and `getUsers()`, `createUser()`, `deactivateUser()` to `apiClient`.
+- `TopNav` now accepts optional `roles` prop; computes `visibleTabs` at render time — ADMIN sees "Users" tab, others do not.
+- `AppShell` passes `roles={authToken.getRoles()}` to `TopNav`.
+- `UserManagementPage` fetches users on mount; 403 → forbidden state; table with inline create form and inline deactivate confirmation; self-deactivation hidden; status badges use rounded pill (no `border-l-*`).
+- Route `/users` added as protected route in `APP_ROUTES`.
+- Build: clean (0 TS errors). Tests: 47/47 pass.
+
 ### File List
+
+- ces-ddr-platform/ces-frontend/src/lib/auth.ts (modified)
+- ces-ddr-platform/ces-frontend/src/lib/api.ts (modified)
+- ces-ddr-platform/ces-frontend/src/components/TopNav.tsx (modified)
+- ces-ddr-platform/ces-frontend/src/components/AppShell.tsx (modified)
+- ces-ddr-platform/ces-frontend/src/pages/UserManagementPage.tsx (new)
+- ces-ddr-platform/ces-frontend/src/routes.ts (modified)
+- ces-ddr-platform/ces-frontend/src/App.test.tsx (modified — route snapshot updated)
+
+## Change Log
+
+- 2026-05-26: Implemented story 7-6 — Admin User Management UI. Added getRoles/getUserId to AuthToken, User types + API methods, conditional Users tab in TopNav, UserManagementPage with create/deactivate flows, /users route.
