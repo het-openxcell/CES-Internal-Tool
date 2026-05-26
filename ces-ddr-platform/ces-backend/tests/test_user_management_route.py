@@ -106,21 +106,21 @@ def admin_client():
 
 
 def test_get_users_requires_auth(client: TestClient) -> None:
-    response = client.get("/api/users/")
+    response = client.get("/api/users")
     assert response.status_code == 401
 
 
 def test_get_users_non_admin_gets_403(client: TestClient) -> None:
     backend_app.dependency_overrides[jwt_authentication] = override_user_auth
     try:
-        response = client.get("/api/users/")
+        response = client.get("/api/users")
     finally:
         backend_app.dependency_overrides.clear()
     assert response.status_code == 403
 
 
 def test_get_users_returns_safe_fields(admin_client: TestClient) -> None:
-    response = admin_client.get("/api/users/")
+    response = admin_client.get("/api/users")
     assert response.status_code == 200
     data = response.json()
     assert isinstance(data, list)
@@ -134,21 +134,21 @@ def test_get_users_returns_safe_fields(admin_client: TestClient) -> None:
 
 
 def test_post_users_requires_auth(client: TestClient) -> None:
-    response = client.post("/api/users/", json={"username": "newuser", "password": "strongpass"})
+    response = client.post("/api/users", json={"username": "newuser", "password": "strongpass"})
     assert response.status_code == 401
 
 
 def test_post_users_non_admin_gets_403(client: TestClient) -> None:
     backend_app.dependency_overrides[jwt_authentication] = override_user_auth
     try:
-        response = client.post("/api/users/", json={"username": "newuser", "password": "strongpass"})
+        response = client.post("/api/users", json={"username": "newuser", "password": "strongpass"})
     finally:
         backend_app.dependency_overrides.clear()
     assert response.status_code == 403
 
 
 def test_post_users_creates_user(admin_client: TestClient) -> None:
-    response = admin_client.post("/api/users/", json={"username": "newuser", "password": "strongpass"})
+    response = admin_client.post("/api/users", json={"username": "newuser", "password": "strongpass"})
     assert response.status_code == 201
     data = response.json()
     assert data["username"] == "newuser"
@@ -159,12 +159,12 @@ def test_post_users_creates_user(admin_client: TestClient) -> None:
 
 
 def test_post_users_short_password_rejected(admin_client: TestClient) -> None:
-    response = admin_client.post("/api/users/", json={"username": "newuser", "password": "short"})
+    response = admin_client.post("/api/users", json={"username": "newuser", "password": "short"})
     assert response.status_code == 422
 
 
 def test_post_users_duplicate_username_conflict(admin_client: TestClient) -> None:
-    response = admin_client.post("/api/users/", json={"username": "admin", "password": "strongpass"})
+    response = admin_client.post("/api/users", json={"username": "admin", "password": "strongpass"})
     assert response.status_code == 409
 
 
@@ -203,5 +203,5 @@ def test_patch_deactivate_nonexistent_user_returns_404(admin_client: TestClient)
 
 def test_openapi_includes_user_management_paths(client: TestClient) -> None:
     schema = client.get("/openapi.json").json()
-    assert "/api/users/" in schema["paths"]
+    assert "/api/users" in schema["paths"]
     assert "/api/users/{id}/deactivate" in schema["paths"]
