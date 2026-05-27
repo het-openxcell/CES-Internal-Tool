@@ -153,7 +153,7 @@ async def get_ddr(
         status=ddr.status,
         well_name=ddr.well_name,
         created_at=ddr.created_at,
-        uploaded_by_username=getattr(ddr, "uploaded_by_username", None),
+        uploaded_by_email=getattr(ddr, "uploaded_by_email", None),
         dates=[DDRDateInResponse.model_validate(row) for row in rows],
     )
 

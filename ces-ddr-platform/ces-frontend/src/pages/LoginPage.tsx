@@ -1,5 +1,5 @@
 import { type FormEvent, useRef, useState } from "react";
-import { Eye as EyeIcon, EyeOff as EyeSlashIcon, Lock as LockIcon, User as UserIcon } from "lucide-react";
+import { Eye as EyeIcon, EyeOff as EyeSlashIcon, Lock as LockIcon, Mail as MailIcon } from "lucide-react";
 import { useNavigate } from "react-router";
 
 import { Button } from "@/components/ui/button";
@@ -45,7 +45,7 @@ function Spinner({ className }: { className?: string }) {
 export default function LoginPage() {
   const navigate = useNavigate();
   const passwordRef = useRef<HTMLInputElement>(null);
-  const [username, setUsername] = useState("");
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -58,7 +58,7 @@ export default function LoginPage() {
     setIsSubmitting(true);
 
     try {
-      const response = await apiClient.login({ username, password });
+      const response = await apiClient.login({ email, password });
       authToken.store(response.token);
 
       navigate("/", { replace: true });
@@ -67,7 +67,7 @@ export default function LoginPage() {
       setTimeout(() => setShake(false), 500);
 
       if (caughtError instanceof ApiError && caughtError.code === "UNAUTHORIZED") {
-        setError("Invalid username or password");
+        setError("Invalid email or password");
         setPassword("");
         passwordRef.current?.focus();
       } else {
@@ -94,21 +94,21 @@ export default function LoginPage() {
 
         <form className="login-form" onSubmit={handleSubmit} noValidate>
           <div className="input-group">
-            <label className="field-label" htmlFor="username">
-              Username
+            <label className="field-label" htmlFor="email">
+              Email
             </label>
             <div className="input-wrap">
-              <UserIcon className="input-icon" />
+              <MailIcon className="input-icon" />
               <input
-                autoComplete="username"
+                autoComplete="email"
                 className="text-field text-field--icon"
-                id="username"
-                name="username"
-                onChange={(event) => setUsername(event.target.value)}
-                placeholder="Enter your username"
+                id="email"
+                name="email"
+                onChange={(event) => setEmail(event.target.value)}
+                placeholder="Enter your email"
                 required
-                type="text"
-                value={username}
+                type="email"
+                value={email}
               />
             </div>
           </div>
@@ -149,7 +149,7 @@ export default function LoginPage() {
             </p>
           ) : null}
 
-          <Button type="submit" disabled={isSubmitting || !username || !password} className="login-submit">
+          <Button type="submit" disabled={isSubmitting || !email || !password} className="login-submit">
             {isSubmitting ? (
               <>
                 <Spinner className="spinner" />

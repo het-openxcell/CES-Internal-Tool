@@ -15,13 +15,13 @@ describe("apiClient", () => {
       new Response(JSON.stringify({ token: "jwt-token", expires_at: 1778158800 }), { status: 200 }),
     );
 
-    await apiClient.login({ username: "operator", password: "secret" });
+    await apiClient.login({ email: "operator@example.com", password: "secret" });
 
     expect(fetch).toHaveBeenCalledWith(
       "http://localhost:8000/api/auth/login",
       expect.objectContaining({
         method: "POST",
-        body: JSON.stringify({ username: "operator", password: "secret" }),
+        body: JSON.stringify({ email: "operator@example.com", password: "secret" }),
       }),
     );
   });

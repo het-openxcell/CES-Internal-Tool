@@ -158,7 +158,7 @@ export default function ReportDetailPage() {
 
   const reportName = ddr?.file_path.split("/").at(-1) ?? `DDR ${id}`;
   const uploadedAt = ddr ? new Date(ddr.created_at * 1000).toLocaleDateString() : "—";
-  const uploadedBy = ddr?.uploaded_by_username ?? "—";
+  const uploadedBy = ddr?.uploaded_by_email ?? "—";
 
   const showProcessingSection = status.totalDates > 0 || isProcessing;
 

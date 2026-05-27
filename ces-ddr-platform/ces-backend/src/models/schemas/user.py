@@ -5,7 +5,7 @@ from src.models.schemas.base import BaseSchemaModel
 
 class UserResponse(BaseSchemaModel):
     id: str
-    username: str
+    email: str
     is_active: bool
     roles: list[str]
     created_at: int
@@ -13,5 +13,9 @@ class UserResponse(BaseSchemaModel):
 
 
 class CreateUserRequest(BaseSchemaModel):
-    username: str
+    email: str
     password: str = Field(..., min_length=8)
+
+
+class UpdateUserRequest(BaseSchemaModel):
+    email: str

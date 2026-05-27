@@ -9,11 +9,11 @@ from src.main import backend_app
 from src.securities.authorizations.jwt_authentication import jwt_authentication
 
 
-def make_user(user_id: str, username: str, is_active: bool, role_names: list[str]):
+def make_user(user_id: str, email: str, is_active: bool, role_names: list[str]):
     roles = [SimpleNamespace(name=r) for r in role_names]
     return SimpleNamespace(
         id=user_id,
-        username=username,
+        email=email,
         is_active=is_active,
         roles=roles,
         password_hash="hash",
@@ -22,8 +22,8 @@ def make_user(user_id: str, username: str, is_active: bool, role_names: list[str
     )
 
 
-ADMIN_USER = make_user("admin-id", "admin", True, ["ADMIN"])
-REGULAR_USER = make_user("user-id", "bob", True, ["USER"])
+ADMIN_USER = make_user("admin-id", "admin@example.com", True, ["ADMIN"])
+REGULAR_USER = make_user("user-id", "bob@example.com", True, ["USER"])
 
 
 def override_admin_auth():
@@ -44,14 +44,14 @@ class StubUserRepo:
     async def read_all_with_roles(self):
         return self._users
 
-    async def find_by_username(self, username: str):
+    async def find_by_email(self, email: str):
         for u in self._users:
-            if u.username == username:
+            if u.email == email:
                 return u
         return None
 
-    async def create_user(self, username: str, password_hash: str, is_active: bool = True):
-        new = make_user(f"new-id-{username}", username, is_active, [])
+    async def create_user(self, email: str, password_hash: str, is_active: bool = True):
+        new = make_user(f"new-id-{email}", email, is_active, [])
         self._users.append(new)
         return new
 
@@ -128,30 +128,30 @@ def test_get_users_returns_safe_fields(admin_client: TestClient) -> None:
     for user in data:
         assert "password_hash" not in user
         assert "id" in user
-        assert "username" in user
+        assert "email" in user
         assert "is_active" in user
         assert "roles" in user
 
 
 def test_post_users_requires_auth(client: TestClient) -> None:
-    response = client.post("/api/users", json={"username": "newuser", "password": "strongpass"})
+    response = client.post("/api/users", json={"email": "newuser@example.com", "password": "strongpass"})
     assert response.status_code == 401
 
 
 def test_post_users_non_admin_gets_403(client: TestClient) -> None:
     backend_app.dependency_overrides[jwt_authentication] = override_user_auth
     try:
-        response = client.post("/api/users", json={"username": "newuser", "password": "strongpass"})
+        response = client.post("/api/users", json={"email": "newuser@example.com", "password": "strongpass"})
     finally:
         backend_app.dependency_overrides.clear()
     assert response.status_code == 403
 
 
 def test_post_users_creates_user(admin_client: TestClient) -> None:
-    response = admin_client.post("/api/users", json={"username": "newuser", "password": "strongpass"})
+    response = admin_client.post("/api/users", json={"email": "newuser@example.com", "password": "strongpass"})
     assert response.status_code == 201
     data = response.json()
-    assert data["username"] == "newuser"
+    assert data["email"] == "newuser@example.com"
     assert data["is_active"] is True
     assert isinstance(data["roles"], list)
     assert "id" in data
@@ -159,12 +159,12 @@ def test_post_users_creates_user(admin_client: TestClient) -> None:
 
 
 def test_post_users_short_password_rejected(admin_client: TestClient) -> None:
-    response = admin_client.post("/api/users", json={"username": "newuser", "password": "short"})
+    response = admin_client.post("/api/users", json={"email": "newuser@example.com", "password": "short"})
     assert response.status_code == 422
 
 
-def test_post_users_duplicate_username_conflict(admin_client: TestClient) -> None:
-    response = admin_client.post("/api/users", json={"username": "admin", "password": "strongpass"})
+def test_post_users_duplicate_email_conflict(admin_client: TestClient) -> None:
+    response = admin_client.post("/api/users", json={"email": "admin@example.com", "password": "strongpass"})
     assert response.status_code == 409
 
 

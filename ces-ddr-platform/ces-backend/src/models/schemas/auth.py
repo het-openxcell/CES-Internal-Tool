@@ -2,7 +2,7 @@ from src.models.schemas.base import BaseSchemaModel
 
 
 class LoginRequest(BaseSchemaModel):
-    username: str
+    email: str
     password: str
 
 

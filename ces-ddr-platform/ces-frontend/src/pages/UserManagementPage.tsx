@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { UserPlus } from "lucide-react";
 
 import { ApiError, type CreateUserRequest, type User, apiClient } from "@/lib/api";
@@ -25,10 +25,16 @@ export default function UserManagementPage() {
   const [loadError, setLoadError] = useState<string | null>(null);
 
   const [showCreate, setShowCreate] = useState(false);
-  const [createUsername, setCreateUsername] = useState("");
+  const [createEmail, setCreateEmail] = useState("");
   const [createPassword, setCreatePassword] = useState("");
   const [createError, setCreateError] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
+
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editEmail, setEditEmail] = useState("");
+  const [editError, setEditError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  const editInputRef = useRef<HTMLInputElement>(null);
 
   const [confirmDeactivate, setConfirmDeactivate] = useState<string | null>(null);
   const [deactivateErrors, setDeactivateErrors] = useState<Record<string, string>>({});
@@ -44,6 +50,10 @@ export default function UserManagementPage() {
       }
     });
   }, []);
+
+  useEffect(() => {
+    if (editingId) editInputRef.current?.focus();
+  }, [editingId]);
 
   if (forbidden) {
     return (
@@ -61,16 +71,46 @@ export default function UserManagementPage() {
     setCreateError(null);
     setCreating(true);
     try {
-      const req: CreateUserRequest = { username: createUsername, password: createPassword };
+      const req: CreateUserRequest = { email: createEmail, password: createPassword };
       const created = await apiClient.createUser(req);
       setUsers((prev) => [...prev, created]);
-      setCreateUsername("");
+      setCreateEmail("");
       setCreatePassword("");
       setShowCreate(false);
     } catch {
       setCreateError("Failed to create user.");
     } finally {
       setCreating(false);
+    }
+  }
+
+  function startEdit(user: User) {
+    setEditingId(user.id);
+    setEditEmail(user.email);
+    setEditError(null);
+  }
+
+  function cancelEdit() {
+    setEditingId(null);
+    setEditEmail("");
+    setEditError(null);
+  }
+
+  async function handleSaveEdit(userId: string) {
+    setEditError(null);
+    setSaving(true);
+    try {
+      const updated = await apiClient.updateUser(userId, { email: editEmail });
+      setUsers((prev) => prev.map((u) => (u.id === updated.id ? updated : u)));
+      setEditingId(null);
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 409) {
+        setEditError("Email already in use.");
+      } else {
+        setEditError("Failed to update.");
+      }
+    } finally {
+      setSaving(false);
     }
   }
 
@@ -109,10 +149,10 @@ export default function UserManagementPage() {
             <h2 className="text-[14px] font-semibold text-text-primary">New User</h2>
             <input
               required
-              type="text"
-              placeholder="Username"
-              value={createUsername}
-              onChange={(e) => setCreateUsername(e.target.value)}
+              type="email"
+              placeholder="Email"
+              value={createEmail}
+              onChange={(e) => setCreateEmail(e.target.value)}
               className="h-9 px-3 text-[13px] rounded-md border border-border-default focus:outline-none focus:border-text-muted bg-white"
             />
             <input
@@ -149,7 +189,7 @@ export default function UserManagementPage() {
           <table className="w-full text-[13px]">
             <thead>
               <tr className="bg-surface border-b border-border-default">
-                <th className="px-4 py-3 text-left font-semibold text-text-secondary">Username</th>
+                <th className="px-4 py-3 text-left font-semibold text-text-secondary">Email</th>
                 <th className="px-4 py-3 text-left font-semibold text-text-secondary">Roles</th>
                 <th className="px-4 py-3 text-left font-semibold text-text-secondary">Status</th>
                 <th className="px-4 py-3 text-left font-semibold text-text-secondary">Created</th>
@@ -159,7 +199,26 @@ export default function UserManagementPage() {
             <tbody>
               {users.map((user) => (
                 <tr key={user.id} className="border-b border-border-default last:border-0 hover:bg-surface/50 transition-colors">
-                  <td className="px-4 py-3 font-medium text-text-primary">{user.username}</td>
+                  <td className="px-4 py-3 font-medium text-text-primary">
+                    {editingId === user.id ? (
+                      <div className="flex flex-col gap-1">
+                        <input
+                          ref={editInputRef}
+                          type="email"
+                          value={editEmail}
+                          onChange={(e) => setEditEmail(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") handleSaveEdit(user.id);
+                            if (e.key === "Escape") cancelEdit();
+                          }}
+                          className="h-8 px-2 text-[13px] rounded border border-border-default focus:outline-none focus:border-text-muted bg-white w-56"
+                        />
+                        {editError && <p className="text-[11px] text-error-text">{editError}</p>}
+                      </div>
+                    ) : (
+                      user.email
+                    )}
+                  </td>
                   <td className="px-4 py-3 text-text-secondary">{user.roles.join(", ") || "—"}</td>
                   <td className="px-4 py-3">
                     <span
@@ -175,39 +234,68 @@ export default function UserManagementPage() {
                   </td>
                   <td className="px-4 py-3 text-text-secondary">{fmtTs(user.created_at)}</td>
                   <td className="px-4 py-3">
-                    {user.is_active && user.id !== myId && (
-                      <>
-                        {confirmDeactivate === user.id ? (
-                          <span className="inline-flex items-center gap-2">
-                            <span className="text-text-secondary text-[12px]">Confirm deactivate?</span>
-                            <button
-                              type="button"
-                              onClick={() => handleDeactivate(user.id)}
-                              className="text-[12px] font-semibold text-error-text hover:underline"
-                            >
-                              Yes
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => setConfirmDeactivate(null)}
-                              className="text-[12px] text-text-secondary hover:text-text-primary"
-                            >
-                              Cancel
-                            </button>
-                          </span>
-                        ) : (
-                          <button
-                            type="button"
-                            onClick={() => setConfirmDeactivate(user.id)}
-                            className="text-[12px] font-medium text-text-secondary hover:text-error-text transition-colors"
-                          >
-                            Deactivate
-                          </button>
+                    {editingId === user.id ? (
+                      <span className="inline-flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => handleSaveEdit(user.id)}
+                          disabled={saving || !editEmail}
+                          className="text-[12px] font-semibold text-ces-red hover:underline disabled:opacity-50"
+                        >
+                          {saving ? "Saving…" : "Save"}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={cancelEdit}
+                          className="text-[12px] text-text-secondary hover:text-text-primary"
+                        >
+                          Cancel
+                        </button>
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-3">
+                        <button
+                          type="button"
+                          onClick={() => startEdit(user)}
+                          className="text-[12px] font-medium text-text-secondary hover:text-text-primary transition-colors"
+                        >
+                          Edit
+                        </button>
+                        {user.is_active && user.id !== myId && (
+                          <>
+                            {confirmDeactivate === user.id ? (
+                              <span className="inline-flex items-center gap-2">
+                                <span className="text-text-secondary text-[12px]">Confirm deactivate?</span>
+                                <button
+                                  type="button"
+                                  onClick={() => handleDeactivate(user.id)}
+                                  className="text-[12px] font-semibold text-error-text hover:underline"
+                                >
+                                  Yes
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => setConfirmDeactivate(null)}
+                                  className="text-[12px] text-text-secondary hover:text-text-primary"
+                                >
+                                  Cancel
+                                </button>
+                              </span>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={() => setConfirmDeactivate(user.id)}
+                                className="text-[12px] font-medium text-text-secondary hover:text-error-text transition-colors"
+                              >
+                                Deactivate
+                              </button>
+                            )}
+                            {deactivateErrors[user.id] && (
+                              <p className="text-[11px] text-error-text mt-0.5">{deactivateErrors[user.id]}</p>
+                            )}
+                          </>
                         )}
-                        {deactivateErrors[user.id] && (
-                          <p className="text-[11px] text-error-text mt-0.5">{deactivateErrors[user.id]}</p>
-                        )}
-                      </>
+                      </span>
                     )}
                   </td>
                 </tr>

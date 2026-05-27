@@ -13,7 +13,7 @@ class User(Base):
         primary_key=True,
         server_default=sqlalchemy.text("gen_random_uuid()"),
     )
-    username: Mapped[str] = mapped_column(sqlalchemy.String(length=255), nullable=False, unique=True)
+    email: Mapped[str] = mapped_column(sqlalchemy.String(length=255), nullable=False, unique=True)
     password_hash: Mapped[str] = mapped_column(sqlalchemy.Text(), nullable=False)
     is_active: Mapped[bool] = mapped_column(
         sqlalchemy.Boolean(),

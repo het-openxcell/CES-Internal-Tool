@@ -13,9 +13,9 @@ const TABS = [
   { key: "keywords", label: "Keywords", path: "/settings/keywords", Icon: Key },
 ];
 
-export default function TopNav({ onLogout, username, roles }: { onLogout: () => void; username?: string | null; roles?: string[] }) {
-  const initials = username
-    ? (username.split(/[\s._-]+/).map((w) => w[0]?.toUpperCase() ?? "").join("").slice(0, 2) || (username[0]?.toUpperCase() ?? "?"))
+export default function TopNav({ onLogout, email, roles }: { onLogout: () => void; email?: string | null; roles?: string[] }) {
+  const initials = email
+    ? (email.split(/[\s._@-]+/).map((w) => w[0]?.toUpperCase() ?? "").join("").slice(0, 2) || (email[0]?.toUpperCase() ?? "?"))
     : "?";
   const location = useLocation();
   const navigate = useNavigate();
@@ -107,7 +107,7 @@ export default function TopNav({ onLogout, username, roles }: { onLogout: () => 
               {initials}
             </div>
             <div className="text-[11px] leading-tight pr-1 text-left">
-              <div className="font-semibold text-text-primary">{username ?? "—"}</div>
+              <div className="font-semibold text-text-primary">{email ?? "—"}</div>
             </div>
           </button>
 

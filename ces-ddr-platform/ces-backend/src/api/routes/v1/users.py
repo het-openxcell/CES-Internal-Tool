@@ -3,7 +3,7 @@ from sqlalchemy.exc import IntegrityError
 
 from src.api.dependencies.repository import get_repository
 from src.models.db.user import User
-from src.models.schemas.user import CreateUserRequest, UserResponse
+from src.models.schemas.user import CreateUserRequest, UpdateUserRequest, UserResponse
 from src.repository.crud.role import RoleCRUDRepository
 from src.repository.crud.user import UserCRUDRepository
 from src.securities.authorizations.jwt_authentication import jwt_authentication
@@ -17,7 +17,7 @@ router = APIRouter(prefix="/users", tags=["Users"])
 def _user_response(user) -> UserResponse:
     return UserResponse(
         id=user.id,
-        username=user.username,
+        email=user.email,
         is_active=user.is_active,
         roles=[r.name for r in user.roles],
         created_at=user.created_at,
@@ -39,7 +39,7 @@ async def create_user(
     user_repository: UserCRUDRepository = Depends(get_repository(UserCRUDRepository)),
     role_repository: RoleCRUDRepository = Depends(get_repository(RoleCRUDRepository)),
 ) -> UserResponse:
-    existing = await user_repository.find_by_username(body.username)
+    existing = await user_repository.find_by_email(body.email)
     if existing is not None:
         raise UsernameConflictException()
 
@@ -49,13 +49,40 @@ async def create_user(
 
     password_hash = await pwd_generator.generate_hashed_password(body.password)
     try:
-        new_user = await user_repository.create_user(username=body.username, password_hash=password_hash)
+        new_user = await user_repository.create_user(email=body.email, password_hash=password_hash)
         await user_repository.assign_role(new_user, user_role)
     except IntegrityError:
         raise UsernameConflictException() from None
 
     user_with_roles = await user_repository.read_user_with_roles(new_user.id)
     return _user_response(user_with_roles)
+
+
+@router.patch(
+    "/{id}",
+    response_model=UserResponse,
+    status_code=status.HTTP_200_OK,
+    dependencies=[Depends(admin_only)],
+)
+async def update_user(
+    id: str,
+    body: UpdateUserRequest,
+    user_repository: UserCRUDRepository = Depends(get_repository(UserCRUDRepository)),
+) -> UserResponse:
+    user = await user_repository.read_user_with_roles(id)
+    if user is None:
+        raise EntityDoesNotExist(f"User {id} not found")
+
+    conflict = await user_repository.find_by_email(body.email)
+    if conflict is not None and str(conflict.id) != id:
+        raise UsernameConflictException()
+
+    try:
+        updated = await user_repository.update_email(user, body.email)
+    except IntegrityError:
+        raise UsernameConflictException() from None
+
+    return _user_response(updated)
 
 
 @router.patch(

@@ -48,7 +48,7 @@ describe("App routing and login", () => {
     await waitFor(() => expect(screen.getByRole("heading", { name: "DDR Processing" })).toBeInTheDocument());
   });
 
-  it("shows safe invalid-credential copy, clears password, and keeps username", async () => {
+  it("shows safe invalid-credential copy, clears password, and keeps email", async () => {
     vi.stubGlobal(
       "fetch",
       vi.fn().mockResolvedValue(
@@ -61,12 +61,12 @@ describe("App routing and login", () => {
 
     render(<App />);
 
-    await userEvent.type(screen.getByLabelText("Username"), "operator");
+    await userEvent.type(screen.getByLabelText("Email"), "operator@example.com");
     await userEvent.type(screen.getByLabelText("Password"), "bad");
     await userEvent.click(screen.getByRole("button", { name: "Sign in" }));
 
-    expect(await screen.findByText("Invalid username or password")).toBeInTheDocument();
-    expect(screen.getByLabelText("Username")).toHaveValue("operator");
+    expect(await screen.findByText("Invalid email or password")).toBeInTheDocument();
+    expect(screen.getByLabelText("Email")).toHaveValue("operator@example.com");
     expect(screen.getByLabelText("Password")).toHaveValue("");
   });
 
