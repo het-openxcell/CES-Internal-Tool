@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import { Plus as PlusIcon, X as XIcon } from "lucide-react";
 
-import { TypeBadge } from "@/components/TypeBadge";
 import { apiClient } from "@/lib/api";
 import { cn } from "@/lib/utils";
 
@@ -121,7 +120,9 @@ export default function KeywordsPage() {
             {groups.map((rule, gi) => (
               <div key={rule.type} className="border border-gray-200 rounded-lg px-3 py-2.5 bg-white">
                 <div className="flex items-center gap-2 mb-2.5">
-                  <TypeBadge type={rule.type} />
+                  <span className="inline-flex items-center px-3 py-1 rounded text-[13px] font-semibold bg-gray-100 text-gray-700">
+                    {rule.type}
+                  </span>
                   <span className="text-[13px] text-gray-500">{rule.patterns.length} patterns</span>
                   <button
                     onClick={() => saveGroup(gi)}
@@ -156,7 +157,7 @@ export default function KeywordsPage() {
                     />
                     <button
                       onClick={() => addPattern(gi)}
-                      className="h-6 w-6 flex items-center justify-center rounded border border-dashed border-gray-300 text-gray-400 hover:text-gray-700 hover:border-gray-400"
+                      className="h-6 w-6 flex items-center justify-center rounded border border-dashed border-gray-700 text-gray-800 hover:text-gray-950 hover:border-gray-900"
                     >
                       <PlusIcon size={10} />
                     </button>
