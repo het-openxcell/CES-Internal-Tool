@@ -176,9 +176,9 @@ export default function ReportListSidebar({ selectedId, reports: propReports }: 
                   <div className="text-[11px] text-text-muted truncate mt-0.5">
                     {r.well_name ?? "—"} · {r.dates?.length ?? 0} occ
                   </div>
-                  {r.uploaded_by_username && (
+                  {r.uploaded_by_email && (
                     <div className="text-[10.5px] text-text-muted truncate mt-0.5">
-                      {r.uploaded_by_username}
+                      {r.uploaded_by_email}
                     </div>
                   )}
                   {isProcessing && total > 0 && (

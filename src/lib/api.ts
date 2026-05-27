@@ -1,7 +1,7 @@
 import { authToken } from "@/lib/auth";
 
 type LoginCredentials = {
-  username: string;
+  email: string;
   password: string;
 };
 
@@ -32,7 +32,7 @@ export type DDRDetail = {
   status: DDRStatus;
   well_name?: string | null;
   created_at: number;
-  uploaded_by_username?: string | null;
+  uploaded_by_email?: string | null;
   dates?: DDRDateDetail[];
 };
 
@@ -166,7 +166,7 @@ export type MasterExportFilters = {
 
 export type User = {
   id: string;
-  username: string;
+  email: string;
   is_active: boolean;
   roles: string[];
   created_at: number;
@@ -174,8 +174,12 @@ export type User = {
 };
 
 export type CreateUserRequest = {
-  username: string;
+  email: string;
   password: string;
+};
+
+export type UpdateUserRequest = {
+  email: string;
 };
 
 type ApiErrorCode = "UNAUTHORIZED" | "API_ERROR";
@@ -398,6 +402,13 @@ class ApiClient {
   async createUser(req: CreateUserRequest) {
     return this.request<User>("/users", {
       method: "POST",
+      body: JSON.stringify(req),
+    });
+  }
+
+  async updateUser(userId: string, req: UpdateUserRequest) {
+    return this.request<User>(`/users/${encodeURIComponent(userId)}`, {
+      method: "PATCH",
       body: JSON.stringify(req),
     });
   }

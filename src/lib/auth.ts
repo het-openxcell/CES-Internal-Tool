@@ -2,7 +2,7 @@ const TOKEN_KEY = "ces.auth.token";
 
 type JwtPayload = {
   exp?: unknown;
-  username?: unknown;
+  email?: unknown;
   roles?: unknown;
   user_id?: unknown;
 };
@@ -23,11 +23,11 @@ class AuthToken {
     return token;
   }
 
-  getUsername(): string | null {
+  getEmail(): string | null {
     const token = this.get();
     if (!token) return null;
     const payload = this.decodePayload(token);
-    return typeof payload?.username === "string" ? payload.username : null;
+    return typeof payload?.email === "string" ? payload.email : null;
   }
 
   getRoles(): string[] {
