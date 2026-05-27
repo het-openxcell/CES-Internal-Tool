@@ -15,7 +15,7 @@ async def login(
     request: LoginRequest,
     user_repository: UserCRUDRepository = Depends(get_repository(UserCRUDRepository)),
 ) -> LoginResponse:
-    user = await user_repository.find_by_username_with_roles(request.username)
+    user = await user_repository.find_by_email_with_roles(request.email)
 
     if user is not None and not user.is_active:
         user = None

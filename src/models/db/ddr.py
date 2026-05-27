@@ -47,8 +47,8 @@ class DDR(Base):
     uploaded_by: Mapped["User | None"] = relationship("User", lazy="selectin")
 
     @property
-    def uploaded_by_username(self) -> str | None:
-        return self.uploaded_by.username if self.uploaded_by else None
+    def uploaded_by_email(self) -> str | None:
+        return self.uploaded_by.email if self.uploaded_by else None
 
 
 class DDRDate(Base):

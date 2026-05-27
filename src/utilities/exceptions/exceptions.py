@@ -154,7 +154,7 @@ class PasswordDoesNotMatchException(Exception):
 
 
 class UsernameConflictException(EntityAlreadyExistsException):
-    def __init__(self, detail: str = "Username already exists"):
+    def __init__(self, detail: str = "Email already exists"):
         super().__init__(detail)
 
 
