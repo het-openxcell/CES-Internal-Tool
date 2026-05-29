@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { apiClient, type DDRDateStatus, type DDRDetail, type DDRStatus } from "@/lib/api";
-import { fireNotification, requestNotificationPermission } from "@/lib/notifications";
 
 export type ProcessingDateStatus = DDRDateStatus | "processing";
 
@@ -231,13 +230,9 @@ export function useProcessingStatus(ddrId?: string) {
       setConnectionMode("closed");
       source?.close();
       stopPolling();
-      const title = allFailed ? "DDR Processing Failed" : "DDR Processing Complete";
-      const body = `${payload.total_dates} dates — ${payload.failed_dates} failed, ${payload.warning_dates} warnings`;
-      fireNotification(title, body);
     };
 
     const openStream = () => {
-      void requestNotificationPermission();
       source = new EventSource(apiClient.ddrStatusStreamUrl(ddrId));
       setConnectionMode("sse");
       source.addEventListener("date_started", handleDateStarted);

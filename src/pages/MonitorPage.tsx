@@ -359,9 +359,11 @@ export default function MonitorPage() {
   const [loadingQueue, setLoadingQueue] = useState(true);
   const [loadingCorrections, setLoadingCorrections] = useState(false);
 
-  const loadMetricsAndQueue = useCallback(async () => {
-    setLoadingMetrics(true);
-    setLoadingQueue(true);
+  const loadMetricsAndQueue = useCallback(async (silent = false) => {
+    if (!silent) {
+      setLoadingMetrics(true);
+      setLoadingQueue(true);
+    }
     const [m, q] = await Promise.all([
       apiClient.getMonitorMetrics().catch(() => null),
       apiClient.getMonitorQueue().catch(() => []),
@@ -392,6 +394,16 @@ export default function MonitorPage() {
   };
 
   const activeCount = queue.filter((q) => q.status === "processing" || q.status === "queued").length;
+
+  useEffect(() => {
+    if (activeCount === 0) {
+      return;
+    }
+    const interval = setInterval(() => {
+      void loadMetricsAndQueue(true);
+    }, 3000);
+    return () => clearInterval(interval);
+  }, [activeCount, loadMetricsAndQueue]);
 
   const tabs: { k: Tab; l: string; n: number | null }[] = [
     { k: "pipeline", l: "Processing queue", n: activeCount },
