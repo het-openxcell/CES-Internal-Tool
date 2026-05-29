@@ -11,6 +11,7 @@ import { Link, Navigate, useParams } from "react-router";
 
 import { OccurrenceMetrics } from "@/components/OccurrenceMetrics";
 import { OccurrenceTable } from "@/components/OccurrenceTable";
+import { useProcessingTracker } from "@/components/ProcessingTrackerContext";
 import ReportListSidebar from "@/components/ReportListSidebar";
 import ReprocessModal from "@/components/ReprocessModal";
 import { useOccurrences } from "@/hooks/useOccurrences";
@@ -58,7 +59,14 @@ export default function ReportDetailPage() {
   };
 
   const status = useProcessingStatus(id);
+  const { track } = useProcessingTracker();
   const { data: occurrences, isLoading: occurrencesLoading, refetch: refetchOccurrences } = useOccurrences(id);
+
+  useEffect(() => {
+    if (status.ddrStatus === "queued" || status.ddrStatus === "processing") {
+      track(id);
+    }
+  }, [id, status.ddrStatus, track]);
   const { retryingDate, handleRetryDate } = useRetryDate(id, status.refresh, status.reconnect);
 
   const mapCorrectionToHistory = useCallback((correction: Correction): EditHistoryRow => {

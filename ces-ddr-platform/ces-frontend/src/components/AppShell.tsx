@@ -1,6 +1,7 @@
 import { useNavigate } from "react-router";
 
 import DDRUploadModal from "@/components/DDRUploadModal";
+import { ProcessingTrackerProvider, useProcessingTracker } from "@/components/ProcessingTrackerContext";
 import TopNav from "@/components/TopNav";
 import { UploadModalProvider, useUploadModal } from "@/components/UploadModalContext";
 import { authToken } from "@/lib/auth";
@@ -8,6 +9,7 @@ import { authToken } from "@/lib/auth";
 function AppShellInner({ children }: { children: React.ReactNode }) {
   const navigate = useNavigate();
   const { open, setOpen } = useUploadModal();
+  const { track } = useProcessingTracker();
   const email = authToken.getEmail();
   const roles = authToken.getRoles();
 
@@ -34,8 +36,9 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
       <DDRUploadModal
         open={open}
         onClose={() => setOpen(false)}
-        onUploaded={() => {
+        onUploaded={(result) => {
           setOpen(false);
+          track(result.id);
           navigate("/monitor");
         }}
       />
@@ -45,8 +48,10 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
   return (
-    <UploadModalProvider>
-      <AppShellInner>{children}</AppShellInner>
-    </UploadModalProvider>
+    <ProcessingTrackerProvider>
+      <UploadModalProvider>
+        <AppShellInner>{children}</AppShellInner>
+      </UploadModalProvider>
+    </ProcessingTrackerProvider>
   );
 }
