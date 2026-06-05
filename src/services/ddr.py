@@ -185,6 +185,47 @@ class DDRReprocessService:
         return total
 
 
+class DDRCancellationService:
+    CANCELLABLE_STATUSES = (DDRStatus.QUEUED, DDRStatus.PROCESSING)
+
+    def __init__(
+        self,
+        ddr_repository: Any,
+        processing_queue_repository: Any,
+        ddr_date_repository: Any | None = None,
+        status_stream_service: ProcessingStatusStreamService | None = None,
+    ) -> None:
+        self.ddr_repository = ddr_repository
+        self.processing_queue_repository = processing_queue_repository
+        self.ddr_date_repository = ddr_date_repository
+        self.status_stream_service = status_stream_service
+
+    async def cancel(self, ddr_id: str) -> Any:
+        ddr = await self.ddr_repository.read_ddr_by_id(ddr_id)
+        if ddr.status not in self.CANCELLABLE_STATUSES:
+            raise BadRequestException("ddr_not_cancellable")
+        await self.ddr_repository.update_status(ddr, DDRStatus.CANCELLED)
+        await self.processing_queue_repository.delete_by_ddr_id(ddr_id)
+        await self._publish_complete(ddr_id)
+        return ddr
+
+    async def _publish_complete(self, ddr_id: str) -> None:
+        if self.status_stream_service is None:
+            return
+        rows = (
+            await self.ddr_date_repository.read_dates_by_ddr_id(ddr_id)
+            if self.ddr_date_repository is not None
+            else []
+        )
+        await self.status_stream_service.publish_processing_complete(
+            ddr_id,
+            total_dates=len(rows),
+            failed_dates=sum(1 for row in rows if row.status == DDRDateStatus.FAILED),
+            warning_dates=sum(1 for row in rows if row.status == DDRDateStatus.WARNING),
+            total_occurrences=0,
+        )
+
+
 class OccurrenceCorrectionService:
     def __init__(
         self,

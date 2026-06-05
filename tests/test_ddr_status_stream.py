@@ -28,6 +28,10 @@ class StubDDRRepository:
     async def read_ddr_by_id(self, ddr_id: str) -> Any:
         return self.ddrs[ddr_id]
 
+    async def read_status(self, ddr_id: str) -> Any:
+        ddr = self.ddrs.get(ddr_id)
+        return ddr.status if ddr is not None else None
+
     async def finalize_status_from_dates(self, ddr: Any, statuses: Any) -> Any:
         ddr.status = "complete" if "success" in list(statuses) else "failed"
         return ddr

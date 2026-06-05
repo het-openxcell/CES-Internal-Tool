@@ -119,6 +119,9 @@ class FakeDDRRepository:
     async def read_ddr_by_id(self, ddr_id):
         return self._ddr
 
+    async def read_status(self, ddr_id):
+        return self._ddr.status
+
     async def update_status(self, ddr, status, commit=True):
         self.update_status_calls.append(status)
         ddr.status = status

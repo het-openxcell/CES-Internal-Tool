@@ -5,6 +5,7 @@ from fastapi.responses import JSONResponse, StreamingResponse
 
 from src.api.dependencies.repository import get_repository
 from src.api.dependencies.services import (
+    get_ddr_cancellation_service,
     get_ddr_reprocess_service,
     get_ddr_reprocess_task,
     get_pipeline_service,
@@ -25,6 +26,7 @@ from src.repository.crud.occurrence import OccurrenceCRUDRepository
 from src.securities.authorizations.jwt_authentication import jwt_authentication, stream_query_token_authentication
 from src.services.ddr import (
     AuthenticatedUserIdentity,
+    DDRCancellationService,
     DDRProcessingTask,
     DDRReprocessService,
     DDRReprocessTask,
@@ -156,6 +158,16 @@ async def get_ddr(
         uploaded_by_email=getattr(ddr, "uploaded_by_email", None),
         dates=[DDRDateInResponse.model_validate(row) for row in rows],
     )
+
+
+@router.post("/{ddr_id}/cancel", response_model=DDRUploadResponse)
+async def cancel_ddr(
+    ddr_id: str,
+    current_user = Depends(jwt_authentication),
+    service: DDRCancellationService = Depends(get_ddr_cancellation_service),
+) -> DDRUploadResponse:
+    ddr = await service.cancel(ddr_id)
+    return DDRUploadResponse(id=ddr.id, status=ddr.status)
 
 
 @router.post("/{ddr_id}/dates/{date}/retry", response_model=DDRDateInResponse)

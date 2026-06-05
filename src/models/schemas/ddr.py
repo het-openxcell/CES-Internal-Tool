@@ -12,10 +12,11 @@ class DDRStatus:
     PROCESSING = "processing"
     COMPLETE = "complete"
     FAILED = "failed"
+    CANCELLED = "cancelled"
 
     @classmethod
     def values(cls) -> tuple[str, ...]:
-        return (cls.QUEUED, cls.PROCESSING, cls.COMPLETE, cls.FAILED)
+        return (cls.QUEUED, cls.PROCESSING, cls.COMPLETE, cls.FAILED, cls.CANCELLED)
 
     @classmethod
     def validate(cls, value: str) -> str:
