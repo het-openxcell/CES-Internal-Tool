@@ -17,6 +17,9 @@ class StubDDRRepository:
         assert ddr_id == self.ddr.id
         return self.ddr
 
+    async def read_status(self, ddr_id: str) -> str:
+        return self.ddr.status
+
     async def update_status(self, ddr: SimpleNamespace, status: str, commit: bool = True) -> SimpleNamespace:
         self.status_updates.append(status)
         ddr.status = status

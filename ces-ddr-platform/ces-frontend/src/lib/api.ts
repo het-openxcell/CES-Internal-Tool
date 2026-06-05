@@ -10,7 +10,7 @@ type LoginResponse = {
   expires_at: number;
 };
 
-export type DDRStatus = "queued" | "processing" | "complete" | "failed";
+export type DDRStatus = "queued" | "processing" | "complete" | "failed" | "cancelled";
 
 export type DDRDateStatus = "queued" | "success" | "warning" | "failed";
 
@@ -255,6 +255,12 @@ class ApiClient {
       if (operator) form.append("operator", operator);
       if (area) form.append("area", area);
       request.send(form);
+    });
+  }
+
+  async cancelDDR(ddrId: string) {
+    return this.request<DDRUploadResponse>(`/ddrs/${encodeURIComponent(ddrId)}/cancel`, {
+      method: "POST",
     });
   }
 

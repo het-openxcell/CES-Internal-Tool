@@ -3,11 +3,16 @@ from fastapi import Depends, Request
 from src.api.dependencies.repository import get_repository
 from src.repository.crud.correction import CorrectionCRUDRepository
 from src.repository.crud.correction_summary import CorrectionSummaryCRUDRepository
-from src.repository.crud.ddr import DDRCRUDRepository, DDRDateCRUDRepository
+from src.repository.crud.ddr import (
+    DDRCRUDRepository,
+    DDRDateCRUDRepository,
+    ProcessingQueueCRUDRepository,
+)
 from src.repository.crud.occurrence import OccurrenceCRUDRepository
 from src.services.correction.review import CorrectionReviewService
 from src.services.correction.summary import CorrectionSummaryService
 from src.services.ddr import (
+    DDRCancellationService,
     DDRReprocessService,
     DDRReprocessTask,
     OccurrenceCorrectionService,
@@ -64,6 +69,22 @@ def get_ddr_reprocess_service(
         storage_service,
         correction_repository,
         correction_summary_repository,
+    )
+
+
+def get_ddr_cancellation_service(
+    ddr_repository: DDRCRUDRepository = Depends(get_repository(DDRCRUDRepository)),
+    ddr_date_repository: DDRDateCRUDRepository = Depends(get_repository(DDRDateCRUDRepository)),
+    processing_queue_repository: ProcessingQueueCRUDRepository = Depends(
+        get_repository(ProcessingQueueCRUDRepository)
+    ),
+    status_stream_service: ProcessingStatusStreamService = Depends(get_processing_status_stream_service),
+) -> DDRCancellationService:
+    return DDRCancellationService(
+        ddr_repository=ddr_repository,
+        processing_queue_repository=processing_queue_repository,
+        ddr_date_repository=ddr_date_repository,
+        status_stream_service=status_stream_service,
     )
 
 

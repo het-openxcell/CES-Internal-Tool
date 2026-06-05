@@ -88,7 +88,7 @@ def test_processing_queue_and_pipeline_run_models_match_contract() -> None:
 
 
 def test_ddr_schemas_validate_status_values() -> None:
-    assert DDRStatus.values() == ("queued", "processing", "complete", "failed")
+    assert DDRStatus.values() == ("queued", "processing", "complete", "failed", "cancelled")
     assert DDRDateStatus.values() == ("queued", "success", "warning", "failed")
     assert DDRInCreate(file_path="/tmp/ddr.pdf", status="queued").status == "queued"
     assert DDRStatusUpdate(status="processing").status == "processing"

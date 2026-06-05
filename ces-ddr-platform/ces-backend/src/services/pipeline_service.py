@@ -71,6 +71,11 @@ class PreSplitPipelineService:
         dates = sorted(result.date_chunks.keys()) if result.has_boundaries else []
         logger.info(f"[DDR:{ddr_id}] pre-split done: has_boundaries={result.has_boundaries}, dates={dates}")
 
+        if await self._is_cancelled(ddr_id):
+            logger.info(f"[DDR:{ddr_id}] cancelled during pre-split, stopping")
+            await self._publish_processing_complete(ddr_id)
+            return result
+
         if not result.has_boundaries:
             logger.warning(f"[DDR:{ddr_id}] no date boundaries found, marking as failed")
             failed_row = await self.ddr_date_repository.create_failed_boundary(
@@ -368,6 +373,8 @@ class PreSplitPipelineService:
             row = date_to_row.get(date)
             if row is None:
                 return DDRDateStatus.FAILED
+            if await self._is_cancelled(ddr_id):
+                return DDRDateStatus.QUEUED
             async with semaphore:
                 return await self._process_one_date(
                     extractor,
@@ -386,6 +393,11 @@ class PreSplitPipelineService:
                     f"[DDR:{ddr_id}] date={date} extraction task raised exception: {outcome!r}",
                     exc_info=outcome,
                 )
+
+        if await self._is_cancelled(ddr_id):
+            logger.info(f"[DDR:{ddr_id}] cancelled during extraction, skipping finalize")
+            await self._publish_processing_complete(ddr_id)
+            return
 
         all_rows = await self.ddr_date_repository.read_dates_by_ddr_id(ddr_id)
         well_name, surface_location = self._metadata_from_rows(all_rows)
@@ -457,6 +469,9 @@ class PreSplitPipelineService:
 
     def _has_queued_dates(self, rows: list[Any] | Any) -> bool:
         return any(row.status == DDRDateStatus.QUEUED for row in rows)
+
+    async def _is_cancelled(self, ddr_id: str) -> bool:
+        return await self.ddr_repository.read_status(ddr_id) == DDRStatus.CANCELLED
 
     def metadata_from_rows(self, rows: list[Any] | Any) -> tuple[str | None, str | None]:
         return self._metadata_from_rows(rows)

@@ -31,6 +31,11 @@ class DDRCRUDRepository(BaseCRUDRepository[DDR]):
         query = await self.async_session.execute(statement=stmt)
         return query.scalars().all()
 
+    async def read_status(self, ddr_id: str) -> str | None:
+        stmt = sqlalchemy.select(DDR.status).where(DDR.id == ddr_id)
+        query = await self.async_session.execute(statement=stmt)
+        return query.scalar_one_or_none()
+
     async def update_status(self, ddr: DDR, status: str, commit: bool = True) -> DDR:
         ddr.status = DDRStatus.validate(status)
         ddr.updated_at = int(time.time())

@@ -6,6 +6,7 @@ import {
   Download as DownloadIcon,
   Pencil,
   RefreshCw as RefreshIcon,
+  X as XIcon,
 } from "lucide-react";
 import { Link, Navigate, useParams } from "react-router";
 
@@ -36,6 +37,7 @@ export default function ReportDetailPage() {
   const [ddr, setDdr] = useState<DDRDetail | null>(null);
   const [reprocessOpen, setReprocessOpen] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
+  const [isCancelling, setIsCancelling] = useState(false);
   const [exportToast, setExportToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
   const [editHistory, setEditHistory] = useState<EditHistoryRow[]>([]);
   const [editSummaries, setEditSummaries] = useState<CorrectionSummary[]>([]);
@@ -68,6 +70,19 @@ export default function ReportDetailPage() {
     }
   }, [id, status.ddrStatus, track]);
   const { retryingDate, handleRetryDate } = useRetryDate(id, status.refresh, status.reconnect);
+
+  const handleCancel = async () => {
+    setIsCancelling(true);
+    try {
+      await apiClient.cancelDDR(id);
+      status.reconnect();
+    } catch {
+      setExportToast({ message: "Cancel failed — please try again", type: "error" });
+      setTimeout(() => setExportToast(null), 3000);
+    } finally {
+      setIsCancelling(false);
+    }
+  };
 
   const mapCorrectionToHistory = useCallback((correction: Correction): EditHistoryRow => {
     const createdAt = new Date(correction.created_at * 1000);
@@ -242,11 +257,36 @@ export default function ReportDetailPage() {
           </div>
 
           {/* Processing Status */}
+          {status.ddrStatus === "queued" && (
+            <div className="rounded-lg border border-border-default bg-white p-4 mb-5 flex items-center justify-between gap-3">
+              <span className="text-[12px] font-semibold text-text-secondary">Queued for processing…</span>
+              <button
+                type="button"
+                onClick={handleCancel}
+                disabled={isCancelling}
+                className="inline-flex items-center gap-1.5 h-7 px-2.5 rounded-md text-[12px] font-medium bg-white border border-border-default text-text-secondary hover:bg-surface transition-colors disabled:opacity-50 shrink-0"
+              >
+                <XIcon className="w-3 h-3" />
+                {isCancelling ? "Cancelling…" : "Cancel"}
+              </button>
+            </div>
+          )}
           {isProcessing && (
             <div className="rounded-lg border border-border-default bg-white p-4 mb-5">
-              <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center justify-between gap-3 mb-2">
                 <span className="text-[12px] font-semibold text-text-secondary">{processedLabel}</span>
-                <span className="text-[12px] font-bold text-ces-red">{Math.round(progressPct)}%</span>
+                <div className="flex items-center gap-3 shrink-0">
+                  <span className="text-[12px] font-bold text-ces-red">{Math.round(progressPct)}%</span>
+                  <button
+                    type="button"
+                    onClick={handleCancel}
+                    disabled={isCancelling}
+                    className="inline-flex items-center gap-1.5 h-7 px-2.5 rounded-md text-[12px] font-medium bg-white border border-border-default text-text-secondary hover:bg-surface transition-colors disabled:opacity-50"
+                  >
+                    <XIcon className="w-3 h-3" />
+                    {isCancelling ? "Cancelling…" : "Cancel"}
+                  </button>
+                </div>
               </div>
               <div className="w-full h-1.5 rounded-full bg-surface overflow-hidden">
                 <div
@@ -254,6 +294,12 @@ export default function ReportDetailPage() {
                   style={{ width: `${progressPct}%` }}
                 />
               </div>
+            </div>
+          )}
+
+          {status.ddrStatus === "cancelled" && (
+            <div className="rounded-lg border border-border-default bg-surface p-4 mb-5 text-[13px] font-medium text-text-secondary">
+              Processing cancelled. Use Reprocess to run this DDR again.
             </div>
           )}
 
