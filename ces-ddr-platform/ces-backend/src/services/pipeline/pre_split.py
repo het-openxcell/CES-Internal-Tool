@@ -98,7 +98,7 @@ class PDFPreSplitter:
             if (
                 active_date is not None
                 and active_date not in unique_on_page
-                and active_date in text
+                and self._mentions_date_token(text, active_date)
             ):
                 assigned.append(active_date)
             for date in unique_on_page:
@@ -116,6 +116,9 @@ class PDFPreSplitter:
             sample = (page_texts[0] or "")[:300].replace("\n", " ")
             logger.warning(f"PDFPreSplitter: no dates found — page 1 text sample: {sample!r}")
         return page_dates
+
+    def _mentions_date_token(self, text: str, date: str) -> bool:
+        return re.search(rf"(?<!\d){re.escape(date)}(?!\d)", text) is not None
 
     def _extract_dates(self, text: str) -> list[str]:
         matches: list[tuple[int, str]] = []
