@@ -17,6 +17,10 @@ class LLMPrompts:
         return (
             "You are extracting structured data from a Daily Drilling Report (DDR) PDF for date "
             f"{date}. Return JSON with sections: {sections}. "
+            f"Extract ONLY rows and values that belong to date {date}. A page may contain spillover or "
+            "continuation content from a different day (e.g. the previous or next day's tour rows, or a "
+            "carried-over header line); ignore any row that belongs to another date and do not attribute "
+            f"it to {date}. "
             "Also extract well_name (string or null) and surface_location (string or null) "
             "from the report header — these are DDR-level fields, not per-section data. "
             "For 'time_logs', preserve the original row order from the report and emit fields in this "

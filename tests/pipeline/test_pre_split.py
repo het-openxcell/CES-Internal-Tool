@@ -63,6 +63,21 @@ def test_overflow_page_with_two_dates_is_shared() -> None:
     assert len(_read_pdf_text(result.date_chunks["20240116"])) == 2
 
 
+def test_prior_date_embedded_in_number_is_not_shared() -> None:
+    pages = [
+        "Tour Sheet Serial: 123456_20240115_1A header",
+        "Tour Sheet Serial: 123456_20240116_1A meter 120240115 reading",
+        "next day content",
+    ]
+    pdf_bytes = _build_text_pdf(pages)
+
+    splitter = PDFPreSplitter()
+    result = splitter.split(pdf_bytes)
+
+    assert result.page_dates[2] == ["20240116"]
+    assert len(_read_pdf_text(result.date_chunks["20240115"])) == 1
+
+
 def test_no_text_page_emits_warning_and_continues() -> None:
     pages = [
         "Tour Sheet Serial: 123456_20240115_1A",
