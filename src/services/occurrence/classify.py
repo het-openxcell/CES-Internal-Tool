@@ -24,7 +24,7 @@ class OccurrenceClassifier:
         if mmd is None:
             return None
         if mmd <= surface_shoe:
-            return "Surface"
+            return "Surface Hole"
         if mmd <= intermediate_shoe:
             return "Int."
         return "Main"

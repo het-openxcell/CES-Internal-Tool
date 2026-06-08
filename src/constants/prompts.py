@@ -51,13 +51,24 @@ class LLMPrompts:
             if keyword_hints_text
             else ""
         )
+        classification_rules = (
+            "\n\nCLASSIFICATION RULES:\n"
+            "- Tight holes, reams, and back-reams are minor but MUST always be captured, even a single brief "
+            "mention — they often precede major events. Never skip them as too minor.\n"
+            "- Do NOT create Kick / Well Control from scheduled safety procedures (kick drills, BOP or function "
+            "tests, flow checks, trip drills). Only flag a kick on real influx evidence: pit gain, SICP/SIDPP "
+            "pressure reading, or unexpected flow with the well shut in.\n"
+            "- Gas Spike applies only to an abnormal gas INCREASE above background (a sudden jump or clearly "
+            "elevated units). Routine gas readings, surveys, and logged connection gas are NOT Gas Spikes.\n"
+        )
         return (
             f"{correction_block}"
             "You are a drilling engineering expert. From the current time logs below, generate the occurrence table "
             "from scratch. Identify drilling events or problems supported by the time logs. "
             "Use ONLY the valid types listed.\n\n"
             f"VALID TYPES: {valid_types}"
-            f"{keyword_context}\n\n"
+            f"{keyword_context}"
+            f"{classification_rules}\n"
             f"CURRENT TIME LOGS:\n{time_logs_text}"
             "\n\nReturn one final JSON object with key 'occurrences'. "
             "Do not return actions or explanations. "
