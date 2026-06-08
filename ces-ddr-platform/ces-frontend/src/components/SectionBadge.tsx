@@ -1,7 +1,8 @@
 export const SECTION_COLOURS = {
-  Surface: { bg: "bg-emerald-600", text: "text-white", border: "border-emerald-700" },
+  "Surface Hole": { bg: "bg-emerald-600", text: "text-white", border: "border-emerald-700" },
   "Int.": { bg: "bg-sky-600", text: "text-white", border: "border-sky-700" },
   Main: { bg: "bg-indigo-600", text: "text-white", border: "border-indigo-700" },
+  "Multi-Leg": { bg: "bg-amber-600", text: "text-white", border: "border-amber-700" },
 } as const;
 
 export function SectionBadge({ section }: { section: string | null | undefined }) {

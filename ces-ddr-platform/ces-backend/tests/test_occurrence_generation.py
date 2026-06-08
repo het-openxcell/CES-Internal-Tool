@@ -197,7 +197,7 @@ def test_mmd_and_section_inferred(mock_keywords, service, ddr_date_repo, occurre
         assert count == 1
         occ = _bulk_args(occurrence_repo)[0]
         assert occ["mmd"] == 500.0
-        assert occ["section"] == "Surface"
+        assert occ["section"] == "Surface Hole"
 
     asyncio.run(run())
 
@@ -375,7 +375,7 @@ def test_custom_shoe_depths(mock_keywords, service, ddr_date_repo, occurrence_re
         count = await service.generate_for_ddr("d1", surface_shoe=500.0, intermediate_shoe=2000.0)
         assert count == 1
         occ = _bulk_args(occurrence_repo)[0]
-        assert occ["section"] == "Surface"
+        assert occ["section"] == "Surface Hole"
 
     asyncio.run(run())
 
@@ -679,3 +679,30 @@ def test_pipeline_service_generate_occurrences_runs_service():
         occurrence_repo.replace_for_ddr.assert_awaited_once()
 
     asyncio.run(run())
+
+
+def test_apply_multi_leg_sections_marks_from_sidetrack_date_onward() -> None:
+    from src.services.occurrence.llm_generate import LLMOccurrenceGenerationService
+
+    occurrences = [
+        {"type": "Tight Hole", "date": "20240101", "section": "Surface Hole"},
+        {"type": "Sidetrack", "date": "20240102", "section": "Main"},
+        {"type": "Stuck Pipe", "date": "20240103", "section": "Main"},
+    ]
+    LLMOccurrenceGenerationService._apply_multi_leg_sections(occurrences)
+
+    assert occurrences[0]["section"] == "Surface Hole"
+    assert occurrences[1]["section"] == "Multi-Leg"
+    assert occurrences[2]["section"] == "Multi-Leg"
+
+
+def test_apply_multi_leg_sections_noop_without_sidetrack() -> None:
+    from src.services.occurrence.llm_generate import LLMOccurrenceGenerationService
+
+    occurrences = [
+        {"type": "Tight Hole", "date": "20240101", "section": "Surface Hole"},
+        {"type": "Stuck Pipe", "date": "20240103", "section": "Main"},
+    ]
+    LLMOccurrenceGenerationService._apply_multi_leg_sections(occurrences)
+
+    assert [occ["section"] for occ in occurrences] == ["Surface Hole", "Main"]

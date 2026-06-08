@@ -15,7 +15,7 @@ def test_occurrence_section_accepts_none() -> None:
 
 
 def test_occurrence_section_accepts_valid_values() -> None:
-    for section in ("Surface", "Int.", "Main"):
+    for section in ("Surface Hole", "Int.", "Main", "Multi-Leg"):
         obj = OccurrenceInCreate(**_base_occurrence(section=section))
         assert obj.section == section
 
@@ -73,8 +73,8 @@ def test_classify_type_multiword_keyword() -> None:
 
 
 def test_classify_section_surface_boundary() -> None:
-    assert OccurrenceClassifier.classify_section(0.0) == "Surface"
-    assert OccurrenceClassifier.classify_section(600.0) == "Surface"
+    assert OccurrenceClassifier.classify_section(0.0) == "Surface Hole"
+    assert OccurrenceClassifier.classify_section(600.0) == "Surface Hole"
 
 
 def test_classify_section_intermediate_boundary() -> None:
@@ -92,8 +92,8 @@ def test_classify_section_none_mmd() -> None:
 
 
 def test_classify_section_custom_shoes() -> None:
-    assert OccurrenceClassifier.classify_section(400.0, surface_shoe=500.0, intermediate_shoe=2000.0) == "Surface"
-    assert OccurrenceClassifier.classify_section(500.0, surface_shoe=500.0, intermediate_shoe=2000.0) == "Surface"
+    assert OccurrenceClassifier.classify_section(400.0, surface_shoe=500.0, intermediate_shoe=2000.0) == "Surface Hole"
+    assert OccurrenceClassifier.classify_section(500.0, surface_shoe=500.0, intermediate_shoe=2000.0) == "Surface Hole"
     assert OccurrenceClassifier.classify_section(501.0, surface_shoe=500.0, intermediate_shoe=2000.0) == "Int."
     assert OccurrenceClassifier.classify_section(1500.0, surface_shoe=500.0, intermediate_shoe=2000.0) == "Int."
     assert OccurrenceClassifier.classify_section(2000.0, surface_shoe=500.0, intermediate_shoe=2000.0) == "Int."

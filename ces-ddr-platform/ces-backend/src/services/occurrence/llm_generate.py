@@ -10,8 +10,10 @@ from src.config.manager import settings
 from src.constants.occurrence import (
     DEFAULT_INTERMEDIATE_SHOE_DEPTH,
     DEFAULT_SURFACE_SHOE_DEPTH,
+    MULTI_LEG_SECTION,
     OCCURRENCE_BACKOFF_SECONDS,
     OCCURRENCE_RATE_LIMIT_SIGNALS,
+    SIDETRACK_OCCURRENCE_TYPE,
     VALID_OCCURRENCE_TYPES,
 )
 from src.constants.prompts import LLMPrompts
@@ -264,8 +266,23 @@ class LLMOccurrenceGenerationService:
             })
 
         deduped = OccurrenceDeduplicator.dedup(all_occurrences)
+        self._apply_multi_leg_sections(deduped)
         await self.occurrence_repository.replace_for_ddr(ddr_id, deduped)
         return len(deduped)
+
+    @staticmethod
+    def _apply_multi_leg_sections(occurrences: list[dict]) -> None:
+        sidetrack_dates = [
+            occ["date"]
+            for occ in occurrences
+            if occ.get("type") == SIDETRACK_OCCURRENCE_TYPE and occ.get("date")
+        ]
+        if not sidetrack_dates:
+            return
+        first_leg_date = min(sidetrack_dates)
+        for occ in occurrences:
+            if occ.get("date") and occ["date"] >= first_leg_date:
+                occ["section"] = MULTI_LEG_SECTION
 
     async def _build_corrections_context(self, ddr_id: str) -> str:
         if self.correction_repository is None:

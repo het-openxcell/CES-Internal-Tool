@@ -69,7 +69,7 @@ describe("useCorrections", () => {
     const { result } = renderHook(() => useCorrections());
 
     await act(async () => {
-      await expect(result.current.saveCorrection("occ-1", "section", "Surface", "bad section")).rejects.toThrow("boom");
+      await expect(result.current.saveCorrection("occ-1", "section", "Surface Hole", "bad section")).rejects.toThrow("boom");
     });
 
     expect(result.current.overrides["occ-1"]).toBeUndefined();

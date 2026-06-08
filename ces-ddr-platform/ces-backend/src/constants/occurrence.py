@@ -1,4 +1,4 @@
-VALID_SECTIONS = frozenset({"Surface", "Int.", "Main"})
+VALID_SECTIONS = frozenset({"Surface Hole", "Int.", "Main", "Multi-Leg"})
 
 VALID_OCCURRENCE_TYPES = frozenset({
     "Anhydrite",
@@ -37,6 +37,9 @@ VALID_OCCURRENCE_TYPES = frozenset({
 
 DEFAULT_SURFACE_SHOE_DEPTH = 600.0
 DEFAULT_INTERMEDIATE_SHOE_DEPTH = 2500.0
+
+MULTI_LEG_SECTION = "Multi-Leg"
+SIDETRACK_OCCURRENCE_TYPE = "Sidetrack"
 
 OCCURRENCE_RATE_LIMIT_SIGNALS = (
     "429",
