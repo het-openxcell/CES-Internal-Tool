@@ -104,15 +104,15 @@ describe("OccurrenceTable", () => {
   it("filters rows by section dropdown", async () => {
     const user = userEvent.setup();
     renderTable({
-      occurrences: [makeOccurrence(), makeOccurrence({ id: "occ-2", section: "Surface" })],
+      occurrences: [makeOccurrence(), makeOccurrence({ id: "occ-2", section: "Surface Hole" })],
     });
 
     const sectionSelect = screen.getByLabelText("Filter by section");
-    await user.selectOptions(sectionSelect, "Surface");
+    await user.selectOptions(sectionSelect, "Surface Hole");
 
     const tableBody = screen.getByRole("grid").querySelector("tbody")!;
     expect(within(tableBody).queryByLabelText("Main")).not.toBeInTheDocument();
-    expect(within(tableBody).getByLabelText("Surface")).toBeInTheDocument();
+    expect(within(tableBody).getByLabelText("Surface Hole")).toBeInTheDocument();
   });
 
   it("global text search filters rows", async () => {

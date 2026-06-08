@@ -23,9 +23,10 @@ const OCCURRENCE_TYPES: FilterOption[] = [
 ];
 
 const SECTIONS: FilterOption[] = [
-  { label: "Surface", tone: "bg-emerald-100 text-emerald-800 border-emerald-200" },
+  { label: "Surface Hole", tone: "bg-emerald-100 text-emerald-800 border-emerald-200" },
   { label: "Int.", tone: "bg-sky-100 text-sky-800 border-sky-200" },
   { label: "Main", tone: "bg-indigo-100 text-indigo-800 border-indigo-200" },
+  { label: "Multi-Leg", tone: "bg-amber-100 text-amber-800 border-amber-200" },
 ];
 
 

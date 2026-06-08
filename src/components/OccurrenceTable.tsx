@@ -37,7 +37,7 @@ const ALL_TYPES = [
   "Bit Failure",
 ];
 
-const ALL_SECTIONS = ["Surface", "Int.", "Main"];
+const ALL_SECTIONS = ["Surface Hole", "Int.", "Main", "Multi-Leg"];
 const EDITABLE_FIELDS = ["type", "section", "mmd", "density", "notes"] as const;
 
 type EditableField = (typeof EDITABLE_FIELDS)[number];
