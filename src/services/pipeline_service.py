@@ -95,14 +95,21 @@ class PreSplitPipelineService:
         date_page_numbers = self._date_page_numbers_from_split(getattr(result, "page_dates", {}))
         logger.info(f"[DDR:{ddr_id}] creating queued date rows: {ordered_dates}")
         await self.ddr_date_repository.bulk_create_queued(ddr_id=ddr_id, dates=ordered_dates, commit=False)
+        logger.debug(f"[DDR:{ddr_id}] bulk_create_queued done, persisting page numbers")
         await self._persist_source_page_numbers(ddr_id, date_page_numbers, commit=False)
+        logger.debug(f"[DDR:{ddr_id}] page numbers persisted, updating DDR status to PROCESSING")
         await self.ddr_repository.update_status(ddr, DDRStatus.PROCESSING, commit=False)
+        logger.debug(f"[DDR:{ddr_id}] committing DB state")
         await self._commit_outcome()
+        logger.info(f"[DDR:{ddr_id}] DB commit done — status=PROCESSING, {len(ordered_dates)} queued dates")
 
         logger.info(f"[DDR:{ddr_id}] uploading {len(result.date_chunks)} date chunks to storage")
+        uploaded = 0
         for date, chunk_bytes in result.date_chunks.items():
             await self.storage_service.upload_chunk(ddr_id, date, chunk_bytes)
-            logger.debug(f"[DDR:{ddr_id}] chunk uploaded for date={date} ({len(chunk_bytes)} bytes)")
+            uploaded += 1
+            logger.debug(f"[DDR:{ddr_id}] S3 chunk {uploaded}/{len(result.date_chunks)} date={date} ({len(chunk_bytes)} bytes)")
+        logger.info(f"[DDR:{ddr_id}] all {uploaded} chunks uploaded to S3")
 
         if self.extract_after_split:
             logger.info(f"[DDR:{ddr_id}] starting extraction for {len(result.date_chunks)} dates")
@@ -360,22 +367,30 @@ class PreSplitPipelineService:
         date_page_numbers: dict[str, list[int]] | None = None,
     ) -> None:
         rows = await self.ddr_date_repository.read_dates_by_ddr_id(ddr_id)
+        status_summary = {s: sum(1 for r in rows if r.status == s) for s in {r.status for r in rows}}
+        logger.info(f"[DDR:{ddr_id}] _extract_all_dates: {len(rows)} total rows, status breakdown={status_summary}")
         date_to_row = {row.date: row for row in rows if row.status == DDRDateStatus.QUEUED}
         if not date_to_row:
+            logger.warning(f"[DDR:{ddr_id}] no QUEUED dates found — skipping extraction (rows exist but none queued)")
             await self.ddr_repository.finalize_status_from_dates(ddr, [])
             await self._publish_processing_complete(ddr_id)
             return
 
+        logger.info(f"[DDR:{ddr_id}] {len(date_to_row)} dates queued for extraction, max_concurrent={self.max_concurrent}")
         extractor = self.extractor or GeminiDDRExtractor()
         semaphore = asyncio.Semaphore(self.max_concurrent)
 
         async def run_one(date: str, chunk_bytes: bytes) -> str:
             row = date_to_row.get(date)
             if row is None:
+                logger.warning(f"[DDR:{ddr_id}] date={date} not in date_to_row — skipping")
                 return DDRDateStatus.FAILED
             if await self._is_cancelled(ddr_id):
+                logger.info(f"[DDR:{ddr_id}] date={date} cancelled before semaphore acquire")
                 return DDRDateStatus.QUEUED
+            logger.debug(f"[DDR:{ddr_id}] date={date} waiting for semaphore slot")
             async with semaphore:
+                logger.debug(f"[DDR:{ddr_id}] date={date} semaphore acquired, calling Gemini")
                 return await self._process_one_date(
                     extractor,
                     row,
@@ -385,14 +400,20 @@ class PreSplitPipelineService:
                 )
 
         coroutines = [run_one(date, chunk) for date, chunk in date_chunks.items() if date in date_to_row]
+        logger.info(f"[DDR:{ddr_id}] launching {len(coroutines)} extraction coroutines")
         outcomes = await asyncio.gather(*coroutines, return_exceptions=True)
 
+        outcome_counts: dict[str, int] = {}
         for date, outcome in zip(date_to_row.keys(), outcomes, strict=False):
             if isinstance(outcome, BaseException):
                 logger.error(
                     f"[DDR:{ddr_id}] date={date} extraction task raised exception: {outcome!r}",
                     exc_info=outcome,
                 )
+                outcome_counts["exception"] = outcome_counts.get("exception", 0) + 1
+            else:
+                outcome_counts[str(outcome)] = outcome_counts.get(str(outcome), 0) + 1
+        logger.info(f"[DDR:{ddr_id}] extraction gather complete — outcomes={outcome_counts}")
 
         if await self._is_cancelled(ddr_id):
             logger.info(f"[DDR:{ddr_id}] cancelled during extraction, skipping finalize")
@@ -400,21 +421,26 @@ class PreSplitPipelineService:
             return
 
         all_rows = await self.ddr_date_repository.read_dates_by_ddr_id(ddr_id)
+        final_summary = {s: sum(1 for r in all_rows if r.status == s) for s in {r.status for r in all_rows}}
+        logger.info(f"[DDR:{ddr_id}] post-extraction status breakdown={final_summary}")
         well_name, surface_location = self._metadata_from_rows(all_rows)
         await self.ddr_repository.update_well_metadata(ddr, well_name, surface_location)
 
         if self._has_queued_dates(all_rows):
+            logger.warning(f"[DDR:{ddr_id}] still has QUEUED dates after extraction — leaving status PROCESSING")
             await self.ddr_repository.update_status(ddr, DDRStatus.PROCESSING)
             return
 
         await self.ddr_repository.finalize_status_from_dates(ddr, [r.status for r in all_rows])
+        logger.info(f"[DDR:{ddr_id}] DDR status finalized")
 
         try:
             total_occurrences = await self._generate_occurrences(
                 ddr_id=ddr_id, well_name=well_name, surface_location=surface_location
             )
-        except Exception:
-            logger.warning(f"Occurrence generation failed for DDR {ddr_id}")
+            logger.info(f"[DDR:{ddr_id}] occurrence generation done — total={total_occurrences}")
+        except Exception as exc:
+            logger.warning(f"[DDR:{ddr_id}] occurrence generation failed: {exc!r}")
             total_occurrences = 0
         await self._publish_processing_complete(ddr_id, total_occurrences=total_occurrences)
 
@@ -578,6 +604,7 @@ class PreSplitPipelineService:
                 logger.info(f"[DDR:{ddr_id}] date={date} embedding complete")
                 return DDRDateStatus.SUCCESS
 
+            logger.error(f"[DDR:{ddr_id}] date={date} validation FAILED — errors={validation.errors}")
             async with self._write_lock:
                 marker = (
                     self.ddr_date_repository.mark_failed_preserve
