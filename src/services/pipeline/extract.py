@@ -136,12 +136,19 @@ class GeminiDDRExtractor:
         last_error: Exception | None = None
         for attempt in range(self.max_retries + 1):
             try:
-                return await client.generate_content(
-                    model=self.model,
-                    pdf_bytes=pdf_bytes,
-                    prompt=prompt,
-                    response_schema=response_schema,
+                return await asyncio.wait_for(
+                    client.generate_content(
+                        model=self.model,
+                        pdf_bytes=pdf_bytes,
+                        prompt=prompt,
+                        response_schema=response_schema,
+                    ),
+                    timeout=settings.GEMINI_CALL_TIMEOUT_SECONDS,
                 )
+            except asyncio.TimeoutError as exc:
+                raise ExtractionError(
+                    f"gemini_call_timeout: exceeded {settings.GEMINI_CALL_TIMEOUT_SECONDS}s"
+                ) from exc
             except Exception as exc:
                 last_error = exc
                 if not self.is_rate_limit(exc):
