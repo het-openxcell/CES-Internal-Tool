@@ -86,12 +86,14 @@ class BackendBaseSettings(BaseSettings):
 
     KEY_HEX: str = config("KEY_HEX", cast=str, default="")
 
-    PDF_SPLIT_TIMEOUT_SECONDS: int = config("PDF_SPLIT_TIMEOUT_SECONDS", cast=int, default=120)
+    PDF_SPLIT_TIMEOUT_SECONDS: int = config("PDF_SPLIT_TIMEOUT_SECONDS", cast=int, default=600)
+    DDR_STUCK_TIMEOUT_SECONDS: int = config("DDR_STUCK_TIMEOUT_SECONDS", cast=int, default=1800)
 
     GEMINI_API_KEY: str = config("GEMINI_API_KEY", cast=str, default="")
     GEMINI_MODEL: str = config("GEMINI_MODEL", cast=str, default="gemini-2.5-flash-lite")
     GEMINI_EXTRACTION_MAX_CONCURRENT: int = config("GEMINI_EXTRACTION_MAX_CONCURRENT", cast=int, default=3)
     GEMINI_EXTRACTION_MAX_RETRIES: int = config("GEMINI_EXTRACTION_MAX_RETRIES", cast=int, default=3)
+    GEMINI_CALL_TIMEOUT_SECONDS: int = config("GEMINI_CALL_TIMEOUT_SECONDS", cast=int, default=180)
     GEMINI_FLASH_LITE_INPUT_COST_PER_1M_TOKENS: str = config(
         "GEMINI_FLASH_LITE_INPUT_COST_PER_1M_TOKENS",
         cast=str,

@@ -1,7 +1,10 @@
 import asyncio
+import time
 from typing import Any
 
+from src.config.manager import settings
 from src.models.schemas.ddr import DDRStatus
+from src.utilities.logging.logger import logger
 
 
 class DDRProcessingResumeService:
@@ -18,6 +21,7 @@ class DDRProcessingResumeService:
         self._lock = asyncio.Lock()
 
     async def resume(self) -> None:
+        await self._reap_stuck()
         ddr_ids = await self._resumable_ddr_ids()
         tasks = []
         for ddr_id in ddr_ids:
@@ -35,6 +39,20 @@ class DDRProcessingResumeService:
         finally:
             async with self._lock:
                 self._active_ddr_ids.discard(ddr_id)
+
+    async def _reap_stuck(self) -> None:
+        threshold = settings.DDR_STUCK_TIMEOUT_SECONDS
+        if threshold <= 0:
+            return
+        cutoff = int(time.time()) - threshold
+        for status in (DDRStatus.QUEUED, DDRStatus.PROCESSING):
+            for ddr in await self.ddr_repository.read_ddrs_by_status(status):
+                updated_at = getattr(ddr, "updated_at", None)
+                if not isinstance(updated_at, int) or updated_at >= cutoff:
+                    continue
+                await self.ddr_repository.update_status(ddr, DDRStatus.FAILED)
+                await self.processing_queue_repository.delete_by_ddr_id(ddr.id)
+                logger.warning(f"[DDR:{ddr.id}] reaped as stuck (no progress for >{threshold}s), marked FAILED")
 
     async def _resumable_ddr_ids(self) -> list[str]:
         ordered: list[str] = []
