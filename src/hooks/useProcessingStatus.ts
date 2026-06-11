@@ -16,7 +16,12 @@ export type ProcessingCompleteSummary = {
   failed_dates: number;
   warning_dates: number;
   total_occurrences: number;
+  ddr_status?: string | null;
 };
+
+function isTerminalStatus(status: DDRStatus) {
+  return status === "complete" || status === "failed" || status === "cancelled";
+}
 
 export type ProcessingConnectionMode = "idle" | "sse" | "polling" | "closed" | "error";
 
@@ -173,7 +178,7 @@ export function useProcessingStatus(ddrId?: string) {
           return;
         }
         const detailRows = applyDetail(detail);
-        if (detail.status === "complete" || detail.status === "failed") {
+        if (isTerminalStatus(detail.status)) {
           completedRef.current = true;
           setConnectionMode("closed");
           setFinalSummary(summaryFromRows(detail, detailRows, totalDatesRef.current));
@@ -225,8 +230,12 @@ export function useProcessingStatus(ddrId?: string) {
       completedRef.current = true;
       setFinalSummary(payload);
       setTotalDates(payload.total_dates);
-      const allFailed = payload.failed_dates === payload.total_dates;
-      setDdrStatus(allFailed ? "failed" : "complete");
+      if (payload.ddr_status === "cancelled") {
+        setDdrStatus("cancelled");
+      } else {
+        const allFailed = payload.failed_dates === payload.total_dates;
+        setDdrStatus(allFailed ? "failed" : "complete");
+      }
       setConnectionMode("closed");
       source?.close();
       stopPolling();
@@ -254,7 +263,7 @@ export function useProcessingStatus(ddrId?: string) {
           return;
         }
         const detailRows = applyDetail(detail);
-        if (detail.status === "complete" || detail.status === "failed") {
+        if (isTerminalStatus(detail.status)) {
           completedRef.current = true;
           setConnectionMode("closed");
           setFinalSummary(summaryFromRows(detail, detailRows, detail.dates?.length ?? detailRows.length));
@@ -305,7 +314,7 @@ export function useProcessingStatus(ddrId?: string) {
     try {
       const detail = await apiClient.getDDR(ddrId);
       const detailRows = applyDetail(detail);
-      if (detail.status === "complete" || detail.status === "failed") {
+      if (isTerminalStatus(detail.status)) {
         completedRef.current = true;
         setConnectionMode("closed");
         const failedDates = detailRows.filter((row) => row.status === "failed").length;
