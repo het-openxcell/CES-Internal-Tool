@@ -706,3 +706,53 @@ def test_apply_multi_leg_sections_noop_without_sidetrack() -> None:
     LLMOccurrenceGenerationService._apply_multi_leg_sections(occurrences)
 
     assert [occ["section"] for occ in occurrences] == ["Surface Hole", "Main"]
+
+
+def test_normalize_kg_m3_scales_specific_gravity() -> None:
+    from src.services.occurrence.density_join import DensityJoinService
+
+    assert DensityJoinService.normalize_kg_m3(1.15) == 1150.0
+    assert DensityJoinService.normalize_kg_m3(1160) == 1160.0
+    assert DensityJoinService.normalize_kg_m3(None) is None
+    assert DensityJoinService.normalize_kg_m3(0) is None
+
+
+def test_carried_density_fills_dates_without_mud_records() -> None:
+    from src.services.occurrence.llm_generate import LLMOccurrenceGenerationService
+
+    date_map = {
+        "20240401": ("id1", {"mud_records": [{"depth_md": 1000, "mud_weight": 1.15}]}),
+        "20240402": ("id2", {"mud_records": []}),
+        "20240403": ("id3", {"mud_records": [{"depth_md": 1500, "mud_weight": 1180}]}),
+    }
+    carried = LLMOccurrenceGenerationService._carried_density_by_date(date_map)
+
+    assert carried["20240401"] == 1150.0
+    assert carried["20240402"] == 1150.0
+    assert carried["20240403"] == 1180.0
+
+
+def test_resolve_mmd_prefers_llm_then_notes_then_anchor() -> None:
+    from src.services.occurrence.llm_generate import LLMOccurrenceGenerationService as S
+
+    fj = {"metres_drilled": [{"to_depth": 392.0}]}
+    assert S._resolve_mmd(1545.0, "anything 100m", fj) == 1545.0
+    assert S._resolve_mmd(None, "bridge between 879m and 881m", fj) == 879.0
+    assert S._resolve_mmd(None, "no depth here", fj) == 392.0
+    assert S._resolve_mmd(None, None, {}) is None
+
+
+def test_format_date_context_surfaces_hole_condition_depths_and_bha() -> None:
+    from src.services.occurrence.llm_generate import LLMOccurrenceGenerationService
+
+    service = LLMOccurrenceGenerationService(ddr_date_repository=None, occurrence_repository=None)
+    context = service._format_date_context(
+        {
+            "metres_drilled": [{"from_depth": 6.0, "to_depth": 392.0, "rpm": 50, "wob": 12}],
+            "hole_condition": [{"torque_at_bottom": 7000, "weight_of_string": 42.0}],
+            "bha_components": [{"component": "311mm bit"}, {"component": "8\" mud motor"}],
+        }
+    )
+    assert "DEPTHS DRILLED: 6.0-392.0m" in context
+    assert "torque_at_bottom=7000" in context
+    assert "BHA: 311mm bit" in context

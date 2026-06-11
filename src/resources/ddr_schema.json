@@ -3,7 +3,7 @@
   "title": "DDRExtraction",
   "type": "object",
   "additionalProperties": false,
-  "required": ["time_logs", "mud_records", "deviation_surveys", "bit_records"],
+  "required": ["time_logs", "mud_records", "deviation_surveys", "bit_records", "metres_drilled", "hole_condition", "bha_components"],
   "properties": {
     "well_name": {"type": ["string", "null"]},
     "surface_location": {"type": ["string", "null"]},
@@ -66,6 +66,49 @@
           "depth_out": {"type": "number"},
           "hours": {"type": ["number", "null"]},
           "comment": {"type": ["string", "null"]}
+        }
+      }
+    },
+    "metres_drilled": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["from_depth", "to_depth"],
+        "properties": {
+          "from_depth": {"type": "number"},
+          "to_depth": {"type": "number"},
+          "drill_code": {"type": ["string", "null"]},
+          "rpm": {"type": ["number", "null"]},
+          "wob": {"type": ["number", "null"]}
+        }
+      }
+    },
+    "hole_condition": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "drag_up": {"type": ["number", "null"]},
+          "drag_down": {"type": ["number", "null"]},
+          "torque_at_bottom": {"type": ["number", "null"]},
+          "kelly_down": {"type": ["number", "null"]},
+          "weight_of_string": {"type": ["number", "null"]}
+        }
+      }
+    },
+    "bha_components": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["component"],
+        "properties": {
+          "component": {"type": "string"},
+          "od": {"type": ["number", "null"]},
+          "id": {"type": ["number", "null"]},
+          "length": {"type": ["number", "null"]}
         }
       }
     }
