@@ -15,12 +15,17 @@ function DdrStatusWatcher({ ddrId, onComplete }: { ddrId: string; onComplete: (d
     if (firedRef.current || !finalSummary) {
       return;
     }
-    if (ddrStatus !== "complete" && ddrStatus !== "failed") {
+    if (ddrStatus !== "complete" && ddrStatus !== "failed" && ddrStatus !== "cancelled") {
       return;
     }
     firedRef.current = true;
     const allFailed = finalSummary.failed_dates === finalSummary.total_dates;
-    const title = allFailed ? "DDR Processing Failed" : "DDR Processing Complete";
+    const title =
+      ddrStatus === "cancelled"
+        ? "DDR Processing Cancelled"
+        : allFailed
+          ? "DDR Processing Failed"
+          : "DDR Processing Complete";
     const body = `${finalSummary.total_dates} dates — ${finalSummary.failed_dates} failed, ${finalSummary.warning_dates} warnings`;
     fireNotification(title, body);
     onComplete(ddrId);

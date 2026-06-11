@@ -76,7 +76,10 @@ class GoogleEmbeddingClient:
         self.client = genai.Client(api_key=api_key)
 
     async def embed_content(self, *, model: str, contents: list[str]) -> list[list[float]]:
-        response = await self.client.aio.models.embed_content(model=model, contents=contents)
+        response = await asyncio.wait_for(
+            self.client.aio.models.embed_content(model=model, contents=contents),
+            timeout=settings.GEMINI_CALL_TIMEOUT_SECONDS,
+        )
         embeddings = getattr(response, "embeddings", None) or []
         return [list(embedding.values) for embedding in embeddings]
 

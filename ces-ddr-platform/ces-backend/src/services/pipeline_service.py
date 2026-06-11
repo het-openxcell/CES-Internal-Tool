@@ -159,6 +159,11 @@ class PreSplitPipelineService:
         if self._has_queued_dates(rows):
             return
 
+        if await self._is_cancelled(ddr_id):
+            logger.info(f"[DDR:{ddr_id}] cancelled during retry, skipping finalize")
+            await self._publish_processing_complete(ddr_id)
+            return
+
         ddr = await self.ddr_repository.read_ddr_by_id(ddr_id)
         await self.ddr_repository.finalize_status_from_dates(ddr, [r.status for r in rows])
 
@@ -211,6 +216,8 @@ class PreSplitPipelineService:
 
         async def run_one(date: str) -> str:
             row = date_to_row[date]
+            if await self._is_cancelled(ddr_id):
+                return DDRDateStatus.QUEUED
             try:
                 chunk_bytes = await self.storage_service.download_chunk(ddr_id, date)
             except Exception as exc:
@@ -233,6 +240,11 @@ class PreSplitPipelineService:
 
         await asyncio.gather(*[run_one(d) for d in date_to_row.keys()], return_exceptions=True)
 
+        if await self._is_cancelled(ddr_id):
+            logger.info(f"[DDR:{ddr_id}] cancelled during reprocess, skipping finalize")
+            await self._publish_processing_complete(ddr_id)
+            return 0
+
         all_rows = await self.ddr_date_repository.read_dates_by_ddr_id(ddr_id)
         well_name, surface_location = self._metadata_from_rows(all_rows)
         await self.ddr_repository.update_well_metadata(ddr, well_name, surface_location)
@@ -252,6 +264,11 @@ class PreSplitPipelineService:
         ddr = await self.ddr_repository.read_ddr_by_id(ddr_id)
         pdf_bytes = await self.pdf_loader(ddr_id)
         result = await self.pre_splitter.split_async(pdf_bytes)
+
+        if await self._is_cancelled(ddr_id):
+            logger.info(f"[DDR:{ddr_id}] cancelled during full reprocess pre-split, stopping")
+            await self._publish_processing_complete(ddr_id)
+            return 0
 
         if not result.has_boundaries:
             await self.ddr_repository.update_status(ddr, DDRStatus.FAILED)
@@ -312,6 +329,8 @@ class PreSplitPipelineService:
             row = date_to_row.get(date)
             if row is None:
                 return DDRDateStatus.FAILED
+            if await self._is_cancelled(ddr_id):
+                return DDRDateStatus.QUEUED
             async with semaphore:
                 return await self._process_one_date(
                     extractor,
@@ -324,6 +343,11 @@ class PreSplitPipelineService:
 
         coroutines = [run_one(date, chunk) for date, chunk in date_chunks.items() if date in date_to_row]
         await asyncio.gather(*coroutines, return_exceptions=True)
+
+        if await self._is_cancelled(ddr_id):
+            logger.info(f"[DDR:{ddr_id}] cancelled during full reprocess, skipping finalize")
+            await self._publish_processing_complete(ddr_id)
+            return
 
         if obsolete_dates:
             await self.ddr_date_repository.delete_by_ddr_id_and_dates(ddr_id, obsolete_dates)

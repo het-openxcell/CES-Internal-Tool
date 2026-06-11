@@ -257,7 +257,7 @@ export default function ReportDetailPage() {
           </div>
 
           {/* Processing Status */}
-          {status.ddrStatus === "queued" && (
+          {status.ddrStatus === "queued" && status.connectionMode !== "idle" && (
             <div className="rounded-lg border border-border-default bg-white p-4 mb-5 flex items-center justify-between gap-3">
               <span className="text-[12px] font-semibold text-text-secondary">Queued for processing…</span>
               <button

@@ -193,13 +193,16 @@ class LLMOccurrenceGenerationService:
         last_error: Exception | None = None
         for attempt, backoff in enumerate(OCCURRENCE_BACKOFF_SECONDS):
             try:
-                response = await self.client.aio.models.generate_content(
-                    model=self.model,
-                    contents=[types.Part.from_text(text=prompt)],
-                    config=types.GenerateContentConfig(
-                        response_mime_type="application/json",
-                        response_schema=LLMOccurrenceResponse.model_json_schema(),
+                response = await asyncio.wait_for(
+                    self.client.aio.models.generate_content(
+                        model=self.model,
+                        contents=[types.Part.from_text(text=prompt)],
+                        config=types.GenerateContentConfig(
+                            response_mime_type="application/json",
+                            response_schema=LLMOccurrenceResponse.model_json_schema(),
+                        ),
                     ),
+                    timeout=settings.GEMINI_CALL_TIMEOUT_SECONDS,
                 )
                 result_text = response.text
                 break

@@ -126,6 +126,7 @@ def test_status_event_payload_contracts() -> None:
         "failed_dates": 2,
         "warning_dates": 1,
         "total_occurrences": 0,
+        "ddr_status": None,
     }
 
 
@@ -148,7 +149,7 @@ def test_stream_service_formats_sse_frames_and_closes_on_complete() -> None:
         assert first == 'event: date_complete\ndata: {"date":"20241031","status":"success","occurrences_count":0}\n\n'
         assert second == (
             'event: processing_complete\n'
-            'data: {"total_dates":1,"failed_dates":0,"warning_dates":0,"total_occurrences":0}\n\n'
+            'data: {"total_dates":1,"failed_dates":0,"warning_dates":0,"total_occurrences":0,"ddr_status":null}\n\n'
         )
 
         try:
@@ -254,6 +255,7 @@ def test_pipeline_publishes_events_after_repository_writes_and_finalizes_counts(
             "failed_dates": 0,
             "warning_dates": 0,
             "total_occurrences": 0,
+            "ddr_status": None,
         }
 
     asyncio.run(run())
