@@ -63,6 +63,9 @@ class GoogleGenAIClient:
         config = types.GenerateContentConfig(
             response_mime_type="application/json",
             response_json_schema=response_schema,
+            temperature=0.5,
+            top_p=1,
+            seed=42,
         )
         contents = [
             types.Part.from_bytes(data=pdf_bytes, mime_type="application/pdf"),

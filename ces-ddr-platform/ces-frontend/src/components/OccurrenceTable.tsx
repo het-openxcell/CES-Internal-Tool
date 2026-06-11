@@ -778,6 +778,23 @@ export function OccurrenceTable({ occurrences, isLoading, onCorrectionSaved }: O
                               ))}
                             </div>
                           </div>
+                        ) : isEditing && editableField === "section" ? (
+                          <select
+                            autoFocus
+                            value={ALL_SECTIONS.includes(editValue) ? editValue : ""}
+                            onChange={(event) => openReasonModal(event.target.value)}
+                            onKeyDown={(event) => {
+                              if (event.key === "Escape") cancelInlineEdit();
+                            }}
+                            onBlur={cancelInlineEdit}
+                            aria-label="Edit Section"
+                            className="h-8 w-full rounded-md border border-border-default px-2 text-sm focus:border-ces-red focus:outline-none"
+                          >
+                            <option value="" disabled>Select section…</option>
+                            {ALL_SECTIONS.map((section) => (
+                              <option key={section} value={section}>{section}</option>
+                            ))}
+                          </select>
                         ) : isEditing && editableField ? (
                           <input
                             autoFocus

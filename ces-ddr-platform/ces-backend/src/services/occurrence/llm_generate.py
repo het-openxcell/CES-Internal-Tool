@@ -1,5 +1,6 @@
 import asyncio
 import json
+import re
 from typing import Any
 
 from google import genai
@@ -134,8 +135,58 @@ class LLMOccurrenceGenerationService:
                 duration_str = f"{duration}h" if duration is not None else "?"
                 page_str = f"pg.{page_number}" if page_number is not None else "pg.?"
                 lines.append(f"[{i}] {start}-{end} ({duration_str}) | {depth_str} | {page_str} | {text}")
+            context = self._format_date_context(final_json)
+            if context:
+                lines.append(context)
             blocks.append("\n".join(lines))
         return "\n\n".join(blocks)
+
+    def _format_date_context(self, final_json: dict[str, Any]) -> str:
+        parts: list[str] = []
+        metres = final_json.get("metres_drilled")
+        if isinstance(metres, list):
+            spans = []
+            for record in metres:
+                if not isinstance(record, dict):
+                    continue
+                from_depth, to_depth = record.get("from_depth"), record.get("to_depth")
+                if from_depth is None or to_depth is None:
+                    continue
+                extras = [
+                    f"{label} {record[key]}"
+                    for label, key in (("RPM", "rpm"), ("WOB", "wob"), ("code", "drill_code"))
+                    if record.get(key) is not None
+                ]
+                spans.append(f"{from_depth}-{to_depth}m" + (f" ({', '.join(extras)})" if extras else ""))
+            if spans:
+                parts.append("DEPTHS DRILLED: " + "; ".join(spans))
+        hole = final_json.get("hole_condition")
+        if isinstance(hole, list):
+            entries = []
+            for record in hole:
+                if not isinstance(record, dict):
+                    continue
+                fields = [
+                    f"{label}={record[key]}"
+                    for label, key in (
+                        ("torque_at_bottom", "torque_at_bottom"),
+                        ("drag_up", "drag_up"),
+                        ("drag_down", "drag_down"),
+                        ("weight_of_string", "weight_of_string"),
+                        ("kelly_down", "kelly_down"),
+                    )
+                    if record.get(key) is not None
+                ]
+                if fields:
+                    entries.append(", ".join(fields))
+            if entries:
+                parts.append("HOLE CONDITION: " + " | ".join(entries))
+        bha = final_json.get("bha_components")
+        if isinstance(bha, list):
+            names = [str(record.get("component")) for record in bha if isinstance(record, dict) and record.get("component")]
+            if names:
+                parts.append("BHA: " + ", ".join(names[:20]))
+        return "\n".join(parts)
 
     def _format_keyword_hints(self) -> str:
         keywords = KeywordLoader.get_keywords()
@@ -200,6 +251,9 @@ class LLMOccurrenceGenerationService:
                         config=types.GenerateContentConfig(
                             response_mime_type="application/json",
                             response_schema=LLMOccurrenceResponse.model_json_schema(),
+                            temperature=0.5,
+                            top_p=1,
+                            seed=42,
                         ),
                     ),
                     timeout=settings.GEMINI_CALL_TIMEOUT_SECONDS,
@@ -236,6 +290,7 @@ class LLMOccurrenceGenerationService:
                     f"ddr_id={ddr_id}: duplicate date {row.date} in successful rows - keeping first"
                 )
 
+        carried_density_by_date = self._carried_density_by_date(date_map)
         page_number_resolver = OccurrencePageNumberResolver(successful_rows)
         all_occurrences: list[dict] = []
         for item in llm_response.occurrences:
@@ -252,13 +307,16 @@ class LLMOccurrenceGenerationService:
             ddr_date_id, final_json = date_map[item.date]
             raw_mr = final_json.get("mud_records")
             mud_records = raw_mr if isinstance(raw_mr, list) else []
-            section = OccurrenceClassifier.classify_section(item.mmd, surface_shoe, intermediate_shoe)
-            density = DensityJoinService.density_join(item.mmd, mud_records)
+            mmd = self._resolve_mmd(item.mmd, item.notes, final_json)
+            section = OccurrenceClassifier.classify_section(mmd, surface_shoe, intermediate_shoe)
+            density = DensityJoinService.normalize_kg_m3(DensityJoinService.density_join(mmd, mud_records))
+            if density is None:
+                density = carried_density_by_date.get(item.date)
             all_occurrences.append({
                 "ddr_id": ddr_id,
                 "ddr_date_id": ddr_date_id,
                 "type": item.type,
-                "mmd": item.mmd,
+                "mmd": mmd,
                 "section": section,
                 "density": density,
                 "well_name": ddr_well_name,
@@ -272,6 +330,52 @@ class LLMOccurrenceGenerationService:
         self._apply_multi_leg_sections(deduped)
         await self.occurrence_repository.replace_for_ddr(ddr_id, deduped)
         return len(deduped)
+
+    _DEPTH_RE = re.compile(r"(\d{2,5}(?:\.\d+)?)\s*m(?![a-z0-9])", re.IGNORECASE)
+
+    @classmethod
+    def _resolve_mmd(cls, item_mmd: float | None, notes: str | None, final_json: dict) -> float | None:
+        if item_mmd is not None:
+            return item_mmd
+        from_notes = cls._depth_from_notes(notes)
+        if from_notes is not None:
+            return from_notes
+        return cls._date_depth_anchor(final_json)
+
+    @classmethod
+    def _depth_from_notes(cls, notes: str | None) -> float | None:
+        if not notes:
+            return None
+        match = cls._DEPTH_RE.search(notes)
+        return float(match.group(1)) if match else None
+
+    @staticmethod
+    def _date_depth_anchor(final_json: dict) -> float | None:
+        depths: list[float] = []
+        for key, field in (("metres_drilled", "to_depth"), ("mud_records", "depth_md"), ("deviation_surveys", "depth_md")):
+            rows = final_json.get(key)
+            if not isinstance(rows, list):
+                continue
+            for record in rows:
+                if isinstance(record, dict):
+                    value = DensityJoinService.safe_float(record.get(field))
+                    if value is not None:
+                        depths.append(value)
+        return max(depths) if depths else None
+
+    @staticmethod
+    def _carried_density_by_date(date_map: dict[str, tuple[Any, dict]]) -> dict[str, float | None]:
+        carried: float | None = None
+        result: dict[str, float | None] = {}
+        for date in sorted(date_map.keys()):
+            _, final_json = date_map[date]
+            raw_mr = final_json.get("mud_records")
+            mud_records = raw_mr if isinstance(raw_mr, list) else []
+            date_density = DensityJoinService.normalize_kg_m3(DensityJoinService.density_join(None, mud_records))
+            if date_density is not None:
+                carried = date_density
+            result[date] = carried
+        return result
 
     @staticmethod
     def _apply_multi_leg_sections(occurrences: list[dict]) -> None:

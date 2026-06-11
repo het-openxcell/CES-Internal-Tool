@@ -25,3 +25,12 @@ class DensityJoinService:
             return float(value)
         except (TypeError, ValueError):
             return None
+
+    @staticmethod
+    def normalize_kg_m3(value: object) -> float | None:
+        density = DensityJoinService.safe_float(value)
+        if density is None or density <= 0:
+            return density if density is None else None
+        if density < 10:
+            return density * 1000.0
+        return density

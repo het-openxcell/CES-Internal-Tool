@@ -8,8 +8,15 @@ type TrackerValue = { track: (ddrId: string) => void };
 const ProcessingTrackerContext = createContext<TrackerValue | null>(null);
 
 function DdrStatusWatcher({ ddrId, onComplete }: { ddrId: string; onComplete: (ddrId: string) => void }) {
-  const { ddrStatus, finalSummary } = useProcessingStatus(ddrId);
+  const { ddrStatus, finalSummary, connectionMode } = useProcessingStatus(ddrId);
   const firedRef = useRef(false);
+  const wasLiveRef = useRef(false);
+
+  useEffect(() => {
+    if (connectionMode === "sse" || connectionMode === "polling") {
+      wasLiveRef.current = true;
+    }
+  }, [connectionMode]);
 
   useEffect(() => {
     if (firedRef.current || !finalSummary) {
@@ -19,15 +26,18 @@ function DdrStatusWatcher({ ddrId, onComplete }: { ddrId: string; onComplete: (d
       return;
     }
     firedRef.current = true;
-    const allFailed = finalSummary.failed_dates === finalSummary.total_dates;
-    const title =
-      ddrStatus === "cancelled"
-        ? "DDR Processing Cancelled"
-        : allFailed
-          ? "DDR Processing Failed"
-          : "DDR Processing Complete";
-    const body = `${finalSummary.total_dates} dates — ${finalSummary.failed_dates} failed, ${finalSummary.warning_dates} warnings`;
-    fireNotification(title, body);
+    // Only notify if we actually watched a live run finish — never on opening an already-finished DDR.
+    if (wasLiveRef.current) {
+      const allFailed = finalSummary.failed_dates === finalSummary.total_dates;
+      const title =
+        ddrStatus === "cancelled"
+          ? "DDR Processing Cancelled"
+          : allFailed
+            ? "DDR Processing Failed"
+            : "DDR Processing Complete";
+      const body = `${finalSummary.total_dates} dates — ${finalSummary.failed_dates} failed, ${finalSummary.warning_dates} warnings`;
+      fireNotification(title, body);
+    }
     onComplete(ddrId);
   }, [ddrStatus, finalSummary, ddrId, onComplete]);
 

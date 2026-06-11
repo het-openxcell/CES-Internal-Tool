@@ -258,10 +258,36 @@ class DDRExtractionBitRecord(DDRExtractionSchemaModel):
     comment: str | None = None
 
 
+class DDRExtractionMetresDrilled(DDRExtractionSchemaModel):
+    from_depth: float
+    to_depth: float
+    drill_code: str | None = None
+    rpm: float | None = None
+    wob: float | None = None
+
+
+class DDRExtractionHoleCondition(DDRExtractionSchemaModel):
+    drag_up: float | None = None
+    drag_down: float | None = None
+    torque_at_bottom: float | None = None
+    kelly_down: float | None = None
+    weight_of_string: float | None = None
+
+
+class DDRExtractionBHAComponent(DDRExtractionSchemaModel):
+    component: str
+    od: float | None = None
+    id: float | None = None
+    length: float | None = None
+
+
 class DDRExtractionPayload(DDRExtractionSchemaModel):
     time_logs: list[DDRExtractionTimeLog]
     mud_records: list[DDRExtractionMudRecord]
     deviation_surveys: list[DDRExtractionDeviationSurvey]
     bit_records: list[DDRExtractionBitRecord]
+    metres_drilled: list[DDRExtractionMetresDrilled] = pydantic.Field(default_factory=list)
+    hole_condition: list[DDRExtractionHoleCondition] = pydantic.Field(default_factory=list)
+    bha_components: list[DDRExtractionBHAComponent] = pydantic.Field(default_factory=list)
     well_name: str | None = None
     surface_location: str | None = None
