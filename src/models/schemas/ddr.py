@@ -180,6 +180,7 @@ class DDRProcessingCompleteEvent(BaseSchemaModel):
     failed_dates: int
     warning_dates: int
     total_occurrences: int = 0
+    ddr_status: str | None = None
 
 
 class DDRDateInResponse(DDRDateBase):

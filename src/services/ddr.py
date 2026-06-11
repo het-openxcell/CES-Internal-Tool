@@ -223,6 +223,7 @@ class DDRCancellationService:
             failed_dates=sum(1 for row in rows if row.status == DDRDateStatus.FAILED),
             warning_dates=sum(1 for row in rows if row.status == DDRDateStatus.WARNING),
             total_occurrences=0,
+            ddr_status=DDRStatus.CANCELLED,
         )
 
 

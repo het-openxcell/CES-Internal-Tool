@@ -98,7 +98,7 @@ class ProcessingStatusStreamService:
             queued = next((row for row in rows if row.status == DDRDateStatus.QUEUED), None)
             if queued is not None:
                 events.append(ProcessingStatusEvent(DATE_STARTED_EVENT, DDRDateStartedEvent(date=queued.date)))
-        if ddr.status in (DDRStatus.COMPLETE, DDRStatus.FAILED):
+        if ddr.status in (DDRStatus.COMPLETE, DDRStatus.FAILED, DDRStatus.CANCELLED):
             events.append(
                 ProcessingStatusEvent(
                     PROCESSING_COMPLETE_EVENT,
@@ -107,6 +107,7 @@ class ProcessingStatusStreamService:
                         failed_dates=sum(1 for row in rows if row.status == DDRDateStatus.FAILED),
                         warning_dates=sum(1 for row in rows if row.status == DDRDateStatus.WARNING),
                         total_occurrences=0,
+                        ddr_status=ddr.status,
                     ),
                 )
             )
@@ -156,6 +157,7 @@ class ProcessingStatusStreamService:
         failed_dates: int,
         warning_dates: int,
         total_occurrences: int = 0,
+        ddr_status: str | None = None,
     ) -> None:
         await self.publish(
             ddr_id,
@@ -165,6 +167,7 @@ class ProcessingStatusStreamService:
                 failed_dates=failed_dates,
                 warning_dates=warning_dates,
                 total_occurrences=total_occurrences,
+                ddr_status=ddr_status,
             ),
         )
 
