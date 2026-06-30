@@ -231,7 +231,6 @@ class DDRExtractionTimeLog(DDRExtractionSchemaModel):
     activity: str
     depth_md: float | None = None
     comment: str | None = None
-    time_code: str | None = None
     page_number: int | None = None
 
 

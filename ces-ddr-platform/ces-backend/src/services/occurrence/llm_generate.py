@@ -128,15 +128,13 @@ class LLMOccurrenceGenerationService:
                 duration = tl.get("duration_hours")
                 depth = tl.get("depth_md")
                 page_number = tl.get("page_number")
-                time_code = tl.get("time_code")
                 activity = tl.get("activity") or ""
                 comment = tl.get("comment") or ""
                 text = f"{activity} {comment}".strip() if comment else activity
                 depth_str = f"{depth}m" if depth is not None else "-"
                 duration_str = f"{duration}h" if duration is not None else "?"
                 page_str = f"pg.{page_number}" if page_number is not None else "pg.?"
-                code_str = f"code:{time_code}" if time_code else "code:-"
-                lines.append(f"[{i}] {start}-{end} ({duration_str}) | {code_str} | {depth_str} | {page_str} | {text}")
+                lines.append(f"[{i}] {start}-{end} ({duration_str}) | {depth_str} | {page_str} | {text}")
             context = self._format_date_context(final_json)
             if context:
                 lines.append(context)
