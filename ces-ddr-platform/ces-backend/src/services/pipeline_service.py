@@ -171,8 +171,8 @@ class PreSplitPipelineService:
             total_occurrences = await self._generate_occurrences(
                 ddr_id=ddr_id, well_name=well_name, surface_location=surface_location
             )
-        except Exception:
-            logger.warning(f"Occurrence generation failed during retry for DDR {ddr_id}")
+        except Exception as exc:
+            logger.warning(f"Occurrence generation failed during retry for DDR {ddr_id}: {exc!r}")
             total_occurrences = 0
 
         await self._publish_processing_complete(ddr_id, total_occurrences=total_occurrences)
@@ -254,8 +254,8 @@ class PreSplitPipelineService:
             total = await self._generate_occurrences(
                 ddr_id=ddr_id, well_name=well_name, surface_location=surface_location
             )
-        except Exception:
-            logger.warning(f"Occurrence generation failed during reprocess for DDR {ddr_id}")
+        except Exception as exc:
+            logger.warning(f"Occurrence generation failed during reprocess for DDR {ddr_id}: {exc!r}")
             total = 0
         await self._publish_processing_complete(ddr_id, total_occurrences=total)
         return total
