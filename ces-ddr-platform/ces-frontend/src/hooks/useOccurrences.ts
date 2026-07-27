@@ -33,7 +33,9 @@ export function useOccurrences(ddrId: string | undefined) {
     return () => controller.abort();
   }, [loadData]);
 
-  return { data, isLoading, error, refetch: () => loadData() };
+  const refetch = useCallback(() => loadData(), [loadData]);
+
+  return { data, isLoading, error, refetch };
 }
 
 export default useOccurrences;

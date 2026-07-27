@@ -69,6 +69,12 @@ export default function ReportDetailPage() {
       track(id);
     }
   }, [id, status.ddrStatus, track]);
+
+  useEffect(() => {
+    if (status.ddrStatus === "complete" || status.ddrStatus === "failed") {
+      void refetchOccurrences();
+    }
+  }, [status.ddrStatus, refetchOccurrences]);
   const { retryingDate, handleRetryDate } = useRetryDate(id, status.refresh, status.reconnect);
 
   const handleCancel = async () => {
