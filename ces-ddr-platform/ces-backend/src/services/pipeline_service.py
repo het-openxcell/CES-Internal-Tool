@@ -23,6 +23,15 @@ from src.services.storage_service import StorageService
 from src.utilities.exceptions import BadRequestException, EntityDoesNotExist
 from src.utilities.logging.logger import logger
 
+_shared_extraction_semaphore: asyncio.Semaphore | None = None
+
+
+def _get_shared_extraction_semaphore() -> asyncio.Semaphore:
+    global _shared_extraction_semaphore
+    if _shared_extraction_semaphore is None:
+        _shared_extraction_semaphore = asyncio.Semaphore(settings.GEMINI_EXTRACTION_MAX_CONCURRENT)
+    return _shared_extraction_semaphore
+
 
 class PreSplitPipelineService:
     def __init__(
@@ -60,6 +69,10 @@ class PreSplitPipelineService:
         self.embedding_service = embedding_service
         self.page_number_normalizer = TimeLogPageNumberNormalizer()
         self._write_lock = asyncio.Lock()
+        if max_concurrent is not None:
+            self._semaphore = asyncio.Semaphore(max(1, max_concurrent))
+        else:
+            self._semaphore = _get_shared_extraction_semaphore()
 
     async def run(self, ddr_id: str) -> PreSplitResult:
         logger.info(f"[DDR:{ddr_id}] pipeline run started")
@@ -211,7 +224,7 @@ class PreSplitPipelineService:
         await self.ddr_repository.update_status(ddr, DDRStatus.PROCESSING)
 
         extractor = self.extractor or GeminiDDRExtractor()
-        semaphore = asyncio.Semaphore(self.max_concurrent)
+        semaphore = self._semaphore
         date_page_numbers = await self._page_numbers_for_rows(ddr_id, rows)
 
         async def run_one(date: str) -> str:
@@ -323,7 +336,7 @@ class PreSplitPipelineService:
             return
 
         extractor = self.extractor or GeminiDDRExtractor()
-        semaphore = asyncio.Semaphore(self.max_concurrent)
+        semaphore = self._semaphore
 
         async def run_one(date: str, chunk_bytes: bytes) -> str:
             row = date_to_row.get(date)
@@ -402,7 +415,7 @@ class PreSplitPipelineService:
 
         logger.info(f"[DDR:{ddr_id}] {len(date_to_row)} dates queued for extraction, max_concurrent={self.max_concurrent}")
         extractor = self.extractor or GeminiDDRExtractor()
-        semaphore = asyncio.Semaphore(self.max_concurrent)
+        semaphore = self._semaphore
 
         async def run_one(date: str, chunk_bytes: bytes) -> str:
             row = date_to_row.get(date)
@@ -542,6 +555,43 @@ class PreSplitPipelineService:
         return well_name, surface_location
 
     async def _process_one_date(
+        self,
+        extractor: GeminiDDRExtractor,
+        row: Any,
+        date: str,
+        chunk_bytes: bytes,
+        original_page_numbers: list[int] | None = None,
+        preserve_existing_payload: bool = False,
+    ) -> str:
+        ddr_id = row.ddr_id
+        try:
+            return await self._process_one_date_body(
+                extractor,
+                row,
+                date,
+                chunk_bytes,
+                original_page_numbers=original_page_numbers,
+                preserve_existing_payload=preserve_existing_payload,
+            )
+        except Exception as exc:
+            logger.error(f"[DDR:{ddr_id}] date={date} extraction task failed unrecoverably: {exc!r}", exc_info=True)
+            try:
+                async with self._write_lock:
+                    marker = (
+                        self.ddr_date_repository.mark_failed_preserve
+                        if preserve_existing_payload
+                        else self.ddr_date_repository.mark_failed
+                    )
+                    updated_row = await marker(row, error_log={"code": "UNRECOVERABLE", "detail": str(exc)})
+                    await self._publish_date_failed(updated_row)
+            except Exception as write_exc:
+                logger.error(
+                    f"[DDR:{ddr_id}] date={date} could not persist failure status either: {write_exc!r}",
+                    exc_info=True,
+                )
+            return DDRDateStatus.FAILED
+
+    async def _process_one_date_body(
         self,
         extractor: GeminiDDRExtractor,
         row: Any,
