@@ -1,8 +1,10 @@
 import asyncio
+import multiprocessing
 import re
+from concurrent.futures import ProcessPoolExecutor
 from dataclasses import dataclass, field
 from io import BytesIO
-from typing import IO, Union
+from typing import IO, ClassVar, Union
 
 import pdfplumber
 import pypdf
@@ -31,6 +33,31 @@ class PreSplitResult:
         return bool(self.date_chunks)
 
 
+class PDFSplitProcessPool:
+    _executor: ClassVar[ProcessPoolExecutor | None] = None
+
+    @classmethod
+    def get(cls) -> ProcessPoolExecutor:
+        if cls._executor is None:
+            from src.config.manager import settings
+
+            cls._executor = ProcessPoolExecutor(
+                max_workers=settings.PDF_SPLIT_PROCESS_POOL_WORKERS,
+                mp_context=multiprocessing.get_context("spawn"),
+            )
+        return cls._executor
+
+    @classmethod
+    def reset(cls) -> None:
+        cls._executor = None
+
+    @classmethod
+    def shutdown(cls) -> None:
+        if cls._executor is not None:
+            cls._executor.shutdown(wait=False, cancel_futures=True)
+            cls._executor = None
+
+
 class PDFPreSplitter:
     def split(self, source: PDFSource) -> PreSplitResult:
         source = self._normalize_source(source)
@@ -55,11 +82,27 @@ class PDFPreSplitter:
         )
 
     async def split_async(self, source: PDFSource, timeout: float | None = None) -> PreSplitResult:
+        from concurrent.futures.process import BrokenProcessPool
+
         from src.config.manager import settings
+
         effective_timeout = timeout if timeout is not None else float(settings.PDF_SPLIT_TIMEOUT_SECONDS)
         logger.info(f"PDFPreSplitter: split_async starting with timeout={effective_timeout}s")
+        normalized_source = self._normalize_source(source)
+        loop = asyncio.get_running_loop()
         try:
-            return await asyncio.wait_for(asyncio.to_thread(self.split, source), timeout=effective_timeout)
+            try:
+                return await asyncio.wait_for(
+                    loop.run_in_executor(PDFSplitProcessPool.get(), _run_pdf_split, normalized_source),
+                    timeout=effective_timeout,
+                )
+            except BrokenProcessPool:
+                logger.warning("PDFPreSplitter: process pool worker died, restarting pool and retrying once")
+                PDFSplitProcessPool.reset()
+                return await asyncio.wait_for(
+                    loop.run_in_executor(PDFSplitProcessPool.get(), _run_pdf_split, normalized_source),
+                    timeout=effective_timeout,
+                )
         except asyncio.TimeoutError:
             logger.error(f"PDFPreSplitter.split_async timed out after {effective_timeout}s — PDF too large/complex")
             raise
@@ -176,3 +219,7 @@ class PDFPreSplitter:
         if isinstance(source, (bytes, bytearray)):
             return BytesIO(bytes(source))
         return source
+
+
+def _run_pdf_split(source: PDFSource) -> PreSplitResult:
+    return PDFPreSplitter().split(source)

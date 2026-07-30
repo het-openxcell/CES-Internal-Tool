@@ -87,6 +87,7 @@ class BackendBaseSettings(BaseSettings):
     KEY_HEX: str = config("KEY_HEX", cast=str, default="")
 
     PDF_SPLIT_TIMEOUT_SECONDS: int = config("PDF_SPLIT_TIMEOUT_SECONDS", cast=int, default=600)
+    PDF_SPLIT_PROCESS_POOL_WORKERS: int = config("PDF_SPLIT_PROCESS_POOL_WORKERS", cast=int, default=2)
     DDR_STUCK_TIMEOUT_SECONDS: int = config("DDR_STUCK_TIMEOUT_SECONDS", cast=int, default=1800)
     DDR_PIPELINE_MAX_CONCURRENT: int = config("DDR_PIPELINE_MAX_CONCURRENT", cast=int, default=4)
 

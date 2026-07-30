@@ -77,6 +77,7 @@ class PreSplitPipelineService:
     async def run(self, ddr_id: str) -> PreSplitResult:
         logger.info(f"[DDR:{ddr_id}] pipeline run started")
         ddr = await self.ddr_repository.read_ddr_by_id(ddr_id)
+        await self._commit_outcome()
         logger.info(f"[DDR:{ddr_id}] loading PDF from storage")
         pdf_bytes = await self.pdf_loader(ddr_id)
         logger.info(f"[DDR:{ddr_id}] PDF loaded ({len(pdf_bytes)} bytes), running pre-splitter")
@@ -153,6 +154,7 @@ class PreSplitPipelineService:
         row = next((r for r in rows_all if r.date == date), None)
         if row is None:
             return
+        await self._commit_outcome()
 
         chunk_bytes = await self.storage_service.download_chunk(ddr_id, date)
         date_page_numbers = await self._page_numbers_for_rows(ddr_id, [row])
@@ -275,6 +277,7 @@ class PreSplitPipelineService:
 
     async def reprocess_full(self, ddr_id: str) -> int:
         ddr = await self.ddr_repository.read_ddr_by_id(ddr_id)
+        await self._commit_outcome()
         pdf_bytes = await self.pdf_loader(ddr_id)
         result = await self.pre_splitter.split_async(pdf_bytes)
 
@@ -337,6 +340,7 @@ class PreSplitPipelineService:
 
         extractor = self.extractor or GeminiDDRExtractor()
         semaphore = self._semaphore
+        await self._commit_outcome()
 
         async def run_one(date: str, chunk_bytes: bytes) -> str:
             row = date_to_row.get(date)
@@ -414,6 +418,7 @@ class PreSplitPipelineService:
             return
 
         logger.info(f"[DDR:{ddr_id}] {len(date_to_row)} dates queued for extraction, max_concurrent={self.max_concurrent}")
+        await self._commit_outcome()
         extractor = self.extractor or GeminiDDRExtractor()
         semaphore = self._semaphore
 
@@ -534,7 +539,10 @@ class PreSplitPipelineService:
         return any(row.status == DDRDateStatus.QUEUED for row in rows)
 
     async def _is_cancelled(self, ddr_id: str) -> bool:
-        return await self.ddr_repository.read_status(ddr_id) == DDRStatus.CANCELLED
+        async with self._write_lock:
+            status = await self.ddr_repository.read_status(ddr_id)
+            await self._commit_outcome()
+        return status == DDRStatus.CANCELLED
 
     def metadata_from_rows(self, rows: list[Any] | Any) -> tuple[str | None, str | None]:
         return self._metadata_from_rows(rows)

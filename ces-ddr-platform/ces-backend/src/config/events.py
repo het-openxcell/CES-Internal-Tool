@@ -7,6 +7,7 @@ from src.repository.crud.ddr import DDRCRUDRepository, ProcessingQueueCRUDReposi
 from src.repository.events import dispose_db_connection, initialize_db_connection
 from src.services.ddr import DDRProcessingTask
 from src.services.keywords.loader import KeywordLoader
+from src.services.pipeline.pre_split import PDFSplitProcessPool
 from src.services.processing_resume import DDRProcessingResumeService
 from src.services.processing_status import ProcessingStatusStreamService
 from src.utilities.logging.logger import logger
@@ -34,6 +35,7 @@ def terminate_backend_server_event_handler(backend_app: FastAPI) -> typing.Any:
             pass
 
         await dispose_db_connection(backend_app=backend_app)
+        PDFSplitProcessPool.shutdown()
         logger.info("Application shutdown completed")
 
     return stop_backend_server_events
