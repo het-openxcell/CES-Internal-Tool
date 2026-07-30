@@ -7,6 +7,7 @@ from src.constants.pipeline import DDR_METADATA_KEYS, GEMINI_BACKOFF_SECONDS, GE
 from src.constants.prompts import LLMPrompts
 from src.resources.ddr_schema import DDRExtractionSchema, load_ddr_extraction_schema
 from src.services.langsmith_tracing import LangSmithTracingService
+from src.utilities.logging.logger import logger
 
 
 class ExtractionError(Exception):
@@ -18,6 +19,9 @@ class ExtractionError(Exception):
 class RateLimitError(ExtractionError):
     def __init__(self, detail: str = "rate_limited"):
         super().__init__(detail)
+
+
+_FALLBACK_MODEL_UNSET = object()
 
 
 @dataclass
@@ -89,12 +93,16 @@ class GeminiDDRExtractor:
         self,
         client: GeminiClientProtocol | None = None,
         model: str | None = None,
+        fallback_model: str | None = _FALLBACK_MODEL_UNSET,
         schema: DDRExtractionSchema | None = None,
         max_retries: int | None = None,
         sleep: Any = asyncio.sleep,
     ):
         self.client = client
         self.model = model or settings.GEMINI_MODEL
+        self.fallback_model = (
+            settings.GEMINI_FALLBACK_MODEL if fallback_model is _FALLBACK_MODEL_UNSET else fallback_model
+        )
         self.schema_definition = schema or load_ddr_extraction_schema()
         configured_retries = settings.GEMINI_EXTRACTION_MAX_RETRIES if max_retries is None else max_retries
         self.max_retries = max(0, configured_retries)
@@ -136,12 +144,43 @@ class GeminiDDRExtractor:
         prompt = self.build_prompt(date, original_page_numbers=original_page_numbers)
         response_schema = self.schema_definition.gemini_response_schema()
 
+        try:
+            return await self._extract_with_model(
+                client, self.model, pdf_bytes, prompt, response_schema, max_retries=self.max_retries
+            )
+        except ExtractionError as primary_error:
+            if not self.fallback_model or self.fallback_model == self.model:
+                raise
+            logger.warning(
+                f"date={date} model={self.model} failed ({primary_error.detail}); "
+                f"falling back to model={self.fallback_model}"
+            )
+            try:
+                return await self._extract_with_model(
+                    client, self.fallback_model, pdf_bytes, prompt, response_schema, max_retries=0
+                )
+            except ExtractionError as fallback_error:
+                error_cls = RateLimitError if isinstance(primary_error, RateLimitError) else ExtractionError
+                raise error_cls(
+                    f"{primary_error.detail}; fallback_model={self.fallback_model} also failed: "
+                    f"{fallback_error.detail}"
+                ) from fallback_error
+
+    async def _extract_with_model(
+        self,
+        client: GeminiClientProtocol,
+        model: str,
+        pdf_bytes: bytes,
+        prompt: str,
+        response_schema: dict[str, Any],
+        max_retries: int,
+    ) -> ExtractionResult:
         last_error: Exception | None = None
-        for attempt in range(self.max_retries + 1):
+        for attempt in range(max_retries + 1):
             try:
                 return await asyncio.wait_for(
                     client.generate_content(
-                        model=self.model,
+                        model=model,
                         pdf_bytes=pdf_bytes,
                         prompt=prompt,
                         response_schema=response_schema,
@@ -156,11 +195,11 @@ class GeminiDDRExtractor:
                 last_error = exc
                 if not self.is_rate_limit(exc):
                     raise ExtractionError(f"gemini_call_failed: {exc}") from exc
-                if attempt >= self.max_retries:
+                if attempt >= max_retries:
                     break
                 await self.sleep(GEMINI_BACKOFF_SECONDS[min(attempt, len(GEMINI_BACKOFF_SECONDS) - 1)])
 
-        if self.max_retries == 3:
+        if max_retries == 3:
             await self.sleep(GEMINI_BACKOFF_SECONDS[3])
         raise RateLimitError("rate_limited") from None if last_error is None else RateLimitError("rate_limited")
 

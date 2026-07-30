@@ -93,6 +93,7 @@ class BackendBaseSettings(BaseSettings):
 
     GEMINI_API_KEY: str = config("GEMINI_API_KEY", cast=str, default="")
     GEMINI_MODEL: str = config("GEMINI_MODEL", cast=str, default="gemini-2.5-flash-lite")
+    GEMINI_FALLBACK_MODEL: str = config("GEMINI_FALLBACK_MODEL", cast=str, default="gemini-flash-latest")
     GEMINI_EXTRACTION_MAX_CONCURRENT: int = config("GEMINI_EXTRACTION_MAX_CONCURRENT", cast=int, default=3)
     GEMINI_EXTRACTION_MAX_RETRIES: int = config("GEMINI_EXTRACTION_MAX_RETRIES", cast=int, default=3)
     GEMINI_CALL_TIMEOUT_SECONDS: int = config("GEMINI_CALL_TIMEOUT_SECONDS", cast=int, default=180)

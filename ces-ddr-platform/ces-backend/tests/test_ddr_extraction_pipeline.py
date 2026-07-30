@@ -266,7 +266,7 @@ def test_extractor_retries_on_rate_limit_and_eventually_raises() -> None:
     err = rate()
     err.status_code = 429
     fake = FakeGeminiClient([err, err, err, err])
-    extractor = GeminiDDRExtractor(client=fake, model="m", max_retries=3, sleep=fake_sleep)
+    extractor = GeminiDDRExtractor(client=fake, model="m", fallback_model=None, max_retries=3, sleep=fake_sleep)
 
     raised = False
     try:
@@ -278,9 +278,40 @@ def test_extractor_retries_on_rate_limit_and_eventually_raises() -> None:
     assert len(fake.calls) == 4
 
 
+def test_extractor_falls_back_to_secondary_model_after_primary_exhausted() -> None:
+    err = RuntimeError("503 UNAVAILABLE")
+    fake = FakeGeminiClient([err, ExtractionResult(text=FIXTURE_JSON, input_tokens=1, output_tokens=2)])
+    extractor = GeminiDDRExtractor(
+        client=fake, model="m", fallback_model="m-fallback", max_retries=0, sleep=lambda _s: asyncio.sleep(0)
+    )
+
+    result = asyncio.run(extractor.extract(date="20240115", pdf_bytes=b"x"))
+
+    assert result.text == FIXTURE_JSON
+    assert [call["model"] for call in fake.calls] == ["m", "m-fallback"]
+
+
+def test_extractor_raises_when_fallback_also_fails_preserving_rate_limit_type() -> None:
+    rate = type("RL", (Exception,), {})
+    rate_err = rate()
+    rate_err.status_code = 429
+    fake = FakeGeminiClient([rate_err, rate_err])
+    extractor = GeminiDDRExtractor(
+        client=fake, model="m", fallback_model="m-fallback", max_retries=0, sleep=lambda _s: asyncio.sleep(0)
+    )
+
+    raised = False
+    try:
+        asyncio.run(extractor.extract(date="20240115", pdf_bytes=b"x"))
+    except RateLimitError:
+        raised = True
+    assert raised
+    assert [call["model"] for call in fake.calls] == ["m", "m-fallback"]
+
+
 def test_extractor_raises_extraction_error_on_non_rate_limit() -> None:
     fake = FakeGeminiClient([RuntimeError("server_blew_up")])
-    extractor = GeminiDDRExtractor(client=fake, model="m", max_retries=3, sleep=lambda _s: asyncio.sleep(0))
+    extractor = GeminiDDRExtractor(client=fake, model="m", fallback_model=None, max_retries=3, sleep=lambda _s: asyncio.sleep(0))
 
     raised = False
     try:
@@ -298,7 +329,7 @@ def test_extractor_does_not_treat_generate_errors_as_rate_limits() -> None:
         sleeps.append(seconds)
 
     fake = FakeGeminiClient([RuntimeError("generate_content failed")])
-    extractor = GeminiDDRExtractor(client=fake, model="m", max_retries=3, sleep=fake_sleep)
+    extractor = GeminiDDRExtractor(client=fake, model="m", fallback_model=None, max_retries=3, sleep=fake_sleep)
 
     raised = False
     try:
@@ -330,7 +361,9 @@ def test_pipeline_persists_success_warning_and_failure_per_date(tmp_path) -> Non
             rate_err, rate_err, rate_err, rate_err,
         ]
     )
-    extractor = GeminiDDRExtractor(client=fake_client, model="m", max_retries=3, sleep=lambda _s: asyncio.sleep(0))
+    extractor = GeminiDDRExtractor(
+        client=fake_client, model="m", fallback_model=None, max_retries=3, sleep=lambda _s: asyncio.sleep(0)
+    )
 
     async def loader(_):
         return b"%PDF-1.7"
