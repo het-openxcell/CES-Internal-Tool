@@ -6,6 +6,7 @@ from typing import Any, Callable
 
 from fastapi import HTTPException, UploadFile
 
+from src.config.manager import settings
 from src.constants.occurrence import VALID_SECTIONS
 from src.constants.storage import PDF_CONTENT_TYPES, PDF_HEADER, UPLOAD_CHUNK_SIZE_BYTES
 from src.models.schemas.ddr import DDRDateStatus, DDRStatus
@@ -25,6 +26,16 @@ class DDRUploadValidationError(BadRequestException):
         super().__init__(detail=detail)
 
 
+_shared_pipeline_semaphore: asyncio.Semaphore | None = None
+
+
+def _get_shared_pipeline_semaphore() -> asyncio.Semaphore:
+    global _shared_pipeline_semaphore
+    if _shared_pipeline_semaphore is None:
+        _shared_pipeline_semaphore = asyncio.Semaphore(settings.DDR_PIPELINE_MAX_CONCURRENT)
+    return _shared_pipeline_semaphore
+
+
 class AuthenticatedUserIdentity:
     @classmethod
     def user_id(cls, current_user: Any) -> str:
@@ -42,11 +53,17 @@ class DDRPipelineTaskBase:
         pipeline_service_factory: Callable[[Any], PreSplitPipelineService] | None = None,
         status_stream_service: ProcessingStatusStreamService | None = None,
         storage_service: StorageService | None = None,
+        max_concurrent: int | None = None,
     ) -> None:
         self._session_factory = session_factory
         self.status_stream_service = status_stream_service
         self.storage_service = storage_service or StorageService()
         self.pipeline_service_factory = pipeline_service_factory or self._default_pipeline_service_factory
+        self._pipeline_semaphore = (
+            asyncio.Semaphore(max(1, max_concurrent))
+            if max_concurrent is not None
+            else _get_shared_pipeline_semaphore()
+        )
 
     def session_factory(self) -> Callable[[], Any]:
         return self._session_factory or self._default_session_factory()
@@ -76,23 +93,25 @@ class DDRPipelineTaskBase:
 
 class DDRProcessingTask(DDRPipelineTaskBase):
     async def process(self, ddr_id: str) -> None:
-        logger.info(f"[DDR:{ddr_id}] processing task started")
-        session_factory = self.session_factory()
-        async with session_factory() as session:
-            processing_finished = False
-            try:
-                await self.pipeline_service(session).run(ddr_id)
-                processing_finished = True
-                logger.info(f"[DDR:{ddr_id}] pipeline run completed successfully")
-            except Exception as exc:
-                logger.error(f"[DDR:{ddr_id}] pipeline run raised exception: {exc!r}", exc_info=True)
-                await session.rollback()
-                await self._mark_failed(session, ddr_id)
-                processing_finished = True
-                logger.error(f"[DDR:{ddr_id}] pre-split failed, marked as failed: {exc}")
-            if processing_finished:
-                await ProcessingQueueCRUDRepository(async_session=session).delete_by_ddr_id(ddr_id)
-                logger.info(f"[DDR:{ddr_id}] removed from processing queue")
+        logger.info(f"[DDR:{ddr_id}] processing task queued, waiting for pipeline slot")
+        async with self._pipeline_semaphore:
+            logger.info(f"[DDR:{ddr_id}] processing task started")
+            session_factory = self.session_factory()
+            async with session_factory() as session:
+                processing_finished = False
+                try:
+                    await self.pipeline_service(session).run(ddr_id)
+                    processing_finished = True
+                    logger.info(f"[DDR:{ddr_id}] pipeline run completed successfully")
+                except Exception as exc:
+                    logger.error(f"[DDR:{ddr_id}] pipeline run raised exception: {exc!r}", exc_info=True)
+                    await session.rollback()
+                    await self._mark_failed(session, ddr_id)
+                    processing_finished = True
+                    logger.error(f"[DDR:{ddr_id}] pre-split failed, marked as failed: {exc}")
+                if processing_finished:
+                    await ProcessingQueueCRUDRepository(async_session=session).delete_by_ddr_id(ddr_id)
+                    logger.info(f"[DDR:{ddr_id}] removed from processing queue")
 
     async def _mark_failed(self, session: Any, ddr_id: str) -> None:
         try:
@@ -112,18 +131,19 @@ class DDRReprocessTask(DDRPipelineTaskBase):
         await self._run(ddr_id, "dates", dates)
 
     async def _run(self, ddr_id: str, mode: str, dates: list[str] | None = None) -> None:
-        session_factory = self.session_factory()
-        async with session_factory() as session:
-            try:
-                service = self.pipeline_service(session)
-                if mode == "full":
-                    await service.reprocess_full(ddr_id)
-                else:
-                    await service.reprocess_dates(ddr_id, dates)
-            except Exception as exc:
-                await session.rollback()
-                await self._mark_failed(session, ddr_id)
-                logger.error(f"DDR reprocess failed for {ddr_id}: {exc}")
+        async with self._pipeline_semaphore:
+            session_factory = self.session_factory()
+            async with session_factory() as session:
+                try:
+                    service = self.pipeline_service(session)
+                    if mode == "full":
+                        await service.reprocess_full(ddr_id)
+                    else:
+                        await service.reprocess_dates(ddr_id, dates)
+                except Exception as exc:
+                    await session.rollback()
+                    await self._mark_failed(session, ddr_id)
+                    logger.error(f"DDR reprocess failed for {ddr_id}: {exc}")
 
     async def _mark_failed(self, session: Any, ddr_id: str) -> None:
         try:

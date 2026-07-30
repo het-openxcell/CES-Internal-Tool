@@ -88,6 +88,7 @@ class BackendBaseSettings(BaseSettings):
 
     PDF_SPLIT_TIMEOUT_SECONDS: int = config("PDF_SPLIT_TIMEOUT_SECONDS", cast=int, default=600)
     DDR_STUCK_TIMEOUT_SECONDS: int = config("DDR_STUCK_TIMEOUT_SECONDS", cast=int, default=1800)
+    DDR_PIPELINE_MAX_CONCURRENT: int = config("DDR_PIPELINE_MAX_CONCURRENT", cast=int, default=4)
 
     GEMINI_API_KEY: str = config("GEMINI_API_KEY", cast=str, default="")
     GEMINI_MODEL: str = config("GEMINI_MODEL", cast=str, default="gemini-2.5-flash-lite")
