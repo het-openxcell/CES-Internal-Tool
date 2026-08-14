@@ -9,7 +9,12 @@ from typing import IO, ClassVar, Union
 import pdfplumber
 import pypdf
 
-from src.constants.pipeline import DATE_SERIAL_PATTERN, RAW_TEXT_PREVIEW_CHARS, TRUNCATED_DATE_SERIAL_PATTERN
+from src.constants.pipeline import (
+    DATE_SERIAL_PATTERN,
+    LABELED_DATE_PATTERN,
+    RAW_TEXT_PREVIEW_CHARS,
+    TRUNCATED_DATE_SERIAL_PATTERN,
+)
 from src.utilities.logging.logger import logger
 
 PDFSource = Union[str, bytes, IO[bytes]]
@@ -169,6 +174,8 @@ class PDFPreSplitter:
             matches.append((match.start(), match.group(1)))
         for match in re.finditer(TRUNCATED_DATE_SERIAL_PATTERN, text):
             matches.append((match.start(), f"2{match.group(1)}"))
+        for match in re.finditer(LABELED_DATE_PATTERN, text):
+            matches.append((match.start(), f"{match.group(1)}{match.group(2)}{match.group(3)}"))
         return [date for _, date in sorted(matches)]
 
     def _build_chunks(self, source: PDFSource, page_dates: dict[int, list[str]]) -> dict[str, bytes]:
