@@ -36,7 +36,6 @@ class AsyncDatabase:
             pool_timeout=30,
         )
 
-        self.async_session: SQLAlchemyAsyncSession = SQLAlchemyAsyncSession(bind=self.async_engine)
         self.pool: SQLAlchemyPool = self.async_engine.pool
 
         self.async_session_factory = async_sessionmaker(

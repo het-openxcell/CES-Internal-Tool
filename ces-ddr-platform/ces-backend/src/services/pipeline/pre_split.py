@@ -54,7 +54,7 @@ class PDFSplitProcessPool:
 
     @classmethod
     def reset(cls) -> None:
-        cls._executor = None
+        cls.shutdown()
 
     @classmethod
     def shutdown(cls) -> None:

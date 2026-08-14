@@ -17,8 +17,17 @@ class DDRStatusSnapshotFactory:
         self.status_stream_service = status_stream_service
 
     async def events(self) -> list:
-        ddr = await self.ddr_repository.read_by_id(self.ddr_id)
-        if ddr is None:
-            return []
-        rows = list(await self.ddr_date_repository.read_dates_by_ddr_id(self.ddr_id))
-        return self.status_stream_service.snapshot_events(ddr, rows)
+        try:
+            ddr = await self.ddr_repository.read_by_id(self.ddr_id)
+            if ddr is None:
+                return []
+            rows = list(await self.ddr_date_repository.read_dates_by_ddr_id(self.ddr_id))
+            return self.status_stream_service.snapshot_events(ddr, rows)
+        finally:
+            await self.release_sessions()
+
+    async def release_sessions(self) -> None:
+        for repository in (self.ddr_repository, self.ddr_date_repository):
+            session = getattr(repository, "async_session", None)
+            if session is not None:
+                await session.close()

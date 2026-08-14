@@ -79,7 +79,7 @@ class CustomOAuth2PasswordBearer(OAuth2PasswordBearer):
 
 
 async def get_current_user(user_id: str) -> User | None:
-    async for async_session in async_db.get_session():
+    async with async_db.async_session_factory() as async_session:
         stmt = (
             sqlalchemy.select(User)
             .options(selectinload(User.roles))
