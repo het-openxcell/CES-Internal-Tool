@@ -2,7 +2,8 @@ import asyncio
 from types import SimpleNamespace
 from typing import Any
 
-from src.repository.database import async_db
+import pytest
+
 from src.securities.authorizations import jwt_authentication
 from src.services.ddr_status import DDRStatusSnapshotFactory
 from src.services.processing_status import ProcessingStatusStreamService
@@ -49,22 +50,41 @@ class SnapshotRepository:
         return self.rows
 
 
-def test_get_current_user_releases_session(monkeypatch) -> None:
+def test_get_current_user_reuses_request_session() -> None:
     session = TrackingSession(user=SimpleNamespace(id="user-1", is_active=True, roles=[]))
-    monkeypatch.setattr(async_db, "async_session_factory", lambda: session)
 
-    user = EventLoopRunner.run(jwt_authentication.get_current_user(user_id="user-1"))
+    user = EventLoopRunner.run(jwt_authentication.get_current_user(user_id="user-1", async_session=session))
 
     assert user is not None
-    assert session.closed is True
+    assert session.closed is False
 
 
-def test_get_current_user_releases_session_for_inactive_user(monkeypatch) -> None:
+def test_get_current_user_reuses_request_session_for_inactive_user() -> None:
     session = TrackingSession(user=SimpleNamespace(id="user-1", is_active=False, roles=[]))
-    monkeypatch.setattr(async_db, "async_session_factory", lambda: session)
 
-    assert EventLoopRunner.run(jwt_authentication.get_current_user(user_id="user-1")) is None
-    assert session.closed is True
+    assert EventLoopRunner.run(jwt_authentication.get_current_user(user_id="user-1", async_session=session)) is None
+    assert session.closed is False
+
+
+def test_authenticate_token_propagates_database_errors(monkeypatch) -> None:
+    class FailingSession(TrackingSession):
+        async def execute(self, statement: Any = None, **_: Any) -> Any:
+            raise TimeoutError("QueuePool limit reached")
+
+    monkeypatch.setattr(
+        jwt_authentication.jwt_generator,
+        "retrieve_details_from_token",
+        lambda token: {"user_id": "user-1", "jti": "jti-1", "token_type": "access", "raw_payload": {}},
+    )
+
+    with pytest.raises(TimeoutError):
+        EventLoopRunner.run(
+            jwt_authentication.authenticate_token(
+                request=SimpleNamespace(state=SimpleNamespace()),
+                token="token",
+                async_session=FailingSession(),
+            )
+        )
 
 
 def test_snapshot_factory_releases_sessions_before_streaming() -> None:
