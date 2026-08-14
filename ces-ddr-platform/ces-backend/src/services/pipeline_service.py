@@ -82,6 +82,7 @@ class PreSplitPipelineService:
         pdf_bytes = await self.pdf_loader(ddr_id)
         logger.info(f"[DDR:{ddr_id}] PDF loaded ({len(pdf_bytes)} bytes), running pre-splitter")
         result = await self.pre_splitter.split_async(pdf_bytes)
+        del pdf_bytes
         dates = sorted(result.date_chunks.keys()) if result.has_boundaries else []
         logger.info(f"[DDR:{ddr_id}] pre-split done: has_boundaries={result.has_boundaries}, dates={dates}")
 
@@ -280,6 +281,7 @@ class PreSplitPipelineService:
         await self._commit_outcome()
         pdf_bytes = await self.pdf_loader(ddr_id)
         result = await self.pre_splitter.split_async(pdf_bytes)
+        del pdf_bytes
 
         if await self._is_cancelled(ddr_id):
             logger.info(f"[DDR:{ddr_id}] cancelled during full reprocess pre-split, stopping")

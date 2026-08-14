@@ -49,11 +49,14 @@ class PDFSplitProcessPool:
             cls._executor = ProcessPoolExecutor(
                 max_workers=settings.PDF_SPLIT_PROCESS_POOL_WORKERS,
                 mp_context=multiprocessing.get_context("spawn"),
+                max_tasks_per_child=1,
             )
         return cls._executor
 
     @classmethod
-    def reset(cls) -> None:
+    def reset(cls, executor: ProcessPoolExecutor | None = None) -> None:
+        if executor is not None and executor is not cls._executor:
+            return
         cls.shutdown()
 
     @classmethod
@@ -96,14 +99,18 @@ class PDFPreSplitter:
         normalized_source = self._normalize_source(source)
         loop = asyncio.get_running_loop()
         try:
+            executor = PDFSplitProcessPool.get()
             try:
                 return await asyncio.wait_for(
-                    loop.run_in_executor(PDFSplitProcessPool.get(), _run_pdf_split, normalized_source),
+                    loop.run_in_executor(executor, _run_pdf_split, normalized_source),
                     timeout=effective_timeout,
                 )
             except BrokenProcessPool:
-                logger.warning("PDFPreSplitter: process pool worker died, restarting pool and retrying once")
-                PDFSplitProcessPool.reset()
+                logger.warning(
+                    "PDFPreSplitter: process pool worker died (likely killed by the OS for memory), "
+                    "restarting pool and retrying once"
+                )
+                PDFSplitProcessPool.reset(executor)
                 return await asyncio.wait_for(
                     loop.run_in_executor(PDFSplitProcessPool.get(), _run_pdf_split, normalized_source),
                     timeout=effective_timeout,
@@ -126,6 +133,7 @@ class PDFPreSplitter:
                     warnings.append(PreSplitWarning(page_number=page_number, reason="empty_text_layer"))
                     logger.warning(f"PDFPreSplitter: page {page_number} has no extractable text layer")
                 page_texts.append(text)
+                page.close()
             logger.info(f"PDFPreSplitter: text extraction complete, {total_pages} pages processed")
         return page_texts, warnings
 
@@ -197,15 +205,27 @@ class PDFPreSplitter:
                 writer.add_page(reader.pages[page_number - 1])
             buffer = BytesIO()
             writer.write(buffer)
-            chunk_size = len(buffer.getvalue())
-            result[date] = buffer.getvalue()
-            logger.debug(f"PDFPreSplitter: chunk {i+1}/{len(date_to_pages)} date={date} written ({chunk_size} bytes)")
+            writer.close()
+            chunk_bytes = buffer.getvalue()
+            buffer.close()
+            result[date] = chunk_bytes
+            logger.debug(
+                f"PDFPreSplitter: chunk {i+1}/{len(date_to_pages)} date={date} written ({len(chunk_bytes)} bytes)"
+            )
         logger.info(f"PDFPreSplitter: all {len(result)} chunks built successfully")
         return result
 
     def _build_preview(self, page_texts: list[str]) -> str:
-        combined = "\n".join(text for text in page_texts if text)
-        return combined[:RAW_TEXT_PREVIEW_CHARS]
+        collected: list[str] = []
+        length = 0
+        for text in page_texts:
+            if not text:
+                continue
+            collected.append(text)
+            length += len(text) + 1
+            if length > RAW_TEXT_PREVIEW_CHARS:
+                break
+        return "\n".join(collected)[:RAW_TEXT_PREVIEW_CHARS]
 
     def _normalize_source(self, source: PDFSource) -> PDFSource:
         if isinstance(source, (str, bytes, bytearray)):
