@@ -188,6 +188,35 @@ class LLMOccurrenceGenerationService:
             names = [str(record.get("component")) for record in bha if isinstance(record, dict) and record.get("component")]
             if names:
                 parts.append("BHA: " + ", ".join(names[:20]))
+        losses = final_json.get("mud_losses")
+        if isinstance(losses, dict):
+            volumes = [
+                f"{label} {losses[key]}m3"
+                for label, key in (("daily", "daily_m3"), ("cumulative", "cumulative_m3"))
+                if losses.get(key) is not None
+            ]
+            if volumes:
+                parts.append("MUD LOSSES: " + ", ".join(volumes))
+        gas = final_json.get("gas_readings")
+        if isinstance(gas, list):
+            readings = []
+            for record in gas:
+                if not isinstance(record, dict) or record.get("max_ppm") is None:
+                    continue
+                depth = f" @ {record['depth_md']}m" if record.get("depth_md") is not None else ""
+                at_time = f" ({record['time']})" if record.get("time") else ""
+                note = f" — {record['comment']}" if record.get("comment") else ""
+                readings.append(f"{record['max_ppm']} ppm{depth}{at_time}{note}")
+            if readings:
+                parts.append("GAS READINGS: " + " | ".join(readings))
+        summary = final_json.get("daily_summary")
+        if summary:
+            parts.append(f"24H SUMMARY: {summary}")
+        remarks = final_json.get("remarks")
+        if isinstance(remarks, list):
+            lines = [str(remark).strip() for remark in remarks if str(remark or "").strip()]
+            if lines:
+                parts.append("REMARKS:\n" + "\n".join(f"- {line}" for line in lines))
         return "\n".join(parts)
 
     def _format_keyword_hints(self) -> str:

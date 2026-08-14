@@ -3,10 +3,38 @@
   "title": "DDRExtraction",
   "type": "object",
   "additionalProperties": false,
-  "required": ["time_logs", "mud_records", "deviation_surveys", "bit_records", "metres_drilled", "hole_condition", "bha_components"],
+  "required": ["time_logs", "mud_records", "deviation_surveys", "bit_records", "metres_drilled", "hole_condition", "bha_components", "remarks", "gas_readings"],
   "properties": {
     "well_name": {"type": ["string", "null"]},
     "surface_location": {"type": ["string", "null"]},
+    "daily_summary": {"type": ["string", "null"]},
+    "operations_at_report_time": {"type": ["string", "null"]},
+    "remarks": {
+      "type": "array",
+      "items": {"type": "string"}
+    },
+    "mud_losses": {
+      "type": ["object", "null"],
+      "additionalProperties": false,
+      "properties": {
+        "daily_m3": {"type": ["number", "null"]},
+        "cumulative_m3": {"type": ["number", "null"]}
+      }
+    },
+    "gas_readings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["max_ppm"],
+        "properties": {
+          "max_ppm": {"type": "number"},
+          "depth_md": {"type": ["number", "null"]},
+          "time": {"type": ["string", "null"]},
+          "comment": {"type": ["string", "null"]}
+        }
+      }
+    },
     "time_logs": {
       "type": "array",
       "items": {

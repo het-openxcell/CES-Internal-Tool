@@ -282,6 +282,18 @@ class DDRExtractionBHAComponent(DDRExtractionSchemaModel):
     length: float | None = None
 
 
+class DDRExtractionMudLosses(DDRExtractionSchemaModel):
+    daily_m3: float | None = None
+    cumulative_m3: float | None = None
+
+
+class DDRExtractionGasReading(DDRExtractionSchemaModel):
+    max_ppm: float
+    depth_md: float | None = None
+    time: str | None = None
+    comment: str | None = None
+
+
 class DDRExtractionPayload(DDRExtractionSchemaModel):
     time_logs: list[DDRExtractionTimeLog]
     mud_records: list[DDRExtractionMudRecord]
@@ -290,5 +302,10 @@ class DDRExtractionPayload(DDRExtractionSchemaModel):
     metres_drilled: list[DDRExtractionMetresDrilled] = pydantic.Field(default_factory=list)
     hole_condition: list[DDRExtractionHoleCondition] = pydantic.Field(default_factory=list)
     bha_components: list[DDRExtractionBHAComponent] = pydantic.Field(default_factory=list)
+    remarks: list[str] = pydantic.Field(default_factory=list)
+    gas_readings: list[DDRExtractionGasReading] = pydantic.Field(default_factory=list)
+    mud_losses: DDRExtractionMudLosses | None = None
+    daily_summary: str | None = None
+    operations_at_report_time: str | None = None
     well_name: str | None = None
     surface_location: str | None = None
